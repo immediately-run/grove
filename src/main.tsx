@@ -1,19 +1,19 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
+// Entry point. immediately.run runs this module (package.json "main") and
+// boot() installs the host runtime providers (module cache, MDX provider,
+// TinkerableContext, router) and renders into #root. Global CSS is imported
+// here so it is present at runtime.
+import './index.css';
+import './GroveApp.css';
+import { boot } from '@immediately-run/sdk/boot';
+import { GROVE_MDX } from './mdxComponents';
+import App from './App';
 
-// Local-dev / production entry point. immediately.run does NOT use this file —
-// it renders the default export of src/App.tsx directly. Keep anything the
-// rendered app needs (global CSS imports, context providers) inside App.tsx,
-// not here, or it will be missing when the app runs on immediately.run.
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
-
-// Dev-only: prove the local `fs` bridge round-trips against your disk. Stripped
-// from production builds; immediately.run never loads this file. Remove freely.
-if (import.meta.env.DEV) {
-  void import('./dev/fsSmokeTest').then((m) => m.runDevFsSmokeTest())
-}
+// A single catch-all route renders the Grove shell for every URL; the shell
+// reads the current path from TinkerableContext and renders the matching entry,
+// so the nav/footer/theme chrome persists across navigation.
+boot({
+  mdxComponents: GROVE_MDX as never,
+  routingSpec: {
+    routes: [{ name: 'grove', pattern: /.*/, reactNode: <App /> }],
+  },
+});

@@ -1,0 +1,26 @@
+---
+title: About this wiki.
+slug: about
+layout: doc
+date: 2026-06-22
+tags: [handbook, ui/nav]
+nav: About
+order: 60
+description: "The colophon: what the tags mean, what components exist, how to extend it."
+---
+
+This is a Grove — a wiki where every entry is one MDX file and the chrome is composed from tagged entries. This page is an ordinary entry, not special chrome.
+
+## Conventions
+
+- `ui/nav` tags become top-nav items, ordered by `order`
+- `ui/sidebar` tags become sidebar panels
+- Person entries carry `role`, `phone`, and `team` — read by the directory view
+
+## Components in use
+
+- `<DocList>` — the index feed and grid
+- `<Backlinks>` — who links here
+- `<Directory>` — the phone book (agent-added view)
+
+<Callout variant="note" title="For the next agent">These conventions also live in `GROVE.md` at the content root, kept in sync by Grove's agent. Read it before changing structure.</Callout>

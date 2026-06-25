@@ -1,0 +1,27 @@
+---
+title: Incident response.
+slug: incident-response
+layout: doc
+date: 2026-06-20
+tags: [process, security]
+description: "The runbook for outages: declare, mitigate, communicate, review."
+---
+
+When production breaks, follow this. It assumes you have read the [security policy](/content/handbook/security.mdx) and can reach the [engineering](/content/teams/engineering.mdx) on-call.
+
+<Callout variant="warning" title="Declare early">A false alarm costs minutes. A late declaration costs the customer. When in doubt, declare.</Callout>
+
+## The four steps
+
+- **Declare** — open an incident channel, page the lead
+- **Mitigate** — stop the bleeding before you find the cause
+- **Communicate** — status page every `15 min`
+- **Review** — a blameless write-up within `48 h`
+
+## Roles
+
+| Role | Who | Reach |
+|---|---|---|
+| Commander | on-call lead | PagerDuty |
+| Comms | duty manager | status page |
+| Scribe | any responder | incident channel |

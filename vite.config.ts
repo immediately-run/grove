@@ -17,4 +17,13 @@ export default defineConfig({
     { enforce: 'pre', ...mdx() },
     react(),
   ],
+  // `fs` is provided by the dev-fs bridge in `vite dev` and by the immediately.run
+  // host at runtime. immediately.run transpiles source directly (it never runs
+  // this dist), so leave `fs` external in the production build rather than trying
+  // to bundle a node builtin for the browser.
+  build: {
+    rollupOptions: {
+      external: ['fs', 'node:fs'],
+    },
+  },
 })
