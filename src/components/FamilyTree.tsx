@@ -3,6 +3,7 @@ import { useCallback, useContext } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { CONTENT_DIR, sandboxPathToKey } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 interface Node {
   id: string;
@@ -32,7 +33,7 @@ export default function FamilyTree() {
     return out.map((o) => [o.key, o.label, o.group].join('\t'));
   }, []);
   const q = useMetadataQuery(queryFn);
-  const rows = (q && 'result' in q ? (q as any).result : []).map((s: string) => {
+  const rows = queryPaths(q).map((s: string) => {
     const [key, label, group] = s.split('\t');
     return { key, label, group };
   });

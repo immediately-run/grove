@@ -2,6 +2,13 @@
 // Fast-Refresh rule). Shared by the reading-view, index, and agent surfaces.
 import { CONTENT_DIR, keyToHref } from './content';
 
+/** Extract the path strings from a `useMetadataQuery` result. The hook returns a
+ *  `{ path, meta }[]` array directly (or `{ error }`), NOT a `{ result }` wrapper —
+ *  centralising the unwrap here keeps every consumer honest. */
+export function queryPaths(q: unknown): string[] {
+  return Array.isArray(q) ? (q as { path: string }[]).map((e) => e.path) : [];
+}
+
 /** Average adult reading speed; `→ N min read` is rounded up, min 1. */
 export function readingTime(body: string): number {
   const words = body.trim().split(/\s+/).filter(Boolean).length;

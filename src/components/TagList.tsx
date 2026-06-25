@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 // `<TagList/>` — every content tag, sorted, as plain chips (the "related tags"
 // strip on a tag page). Reserved `ui/*` chrome tags are excluded.
@@ -17,7 +18,7 @@ export default function TagList() {
     return Array.from(set).sort();
   }, []);
   const q = useMetadataQuery(queryFn);
-  const tags: string[] = q && 'result' in q ? (q as any).result : [];
+  const tags: string[] = queryPaths(q);
 
   if (!tags.length) return null;
   return (

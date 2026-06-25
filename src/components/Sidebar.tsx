@@ -3,6 +3,7 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { CONTENT_DIR, keyToHref, sandboxPathToKey } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
 const SEP = '\t';
@@ -82,7 +83,7 @@ export default function Sidebar() {
     []
   );
   const q = useMetadataQuery(queryFn);
-  const rows: string[] = q && 'result' in q ? (q as any).result : [];
+  const rows: string[] = queryPaths(q);
 
   const rowsKey = rows.join('|');
   const { tree, sections } = useMemo(() => {

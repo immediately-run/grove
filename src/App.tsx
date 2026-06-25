@@ -13,12 +13,13 @@ import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import {
   CONTENT_DIR,
   HOME_KEY,
+  keyToFsPath,
   keyToHref,
   keyToInclude,
   keyToRepoRel,
   sandboxPathToKey,
 } from './lib/content';
-import { crumb, readingTime, stripFrontmatter } from './lib/wiki';
+import { crumb, queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
 import Icon from './components/Icon';
 import Toc from './components/Toc';
 import Backlinks from './components/Backlinks';
@@ -137,7 +138,7 @@ export default function App() {
     []
   );
   const idx = useMetadataQuery(allKeysQuery);
-  const keys: string[] = idx && 'result' in idx ? (idx as any).result : [];
+  const keys: string[] = queryPaths(idx);
   const indexLoaded = keys.length > 0;
   const missing = indexLoaded && !keys.includes(entryKey);
 
@@ -147,7 +148,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMins(0);
     fs.promises
-      .readFile(entryKey, 'utf8')
+      .readFile(keyToFsPath(entryKey), 'utf8')
       .then((b: unknown) => {
         if (active) setMins(readingTime(stripFrontmatter(String(b))));
       })
@@ -166,7 +167,7 @@ export default function App() {
     []
   );
   const navResult = useMetadataQuery(navQuery);
-  const navRows: string[] = navResult && 'result' in navResult ? (navResult as any).result : [];
+  const navRows: string[] = queryPaths(navResult);
   const navItems = navRows.map((r) => {
     const [key, label] = r.split('\t');
     return { key, href: keyToHref(key), label };

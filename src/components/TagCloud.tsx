@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 // Import-free engine component: every tag across the site, sized by frequency.
 // Chrome tags (`ui/*`) are excluded — they drive layout, not classification.
@@ -24,7 +25,7 @@ export default function TagCloud() {
   }, []);
 
   const result = useMetadataQuery(queryFn);
-  const entries: string[] = result && 'result' in result ? (result as any).result : [];
+  const entries: string[] = queryPaths(result);
 
   return (
     <div className="grove-tagcloud">

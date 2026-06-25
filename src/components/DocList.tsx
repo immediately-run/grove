@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR, keyToHref, slugToKey } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -78,11 +79,11 @@ export default function DocList({ shape = 'feed', title, slugs, tag, limit, sort
     [tag, sort]
   );
   const queried = useMetadataQuery(queryFn);
-  const loaded = !!queried && 'result' in queried;
+  const loaded = Array.isArray(queried);
 
-  let paths = slugs
+  let paths: string[] = slugs
     ? slugs.split(',').map((s) => slugToKey(s.trim())).filter(Boolean)
-    : loaded ? (queried as any).result : [];
+    : queryPaths(queried);
   const n = limit ? Number(limit) : undefined;
   if (n && paths.length > n) paths = paths.slice(0, n);
 

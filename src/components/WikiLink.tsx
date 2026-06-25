@@ -3,6 +3,7 @@ import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { APP_PREFIX, CONTENT_DIR, isEntryKey, sandboxPathToKey } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
 interface Props {
@@ -36,7 +37,7 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
     []
   );
   const q = useMetadataQuery(allKeysQuery);
-  const keys: string[] = q && 'result' in q ? (q as any).result : [];
+  const keys: string[] = queryPaths(q);
   const loaded = keys.length > 0;
 
   if (!targetKey) {

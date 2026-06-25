@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR, keyToHref } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 // One dated entry on the axis: mono date · node · card.
 function Row({ path }: { path: string }) {
@@ -38,8 +39,8 @@ export default function Timeline() {
     []
   );
   const q = useMetadataQuery(queryFn);
-  const loaded = !!q && 'result' in q;
-  const paths: string[] = loaded ? (q as any).result : [];
+  const loaded = Array.isArray(q);
+  const paths: string[] = queryPaths(q);
 
   if (loaded && !paths.length) {
     return <p className="grove-search__empty">No dated entries yet.</p>;

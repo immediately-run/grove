@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR, keyToHref } from '../lib/content';
-import { crumb } from '../lib/wiki';
+import { crumb, queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
 const SEP = '\t';
@@ -31,7 +31,7 @@ export default function Search({ onClose }: { onClose: () => void }) {
     []
   );
   const q = useMetadataQuery(queryFn);
-  const rows: string[] = q && 'result' in q ? (q as any).result : [];
+  const rows: string[] = queryPaths(q);
 
   const rowsKey = rows.join('|');
   const { entries, tags } = useMemo(() => {

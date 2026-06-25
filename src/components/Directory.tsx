@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR, keyToHref } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 interface Props {
   team?: string;
@@ -39,7 +40,7 @@ export default function Directory({ team, compact }: Props) {
     [team]
   );
   const result = useMetadataQuery(queryFn);
-  const paths: string[] = result && 'result' in result ? (result as any).result : [];
+  const paths: string[] = queryPaths(result);
 
   return (
     <div className="grove-table-wrap">

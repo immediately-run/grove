@@ -3,8 +3,8 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import fs from 'fs';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, keyToHref, sandboxPathToKey } from '../lib/content';
-import { backlinkSnippet, bodyLinksTo, crumb } from '../lib/wiki';
+import { CONTENT_DIR, keyToFsPath, keyToHref, sandboxPathToKey } from '../lib/content';
+import { backlinkSnippet, bodyLinksTo, crumb, queryPaths } from '../lib/wiki';
 
 interface Hit {
   key: string;
@@ -37,7 +37,7 @@ export default function Backlinks() {
     []
   );
   const q = useMetadataQuery(allKeys);
-  const keys: string[] = q && 'result' in q ? (q as any).result : [];
+  const keys: string[] = queryPaths(q);
   const keysKey = keys.join('|');
 
   const [hits, setHits] = useState<Hit[] | null>(null);
@@ -49,7 +49,7 @@ export default function Backlinks() {
     Promise.all(
       others.map((k) =>
         fs.promises
-          .readFile(k, 'utf8')
+          .readFile(keyToFsPath(k), 'utf8')
           .then((body: unknown) => ({ key: k, body: String(body) }))
           .catch(() => null)
       )

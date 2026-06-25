@@ -3,7 +3,7 @@ import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { CONTENT_DIR, keyToHref, sandboxPathToKey } from '../lib/content';
-import { namespaceOf } from '../lib/wiki';
+import { namespaceOf, queryPaths } from '../lib/wiki';
 
 // `<ChildPages/>` — the entries that live under the current entry's namespace, as
 // a compact nested list (e.g. everything in `handbook/` from the handbook index).
@@ -25,7 +25,7 @@ export default function ChildPages() {
     [currentKey, scope]
   );
   const q = useMetadataQuery(queryFn);
-  const paths: string[] = q && 'result' in q ? (q as any).result : [];
+  const paths: string[] = queryPaths(q);
 
   if (!paths.length) return null;
   return (
