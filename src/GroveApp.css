@@ -1,127 +1,4 @@
-/* ============ prototype chrome (theme-independent) ============ */
-.proto {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-  font-family: "Public Sans", system-ui, sans-serif;
-  background: #06070d;
-  color: #ecebf4;
-  -webkit-font-smoothing: antialiased;
-}
-.rail {
-  flex: 0 0 264px;
-  height: 100%;
-  overflow-y: auto;
-  background: #0c0d15;
-  border-right: 1px solid rgba(180, 170, 225, .14);
-  padding: 0 0 40px;
-}
-.rail__brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 18px 16px;
-  border-bottom: 1px solid rgba(180, 170, 225, .1);
-  position: sticky;
-  top: 0;
-  background: #0c0d15;
-  z-index: 2;
-}
-.rail__brand .wm {
-  font-family: "Gabarito";
-  font-weight: 800;
-  font-size: 19px;
-  letter-spacing: -.03em;
-}
-.rail__brand .sub {
-  font-family: "Space Mono";
-  font-size: 10px;
-  color: #6a677f;
-  margin-top: 2px;
-  letter-spacing: .04em;
-}
-.rail__sec {
-  padding: 16px 18px 6px;
-}
-.rail__sec h4 {
-  font-family: "Space Mono";
-  font-size: 10.5px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: .12em;
-  color: #6a677f;
-  margin: 0 0 10px;
-}
-.seg {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.seg button {
-  font-family: "Public Sans";
-  font-weight: 600;
-  font-size: 12px;
-  color: #9b97b3;
-  background: #13141d;
-  border: 1px solid rgba(180, 170, 225, .14);
-  border-radius: 30px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: .14s;
-  line-height: 1;
-}
-.seg button:hover {
-  color: #ecebf4;
-  border-color: rgba(180, 170, 225, .3);
-}
-.seg button[data-on="1"] {
-  color: #fff;
-  background: linear-gradient(135deg, oklch(0.74 0.17 350), oklch(0.66 0.18 295));
-  border-color: transparent;
-}
-.rail__note {
-  padding: 10px 18px 0;
-  font-family: "Space Mono";
-  font-size: 10.5px;
-  line-height: 1.6;
-  color: #6a677f;
-}
-.rail__note b {
-  color: #c9a8ee;
-  font-weight: 400;
-}
-.stage {
-  flex: 1;
-  height: 100%;
-  overflow: auto;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 30px;
-  background: radial-gradient(60% 50% at 80% -5%, rgba(178, 133, 242, .06), transparent 60%), #06070d;
-}
-.device {
-  position: relative;
-  border-radius: 22px;
-  background: #000;
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .6);
-  overflow: hidden;
-  flex: 0 0 auto;
-  transition: width .25s ease;
-}
-.device[data-vw="desktop"] {
-  width: 1180px;
-  height: 760px;
-  border: 1px solid rgba(180, 170, 225, .16);
-  border-radius: 14px;
-}
-.device[data-vw="mobile"] {
-  width: 392px;
-  height: 760px;
-  border: 9px solid #15161d;
-  border-radius: 40px;
-}
+/* ============ app scroll container ============ */
 .device__scroll {
   position: absolute;
   inset: 0;
@@ -163,10 +40,13 @@
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
   overflow: hidden;
   position: relative;
   background-image: var(--wash);
+  -webkit-font-smoothing: antialiased;
 }
 .grove-root[data-theme="light"] {
   --bg: #f6f4fb;
@@ -372,6 +252,112 @@
 }
 .grove-nav__more {
   position: relative;
+  display: inline-flex;
+}
+
+/* theme switcher popover */
+.gtm__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.grove-theme-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: 236px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 8px;
+}
+.gtm__h,
+.gtm__sub {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--ink-3);
+  padding: 6px 8px 8px;
+}
+.gtm__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gtm__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ink-2);
+  font: 600 13.5px/1 var(--sans);
+  text-align: left;
+  transition: .14s;
+}
+.gtm__row:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+}
+.gtm__row[data-cur="1"] {
+  color: var(--ink);
+}
+.gtm__sw {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.gtm__name {
+  flex: 1;
+}
+.gtm__ck {
+  display: inline-flex;
+  color: var(--accent-pink);
+}
+.gtm__ck svg {
+  width: 15px;
+  height: 15px;
+}
+.gtm__appearance {
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+  padding-top: 4px;
+}
+.gtm__seg {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+.gtm__seg button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font: 600 12.5px/1 var(--sans);
+  transition: .14s;
+}
+.gtm__seg button svg {
+  width: 15px;
+  height: 15px;
+}
+.gtm__seg button[data-on="1"] {
+  color: #fff;
+  background: var(--grad);
+  border-color: transparent;
 }
 .grove-hamburger {
   display: none;
@@ -898,6 +884,60 @@
   position: absolute;
   inset: 0;
   background: radial-gradient(60% 60% at 50% 50%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 70%);
+}
+.grove-img__el {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--panel-2);
+  border-radius: var(--radius-shape);
+  border: 1px solid var(--line);
+}
+
+/* native-MDX additions */
+.grove-lede {
+  font-size: 1.22em;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+.grove-more {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  color: var(--ink-3);
+  margin: 22px 0;
+  letter-spacing: .3em;
+}
+.grove-infobox__body {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.grove-infobox__body ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.grove-infobox__body li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.grove-doclist-wrap {
+  margin: 18px 0;
+}
+a.gdl-row {
+  text-decoration: none;
+  color: inherit;
+}
+/* in-prose links (the routed wiki/markdown links) */
+.grove-prose a {
+  color: var(--accent-pink);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-pink) 40%, transparent);
+  transition: border-color .14s, color .14s;
+}
+.grove-prose a:hover {
+  border-bottom-color: var(--accent-pink);
 }
 .grove-img__cap {
   font-family: var(--mono);
