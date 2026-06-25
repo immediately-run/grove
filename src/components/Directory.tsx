@@ -39,7 +39,7 @@ export default function Directory({ team, compact }: Props) {
     [team]
   );
   const result = useMetadataQuery(queryFn);
-  const paths: string[] = result && 'result' in result ? result.result : [];
+  const paths: string[] = result && 'result' in result ? (result as any).result : [];
 
   return (
     <div className="grove-table-wrap">

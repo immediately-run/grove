@@ -24,7 +24,7 @@ export default function TagCloud() {
   }, []);
 
   const result = useMetadataQuery(queryFn);
-  const entries: string[] = result && 'result' in result ? result.result : [];
+  const entries: string[] = result && 'result' in result ? (result as any).result : [];
 
   return (
     <div className="grove-tagcloud">
