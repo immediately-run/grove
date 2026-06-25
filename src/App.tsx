@@ -85,19 +85,6 @@ function EntryHeader({ entryKey, writable, mins }: { entryKey: string; writable:
   );
 }
 
-// The reading column skeleton (≤150ms budget, zero layout shift).
-function ProseSkeleton() {
-  return (
-    <div className="grove-prose" aria-busy="true">
-      <div className="sk sk-line" style={{ width: '90%' }} />
-      <div className="sk sk-line" style={{ width: '78%' }} />
-      <div className="sk sk-line" style={{ width: '84%' }} />
-      <div className="sk sk-line" style={{ width: '60%' }} />
-      <div className="sk sk-line" style={{ width: '72%' }} />
-    </div>
-  );
-}
-
 export default function App() {
   const ctx = useContext(TinkerableContext) as any;
   const sandboxPath: string = ctx?.navigationState?.sandboxPath || '/';
@@ -304,13 +291,9 @@ export default function App() {
                       <Toc entryKey={entryKey} />
                     </details>
                   ) : null}
-                  {!indexLoaded && !meta ? (
-                    <ProseSkeleton />
-                  ) : (
-                    <div className="grove-prose">
-                      <Include filename={includePath} baseModule={module} />
-                    </div>
-                  )}
+                  <div className="grove-prose">
+                    <Include filename={includePath} baseModule={module} />
+                  </div>
                   {showRails ? <Backlinks /> : null}
                 </div>
                 {showRails && vw === 'desktop' ? <Toc entryKey={entryKey} /> : null}
