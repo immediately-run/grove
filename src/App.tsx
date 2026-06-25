@@ -4,23 +4,12 @@
 // reachable from App.tsx.
 import './index.css';
 import './App.css';
-import Nav from './components/Nav';
-import Hero from './components/Hero';
-import Features from './components/Features';
-import Counter from './components/Counter';
-import Footer from './components/Footer';
+import './GroveApp.css';
+import GroveApp from './components/GroveApp';
 
 function App() {
   return (
-    <>
-      <Nav />
-      <main className="wrap">
-        <Hero />
-        <Features />
-        <Counter />
-        <Footer />
-      </main>
-    </>
+    <GroveApp />
   );
 }
 
