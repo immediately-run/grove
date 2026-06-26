@@ -27,6 +27,14 @@ them, and recommend.**
 - **Privileged actions stay host-mediated.** The agent proposes changes; the actual
   write/diff/contribute is confirmed through the host. Design the *proposal/preview*, and
   assume the final write confirmation may be a host surface (don't fake a host consent).
+- **The agent runs as a host-brokered mini-app, not ambient in Grove.** Because it needs
+  `llm:chat`, the agent runs through the same capability-mini-app path as any interactive
+  artifact (its own appKey, platform consent), mounted as a Grove-branded child surface the
+  host composites into Grove's region — *not* code living in Grove's own tree (`grove.md`
+  "Interactive content"; `grove-interactive-content.md`). For design this changes nothing
+  visually — it is still Grove's own, contract-aware conversation, drawn in the Grove idiom —
+  but the resting/expanded surface may be a **host-composited region**, so keep the chrome
+  self-contained within its own panel and don't assume it can paint over arbitrary Grove UI.
 
 ## Posture & placement — integral, present, never obscuring (iterate here)
 
