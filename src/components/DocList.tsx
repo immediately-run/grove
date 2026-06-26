@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { CONTENT_DIR, keyToHref, slugToKey } from '../lib/content';
+import { queryPaths } from '../lib/wiki';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -12,26 +13,21 @@ interface Props {
   sort?: 'date' | 'title';
 }
 
-function asPaths(q: any): string[] {
-  if (!q) return [];
-  if (Array.isArray(q)) return q;
-  if (q.result && Array.isArray(q.result)) return q.result;
-  return [];
+function tagsOf(meta: any): string[] {
+  return Array.isArray(meta?.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
 }
 
-// A single entry card — reads its own frontmatter so the hook count is stable.
-function Card({ path }: { path: string }) {
+// One entry as a feed row — reads its own frontmatter so the hook count is stable.
+function Row({ path }: { path: string }) {
   const meta = useFileMetadata(path) as any;
-  if (!meta) return null;
-  const href = keyToHref(path);
-  const tags: string[] = Array.isArray(meta.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
+  if (!meta) return <div className="gdl-row"><div className="sk sk-line" style={{ width: '50%' }} /></div>;
   return (
-    <Link href={href} className="gdl-row">
+    <Link href={keyToHref(path)} className="gdl-row">
       <div>
-        <div className="gdl-row__t">{meta.title || path}</div>
+        <div className="gdl-row__t">{(meta.title || path).replace(/\.$/, '')}</div>
         {meta.description && <div className="gdl-row__d">{meta.description}</div>}
         <div className="gdl-row__tags">
-          {tags.slice(0, 3).map((t) => (
+          {tagsOf(meta).slice(0, 3).map((t) => (
             <span key={t} className="grove-tag">#{t}</span>
           ))}
         </div>
@@ -41,38 +37,73 @@ function Card({ path }: { path: string }) {
   );
 }
 
-// Import-free engine component: a frontmatter-driven index of entries.
-export default function DocList({ shape = 'feed', title, slugs, tag }: Props) {
+// One entry as a grid card — link-graph placeholder pic + a footer of meta.
+function CardTile({ path }: { path: string }) {
+  const meta = useFileMetadata(path) as any;
+  if (!meta) return <div className="gdl-card"><div className="gdl-card__pic" /></div>;
+  return (
+    <Link href={keyToHref(path)} className="gdl-card">
+      <div className="gdl-card__pic" />
+      <div className="gdl-card__foot">
+        <div className="gdl-card__t">{(meta.title || path).replace(/\.$/, '')}</div>
+        {meta.description && <div className="gdl-card__d">{meta.description}</div>}
+        <div className="gdl-card__tags">
+          {tagsOf(meta).slice(0, 3).map((t) => (
+            <span key={t} className="grove-tag">#{t}</span>
+          ))}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// Import-free engine component: a frontmatter-driven index of entries, in a feed
+// or grid shape. `slugs` pins an explicit ordered set; otherwise it queries the
+// whole content space (optionally filtered by `tag`), excluding view/index pages.
+export default function DocList({ shape = 'feed', title, slugs, tag, limit, sort = 'date' }: Props) {
   const queryFn = useCallback(
-    (filesMetadata: Record<string, any>) =>
-      Object.keys(filesMetadata).filter((p) => {
-        if (!p.startsWith(CONTENT_DIR) || !p.endsWith('.mdx')) return false;
-        const m = filesMetadata[p] || {};
+    (fm: Record<string, any>) => {
+      const keys = Object.keys(fm).filter((p) => {
+        if (!p.startsWith(CONTENT_DIR) || !/\.mdx?$/.test(p)) return false;
+        const m = fm[p] || {};
         if (m.view) return false;
         if (tag && !(Array.isArray(m.tags) && m.tags.includes(tag))) return false;
         return true;
-      }),
-    [tag]
+      });
+      keys.sort((a, b) => {
+        if (sort === 'title') return (fm[a].title || a) < (fm[b].title || b) ? -1 : 1;
+        return String(fm[b].date || '').localeCompare(String(fm[a].date || ''));
+      });
+      return keys;
+    },
+    [tag, sort]
   );
   const queried = useMetadataQuery(queryFn);
+  const loaded = Array.isArray(queried);
 
-  const paths = slugs
+  let paths: string[] = slugs
     ? slugs.split(',').map((s) => slugToKey(s.trim())).filter(Boolean)
-    : asPaths(queried).sort();
+    : queryPaths(queried);
+  const n = limit ? Number(limit) : undefined;
+  if (n && paths.length > n) paths = paths.slice(0, n);
 
   return (
     <div className="grove-doclist-wrap">
       {title ? (
         <div className="grove-doclist__head">
           <h2>{title}</h2>
-          <span className="n">{paths.length} entries</span>
+          <span className="n">{paths.length} {paths.length === 1 ? 'entry' : 'entries'}</span>
         </div>
       ) : null}
-      <div className="grove-doclist" data-shape={shape}>
-        {paths.map((p) => (
-          <Card key={p} path={p} />
-        ))}
-      </div>
+      {!slugs && loaded && paths.length === 0 ? (
+        <p className="grove-search__empty">No entries yet.</p>
+      ) : (
+        <div className="grove-doclist" data-shape={shape}>
+          {paths.map((p: string) =>
+            shape === 'grid' ? <CardTile key={p} path={p} /> : <Row key={p} path={p} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
