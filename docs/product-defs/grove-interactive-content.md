@@ -143,6 +143,12 @@ and third-party artifacts alike, and it is exactly what `CLAUDE.md` security-mod
 hand-roll tools around the SDK") and `grove.md`'s "embedded agent is composition, not
 reinvention" already ask for.
 
+> **How the agent then *authors* the wiki** — the principal it runs under, the
+> propose-don't-write patch interface, what it observes to close the loop, and how its edits
+> reconcile with a human's — is the subject of the companion
+> [`grove-agent-authoring.md`](./grove-agent-authoring.md) (the Grove-specific application of
+> the platform's `specs/AGENT_AUTHORING_ARCHITECTURE.md` in the docs repo).
+
 ---
 
 ## The viewer experience for a mini-app: preview, then run
