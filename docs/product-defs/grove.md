@@ -39,7 +39,13 @@ and fall back to editing the MDX directly in the **immediately.run main-pane edi
 only when you want fine control — Grove ships **no editor of its own** in v1 (though it's
 architected to allow one as a fork). Its layout is **themeable by editing CSS alone**, and
 it is built so a coding agent can add views its authors never imagined — a timeline, a
-family tree — **without changing how entries are written**. Most foundational of all,
+family tree — **without changing how entries are written**. Because the
+substrate is MDX, an entry can be **interactive content** as readily as prose — a
+converter, a clickable report, a Claude-artifact-style mini-UI — and such artifacts are
+first-class citizens of the wiki: linkable, taggable, indexed, and contract-described, not
+bolted-on widgets (see *Interactive content*, and the companion
+[`grove-interactive-content.md`](./grove-interactive-content.md) for its trust and
+execution model). Most foundational of all,
 every Grove is **self-describing for agents**: it carries a discoverable, partly
 self-generated, validated **contract** of its own conventions and decisions, so a future
 coding-agent session re-derives exactly how *this* wiki works instead of guessing.
@@ -308,6 +314,19 @@ an entry name in a `[[…]]` link is resolved as either **relative** or **absolu
 The resolution rules are part of the engine, defined once in `src/lib/`, so every
 surface (rendered links, `<Backlinks />`, the broken-link audit) agrees.
 
+**The mechanism — a `<WikiLink>` component, resolved on a stable id.** Ordinary Markdown
+links (`[]()`) and a plain `<Link>` are *path-coupled* — they break when a file moves. The
+`[[…]]` form is implemented by a **remark plugin that rewrites `[[Name]]` into a
+`<WikiLink target="…">` component** at parse time, so authors keep the clean double-bracket
+ergonomics and the engine gets a real component that participates in backlinks and
+broken-link flagging. Crucially, `<WikiLink>` resolves on a **stable `slug` (plus
+`aliases`)**, **not** on the prose `title`: the title is display text and is edited often
+(you wordsmith headlines), whereas the slug is decoupled from both the path and the title,
+so a link survives **both** a file rename **and** a retitle. The pipe form
+(`[[slug|custom text]]`) sets only the visible label; the part before the pipe is the
+stable id that resolves. (Resolving on `title` would be rename-safe but retitle-fragile —
+backwards, since titles change far more than paths.)
+
 ### Images & assets — standard Markdown, resolved through the SDK
 
 Authors embed images with ordinary Markdown — `![alt](./images/overlay.png)` — and link
@@ -389,6 +408,59 @@ Design rules for the engine components:
   overriding `<DocsByTag>`) is one localized edit — the extension surface agents use.
 
 ---
+
+## Interactive content — artifacts as first-class citizens
+
+Because every entry is MDX, **content-that-is-code and content-that-is-text are the same
+kind of citizen.** This is Grove's structural edge over Obsidian and Notion, where
+interactivity is bolted on: a Grove entry can *be* an interactive thing — a Celsius/
+Fahrenheit converter, a clickable report over baked-in data, a Claude-artifact-style
+mini-UI — and that **artifact entry** is linkable, backlinkable, taggable, surfaced by the
+same indexes, described by the same agent contract, and importable like any other entry. Its
+edge over a standalone immediately.run app is precisely that it is a **node in the wiki
+graph**, not an app that merely happens to be linked. (Grove owns the *linked, namespaced,
+indexed, agent-legible substrate*; the artifact is content within it — the line that keeps
+Grove from dissolving into "the platform with a wiki shell".)
+
+The full trust and execution model lives in the companion
+[`grove-interactive-content.md`](./grove-interactive-content.md). The load-bearing points:
+
+- **The axis is *what capability the content needs*, never *who is looking.*** The same
+  content renders the same way for an anonymous visitor, a logged-in non-contributor, and a
+  contributor. There is no per-viewer rendering fork — content that looked great to its
+  author and degraded to its audience would not be publishable.
+- **Capability-free content runs inline, live, identically for all.** Prose, engine
+  components, author/forked presentational components, and interactive artifacts that need
+  **no elevated capability** all render inline in Grove's own tree. A Grove-supplied
+  `<Backlinks />` and a forked `<MyCustomBacklinks />` are indistinguishable — engine code
+  holds no privilege a content author's capability-free code lacks. For a large fraction of
+  useful artifacts this is the whole story: no permission, no isolation, no preview.
+- **The invariant that makes that safe: Grove holds no standing elevated authority.** Inline
+  author code inherits Grove's authority, and that authority is only "read the (public) content
+  and render it" — so there is nothing in it worth stealing, even for a viewer carrying an
+  `llm:chat` key. *Every elevated capability lives only inside a transient, separately-keyed
+  mini-app that requested it.* (Honest residual: inline code can still call the browser
+  `fetch` — the baseline risk of any web page; bounded later by a platform network policy.)
+- **Capability-using content runs as a host-brokered mini-app, started explicitly.** Content
+  needing `llm:chat`, `net:fetch`, a writable mount, or a cross-app task runs as a **separate
+  immediately.run app** — its own appKey, sourced from a filesystem Grove exposes — shown as a
+  **preview (with a capability disclosure) until the viewer starts it**, at which point the
+  **host** brokers consent through the **platform's own consent UI**. Outbound/irreversible
+  actions confirm at the call. Same flow for every viewer.
+- **Grove's own agent is itself a mini-app.** Since the agent needs `llm:chat`, the invariant
+  forbids it from being ambient in Grove's tree: it runs through the *same* mini-app path. One
+  mechanism serves the agent and third-party artifacts (and it is exactly what security-model
+  §8 — "don't hand-roll tools around the SDK" — already wants).
+- **The mini-app is a host-owned *sibling*, composited into a Grove-nominated inline region —
+  never a DOM child of Grove.** Making it Grove's DOM child would put Grove in the mini-app's
+  trusted computing base and hand Grove its capabilities. Instead the host keeps the mini-app a
+  direct child of the host window and *paints* it over a rectangle Grove nominates, pinned as
+  Grove scrolls: structurally flat, visually inline. This rests on two proposed platform deltas
+  — **spawn-a-child-app-from-a-parent-exposed-filesystem-with-its-own-appKey** (load-bearing)
+  and **scroll-tracked region composition** (inline-vs-modal) — with a **docked/modal fallback**
+  until the second lands, in the same "ships now, improves when the delta lands" spirit as the
+  editor path. Details, hazards (scroll sync, z-order, theme propagation), and open questions
+  are in the companion doc.
 
 ## Tag-driven UI — the chrome is content (TiddlyWiki-inspired)
 
@@ -503,6 +575,14 @@ What "Grove-optimized" means concretely — and why it isn't a from-scratch agen
   contribute flow), so the embedded agent gains no authority the capability model wouldn't
   otherwise grant. Grove's agent is clearly **its own**, never a visual imitation of the
   host's trusted agent or chrome.
+- **The agent is itself a capability mini-app, not ambient in Grove's tree.** Because the
+  agent needs `llm:chat`, the *Interactive content* invariant (Grove holds no standing
+  elevated authority) forbids it from living in Grove's own render realm — so it runs through
+  the **same host-brokered mini-app path** as any capability-using artifact: its own appKey,
+  `llm:chat` requested via platform consent, isolated from the inline realm. "Embedded" means
+  *mounted as a Grove-branded, Grove-prompted child surface via the platform primitive* — not
+  *ambient in Grove's JavaScript*. One mechanism serves the agent and third-party artifacts
+  alike (see [`grove-interactive-content.md`](./grove-interactive-content.md)).
 - **Coexists with the workbench agent.** The workbench's agent-conversations pane remains a
   valid way to drive Grove (and to do deep, multi-file engine work); Grove offers a
   hand-off to it. The embedded agent is the *default, integrated* surface; the workbench
@@ -804,7 +884,16 @@ Stated plainly so the product isn't mistaken for something it isn't:
   embedded in v1; the two surfaces take opposite stances, see "Authoring".)*
 - **Not a from-scratch agent.** The embedded agent is the platform backend + the
   SDK-scoped method catalog + a Grove prompt/affordance layer — not a new agent engine, and
-  not a hand-rolled tool surface around the SDK.
+  not a hand-rolled tool surface around the SDK. It runs as a host-brokered mini-app, not
+  ambient in Grove's tree (*Interactive content*).
+- **Not a bespoke sandbox, consent UI, or server-driven-UI protocol.** Capability-using
+  content runs as a host-brokered mini-app using the **platform's** app sandbox and consent;
+  Grove does not invent a JSX-as-JSON protocol to render untrusted output in its own tree
+  (it reinvents a UI framework, kills full interactivity, and adds latency for no security
+  gain over a host-owned sibling). See [`grove-interactive-content.md`](./grove-interactive-content.md).
+- **No per-viewer rendering fork.** The same content renders and functions identically for
+  anonymous, logged-in, and contributor viewers; behaviour depends on the content's
+  capability needs, never on who is looking.
 - **Not desktop-only.** Reading, the embedded agent conversation, agent-authoring, and the
   edit affordance are first-class on mobile (value 8).
 
@@ -849,6 +938,11 @@ Stated plainly so the product isn't mistaken for something it isn't:
 12. **Embedded-agent ↔ workbench-agent boundary** — the clean hand-off between Grove's
     embedded conversation and the workbench agent-conversations pane (when each is right;
     shared vs. separate conversation history; avoiding two divergent agents on one wiki).
+13. **Interactive-content mechanics** (own companion, `grove-interactive-content.md`) — the
+    two platform deltas (spawn-a-child-app-from-a-parent-exposed-filesystem; scroll-tracked
+    region composition), the `uses:` capability-declaration shape and preview disclosure,
+    appKey identity / consent persistence, the ambient-`fetch` residual and any platform
+    network policy, and the serializable inputs contract Grove passes a mini-app at spawn.
 
 ## Decisions already made (don't relitigate)
 
@@ -862,7 +956,18 @@ Stated plainly so the product isn't mistaken for something it isn't:
   platform editor (a bundled editor is a permitted future fork). The two surfaces take
   opposite stances on purpose — embed the primary path, delegate the fallback.
 - **`[[double-bracket]]` wiki-links, relative or absolute,** resolved over a hierarchical
-  namespace.
+  namespace — implemented as a remark plugin that rewrites `[[…]]` into a `<WikiLink>`
+  component **resolved on a stable `slug` + `aliases` (never the prose `title`)**, so links
+  survive both a file rename and a retitle. `title` is the display label only.
+- **Interactive content is first-class, on a capability axis.** Content renders by *what
+  capability it needs*, never *who is looking* (no per-viewer fork). Capability-free content
+  (incl. author/forked components and many artifacts) runs **inline, live, identically for
+  all** — safe because **Grove holds no standing elevated authority**. Capability-using
+  content (incl. Grove's own agent) runs as a **host-brokered, separately-keyed mini-app**,
+  shown as a preview until the viewer starts it, consented through **platform** UI. The
+  mini-app is a **host-owned sibling composited into a Grove-nominated inline region — never
+  a DOM child of Grove** — resting on two proposed platform deltas with a docked/modal
+  fallback. Full model in [`grove-interactive-content.md`](./grove-interactive-content.md).
 - **Frontmatter is the only metadata surface.** No separate config/database.
 - **Two component tiers:** a small **import-free** engine set (the shared vocabulary) and
   author **reuse via standard MDX imports** (infoboxes, partials).
