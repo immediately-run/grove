@@ -1,7 +1,28 @@
 # Grove — a minimal, agent-first MDX wiki engine
 
-**Status:** product definition (proposal) · **Updated:** 2026-06-25
+**Status:** product definition (proposal) · **Updated:** 2026-06-27
 **Author:** drafted for peter@peterneumark.com
+
+> *(Reconciliation, 2026-06-27 — the platform source of truth is the immediately-run docs repo's
+> `specs/AGENT_AUTHORING_ARCHITECTURE.md`, which **supersedes** several mechanisms still described
+> in this doc's deeper sections. Read those sections through these corrections:*
+> - ***The authoring agent is the platform *workbench* agent, not a Grove-hosted `llm:chat`
+>   mini-app.** It runs in the workbench main pane under the editing-session principal and writes
+>   Grove's filesystem directly; **Grove holds no agent and no `llm:chat`** and is a read-only
+>   renderer. Sections describing "Grove's own agent is a mini-app" / "Grove ships its own embedded
+>   coding-agent from v1" are retired in favour of the unmodified workbench agent (the doc's own
+>   intro, line ~12, already says "instruct a coding agent in the immediately.run workbench").*
+> - ***Mini-apps are full-stage-region overlays, not scroll-tracked inline rectangles.** The
+>   "host-owned sibling composited into a Grove-nominated inline region" + "scroll-tracked region
+>   composition" delta is dropped (clickjacking/occlusion surface); capability-using surfaces are
+>   full-region overlays with host chrome.*
+> - ***The absolute "every elevated capability lives only in a mini-app" is refined to a tier:**
+>   high-stakes caps only; a low-stakes `rw` mount may stand (a direct-manipulation app).*
+> - ***"Mini-app" is a UX/role word, not a security class.** Stage app and mini-apps are all
+>   **entry points of one repo** (`appKey = (provider, namespace, repository, entryPoint)`), each
+>   with isolated grants; the stage app is just the default entry point.*
+> - *Conflict/undo specifics live in the companion `grove-agent-authoring.md`: undo is
+>   per-working-tree-timeline (not per-author); field-merge is deferred V2.)*
 
 > **Grove** is a wiki / knowledge-garden engine for
 > [immediately.run](https://immediately.run): every entry is a single MDX file, entries

@@ -137,18 +137,21 @@ collision) — not real-time multi-cursor. Agent patches, a human editing in the
 and a remote collaborator all become writes to the content mount, surfaced to everyone by
 `onFsChange`.
 
+> *(Superseded 2026-06-27 by `AGENT_AUTHORING_ARCHITECTURE.md` §7.2 — the bullets below describe
+> field-merge + chained resolvers + per-author undo, all of which are **retired for V1**. V1
+> conflict is **file-level**, two existing mechanisms: `buffer.ts` block-on-dirty (open text) +
+> `RemoteOverwriteEmitter` (closed-file/delete/binary). **Field-aware merge** (frontmatter per-key,
+> body 3-way) and **app/contract-aware chained resolvers** move to the **deferred V2 CRDT track**.
+> **Undo is per-working-tree-timeline, not per-author** — `FILESYSTEM_SPEC §5` tracks no authorship
+> provenance, so "undo yours not a collaborator's" is unbuildable. Keep only: file-per-entry
+> partitions most conflict away; the durable terminal is GitHub branch/PR (git) or detect-after-
+> clobber (non-git); semantic staleness is caught at human review of the `contribute`/publish diff.)*
+
 - **File-per-entry partitions most conflict away.** Two writers on *different* entries never
   conflict. The domain shrinks to the same entry, concurrently.
-- **Within an entry, merge by field.** Frontmatter is a typed map (per-key merge — disjoint keys
-  auto-merge); the body is text (3-way). A human retitling while the agent retags the same entry
-  is disjoint and merges cleanly; only a true same-field overlap blocks.
-- **Chained resolvers, most-specific to most-general:** Grove's contract-aware resolver
-  (taxonomy, link integrity) → MDX/Markdown structural merge → generic text → terminal. The
-  terminal is **GitHub branch/PR** when content is a git repo, or last-write / a *user-initiated*
-  agent-diff for a non-git space.
-- **Backstops:** semantic staleness (a patch correct as bytes but wrong because the entry's
-  meaning changed under it) is caught by **human review at `contribute`**; **undo is
-  per-author-scoped** (your edits and your agent's, not a collaborator's).
+- ~~**Within an entry, merge by field** … **Chained resolvers** … **undo is per-author-scoped**~~ →
+  **V1 is file-level** (`buffer.ts` open-text + `RemoteOverwriteEmitter`); field-merge/resolvers are
+  deferred V2; undo is per-working-tree-timeline (see the superseding note above).
 
 ---
 
