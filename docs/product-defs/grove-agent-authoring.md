@@ -157,11 +157,20 @@ and a remote collaborator all become writes to the content mount, surfaced to ev
 `GroveAgent.tsx` today runs `chat()` **text-only, ambient in Grove's tree**, and hands writes off
 to the platform editor via `requestEdit`. The target architecture:
 
-1. **Externalize the agent** into a mini-app under the self-authoring principal (own appKey);
-   keep the in-DOM "Ask Grove…" line as a grant-less IPC forwarder.
-2. **Replace the text-only loop with the patch interface** — the agent proposes `patch`/`putAsset`;
-   Grove validates against the contract and applies.
-3. **Apply through a conflict chain** with Grove's contract-aware resolver on top of MDX/text merge.
+> *(Corrected 2026-06-27 per `AGENT_AUTHORING_ARCHITECTURE.md` §3/§7 — steps 1–3 below are
+> superseded. The agent is the platform **workbench agent** (editing-session principal), not a
+> Grove self-authoring mini-app; it **writes Grove's filesystem directly**, so there is no patch
+> interface and no Grove-run conflict chain. Grove becomes a read-only renderer; its contract
+> surfaces as `diagnostics:read` + a Layer-3 drift flag (feedback), and conflict is file-level
+> (`buffer.ts` block-on-dirty + a universal CAS token) reconciled at the gate, not inside Grove.)*
+
+1. ~~**Externalize the agent** into a mini-app under the self-authoring principal~~ → **use the
+   platform workbench agent** (own appKey, editing-session principal). Keep the in-DOM "Ask
+   Grove…" line as a grant-less forwarder of the prompt to the workbench agent.
+2. ~~**Replace the text-only loop with the patch interface**~~ → the workbench agent **writes
+   Grove's filesystem directly**; Grove does not validate/apply patches.
+3. ~~**Apply through a conflict chain** inside Grove~~ → conflict is **file-level at the working
+   tree / the gate** (not a Grove-run resolver chain in V1).
 4. **Wire observation** — `diagnostics:read` (+ optional `render:read`), context re-derived from
    the manifest/`GROVE.md`/entries plus IPC nav deltas.
 5. **Consider the FS-1/FS-2 split** — content in a separate mount by default (no standing write
