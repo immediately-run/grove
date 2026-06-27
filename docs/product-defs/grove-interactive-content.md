@@ -1,11 +1,27 @@
 # Grove — interactive content, capability isolation, and the mini-app model
 
-**Status:** product definition (proposal) · **Updated:** 2026-06-26
+**Status:** product definition (proposal) · **Updated:** 2026-06-27
 **Author:** drafted for peter@peterneumark.com
 **Companion to:** [`grove.md`](./grove.md) — read that first. This document expands one
 claim made there (Grove treats interactive content as a first-class citizen) into its
 trust model and its execution architecture. It is not yet a spec; when Grove is specced,
 this becomes `GROVE_INTERACTIVE_CONTENT_SPEC.md`.
+
+> *(Reconciliation, 2026-06-27 — the immediately-run docs repo's
+> `specs/AGENT_AUTHORING_ARCHITECTURE.md` is the platform source of truth and **supersedes**
+> three claims below. Read it where they touch.* (1) **The absolute invariant is refined to a
+> tier.** "Every elevated capability lives **only** in a mini-app" holds for **high-stakes**
+> capabilities (`llm:chat`, `net:fetch`, secrets, writable foreign mounts) but not for a
+> **low-stakes `rw` mount grant** (a scoped, revocable mount — how a direct-manipulation app
+> writes its own content); see that note's *Capability tiers*. (2) **Grove's authoring agent is
+> the platform workbench agent, not a Grove mini-app.** It runs in the workbench main pane under
+> the editing-session principal and writes Grove's filesystem directly; Grove is a read-only
+> renderer. The "Grove's own agent is a mini-app too" unification below is retired. (3)
+> **Mini-apps overlay the stage's full UI region with host chrome — not an inline,
+> scroll-tracked, Grove-nominated rectangle.** The "host-owned sibling composited into a
+> Grove-nominated region" architecture below (and its scroll/z-order/occlusion hazards) is
+> dropped in favour of a full-region overlay. The capability-free-inline vs. capability-using-
+> mini-app **axis still stands**; only the mini-app's composition and the agent's home change.)*
 
 > **Reads first** (immediately-run docs repo): `docs/specs/UI_AS_APPS_SPEC.md` §3 (slots/
 > regions), §8 (capabilities), `docs/context/core_concepts.md` §1/§4/§5/§7/§8 (principals,
@@ -118,6 +134,12 @@ the declaration. It is to ensure there is **nothing worth calling**:
 > **Grove keeps its own render realm free of standing elevated capabilities. Every elevated
 > capability lives only inside a transient, separately-keyed mini-app that requested it.**
 
+*(Refined 2026-06-27 by `AGENT_AUTHORING_ARCHITECTURE.md` Capability tiers: the absolute form
+holds for **high-stakes** capabilities. A **low-stakes `rw` mount grant** — scoped, revocable,
+collaborator-gated — is permitted standing in a direct-manipulation app that writes its own
+content (e.g. whiteboard/Lodestar's board mount). Grove itself stays read-only in the default
+model; its authoring writes come from the workbench, not from Grove.)*
+
 Grove's *standing* authority is just "read the content mount and render it." The content is
 the wiki itself — public (or already shared with this viewer). So inline author code, honest
 or not, inherits an authority that contains **nothing it could steal**: it can read public
@@ -133,6 +155,14 @@ wiki to grant it network — is class 2 and goes through a mini-app; the residua
 ambient browser primitive.)
 
 ### The unification: Grove's own agent is a mini-app too
+
+> *(Retired 2026-06-27 — superseded by `AGENT_AUTHORING_ARCHITECTURE.md` §3. Grove's authoring
+> agent is **not** a Grove mini-app: it is the platform **workbench agent** (the agent
+> conversation main-pane app), running under the editing-session principal and writing Grove's
+> filesystem directly, used as-is with no Grove-side customization. Grove holds no `chat()` and no
+> agent. The reasoning below — that an `llm:chat` agent can't be ambient in Grove's tree — remains
+> correct; its conclusion changes from "so it's a Grove mini-app" to "so it's the workbench agent
+> Grove never hosts.")*
 
 The invariant applies to Grove's *own* embedded agent, which needs `llm:chat`. Therefore the
 agent **cannot be ambient in Grove's render tree** either: it runs through the *same*
@@ -179,6 +209,15 @@ disclosure. Acceptable.
 ---
 
 ## The architecture: a host-owned sibling, composited into a Grove-nominated region
+
+> *(Superseded 2026-06-27 by `AGENT_AUTHORING_ARCHITECTURE.md` §5. The **host-owned, not
+> Grove-owned** principle below is kept in full — the mini-app is a host sibling, never a DOM
+> child of Grove, and Grove is never in its TCB. What changes is **placement**: a mini-app
+> overlays the stage's **full UI region** (the whole screen in present mode, the main pane in edit
+> mode) with host chrome and an un-occludable host trust indicator — **not** an inline,
+> scroll-tracked sub-rectangle Grove nominates and pins as it scrolls. This drops "Delta 2 /
+> region composition" and its scroll-sync, z-order/occlusion, and clickjacking hazards (review
+> finding H3) entirely; "Delta 1 / spawn-and-broker" survives as the mini-app launch primitive.)*
 
 The dangerous-but-tempting implementation is to make the mini-app a **DOM child of Grove**
 — Grove creates an `<iframe>` in its own document and points it at the mini-app. **We refuse

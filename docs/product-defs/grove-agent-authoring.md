@@ -1,12 +1,24 @@
 # Grove — the agent authoring loop
 
-**Status:** product definition (proposal) · **Updated:** 2026-06-26
+**Status:** product definition (proposal) · **Updated:** 2026-06-27
 **Author:** drafted for peter@peterneumark.com
 **Companion to:** [`grove.md`](./grove.md) and
 [`grove-interactive-content.md`](./grove-interactive-content.md) — read those first.
 **Platform source of truth:** the immediately-run **docs** repo,
 `specs/AGENT_AUTHORING_ARCHITECTURE.md` (the cross-app architecture; this doc is the
 Grove-specific application of it).
+
+> *(Reconciliation, 2026-06-27 — the platform note `specs/AGENT_AUTHORING_ARCHITECTURE.md` was
+> rewritten and now **supersedes** this document's two central mechanisms; this doc will be
+> reworked to match. The deltas: (1) **No "self-authoring agent principal" and no Grove-hosted
+> agent mini-app.** The agent is the platform **workbench agent** (agent conversation main pane),
+> under the existing **editing-session principal**, used as-is. (2) **No semantic-patch interface
+> — the agent writes Grove's filesystem directly**, exactly as the editor does; Grove is a
+> read-only renderer that re-reads on `onFsChange`. Grove no longer validates/applies patches;
+> contract validation surfaces as `diagnostics:read` + a Layer-3 drift flag, not a write gate.
+> (3) **Stage context is FS-carried** (a session-scratch mount the agent reads), not an IPC edge.
+> The "Ask Grove…" line, the conflict model, and the FS-1/FS-2 split below remain directionally
+> correct; the agent's home, principal, and write path change.)*
 
 ---
 
@@ -26,6 +38,16 @@ validates them, merges them against concurrent edits, and writes.
 ---
 
 ## The self-authoring agent principal
+
+> *(Superseded 2026-06-27 by `AGENT_AUTHORING_ARCHITECTURE.md` §3. There is **no** dedicated
+> "self-authoring agent principal" — that fourth principal is retired (review finding M1). The
+> agent is the workbench agent under the **editing-session principal**, which already holds the
+> working-tree write the loop needs. The observation surfaces named below (`diagnostics:read`,
+> `render:read`) survive as the workbench agent's **subject-scoped** observation of the running
+> Grove (paired at spawn); `chat()` is treated as **egress** and the autonomous loop gates on
+> TS-5b. The own-appKey isolation point is replaced by §5.1: the workbench agent and Grove are
+> already distinct apps, and mini-app grant isolation is handled by folding entry-point into
+> appKey.)*
 
 The agent mini-app runs under a tight principal whose ceiling is exactly:
 
@@ -50,6 +72,16 @@ forwarder, so a re-render of the wiki never loses the conversation.
 ---
 
 ## The interface: semantic patches, not file writes
+
+> *(Superseded 2026-06-27 by `AGENT_AUTHORING_ARCHITECTURE.md` §3/§7. The semantic-patch interface
+> is **dropped**: the workbench agent writes Grove's filesystem directly (an ordinary
+> editing-session write), and Grove does not validate/apply patches. The motivation below — the
+> agent needs no write authority because Grove is the gatekeeper — is replaced by: the agent has
+> the workbench's existing tree-write authority, and the security backstop is the **gate** (commit
+> for git, CAS-checked publish for a non-git space), not a Grove validator. Grove's contract
+> (taxonomy, link integrity, frontmatter schema) becomes **feedback** via `diagnostics:read` + a
+> Layer-3 drift flag, not a pre-write reject. Conflict is file-level (`buffer.ts` block-on-dirty +
+> a universal CAS token), not a Grove-run conflict chain.)*
 
 The agent speaks Grove's schema over the IPC edge, in two verbs:
 
