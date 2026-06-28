@@ -78,10 +78,12 @@ forwarder, so a re-render of the wiki never loses the conversation.
 > editing-session write), and Grove does not validate/apply patches. The motivation below — the
 > agent needs no write authority because Grove is the gatekeeper — is replaced by: the agent has
 > the workbench's existing tree-write authority, and the security backstop is the **gate** (commit
-> for git, CAS-checked publish for a non-git space), not a Grove validator. Grove's contract
-> (taxonomy, link integrity, frontmatter schema) becomes **feedback** via `diagnostics:read` + a
-> Layer-3 drift flag, not a pre-write reject. Conflict is file-level (`buffer.ts` block-on-dirty +
-> a universal CAS token), not a Grove-run conflict chain.)*
+> for git; for a non-git space, a local pre-publish diff review + LWW publish with
+> **detect-after-clobber** via `RemoteOverwriteEmitter` — **not** a preventing CAS, FirestoreFS has
+> no etag), not a Grove validator. Grove's contract (taxonomy, link integrity, frontmatter schema)
+> becomes **feedback** via `diagnostics:read` + a Layer-3 drift flag, not a pre-write reject.
+> Conflict is file-level (`buffer.ts` block-on-dirty + a **content-comparison token** — git blob
+> SHA / Firestore `!sameData`), not a Grove-run conflict chain.)*
 
 The agent speaks Grove's schema over the IPC edge, in two verbs:
 
@@ -165,7 +167,8 @@ to the platform editor via `requestEdit`. The target architecture:
 > Grove self-authoring mini-app; it **writes Grove's filesystem directly**, so there is no patch
 > interface and no Grove-run conflict chain. Grove becomes a read-only renderer; its contract
 > surfaces as `diagnostics:read` + a Layer-3 drift flag (feedback), and conflict is file-level
-> (`buffer.ts` block-on-dirty + a universal CAS token) reconciled at the gate, not inside Grove.)*
+> (`buffer.ts` block-on-dirty + a **content-comparison token**, detect-after-clobber on non-git via
+> `RemoteOverwriteEmitter` — not a preventing CAS) reconciled at the gate, not inside Grove.)*
 
 1. ~~**Externalize the agent** into a mini-app under the self-authoring principal~~ → **use the
    platform workbench agent** (own appKey, editing-session principal). Keep the in-DOM "Ask
