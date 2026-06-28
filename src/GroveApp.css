@@ -780,6 +780,79 @@
   color: var(--accent-3);
 }
 
+/* pull-quote */
+.grove-quote {
+  position: relative;
+  margin: 22px 0;
+  padding: 22px 24px 20px 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.grove-quote::before {                 /* gradient accent spine */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--grad);
+}
+.grove-quote__body {
+  font-family: var(--disp);
+  font-weight: 500;
+  font-size: 1.18rem;
+  line-height: 1.5;
+  color: var(--ink);
+  font-style: normal;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.grove-quote__body::before {           /* large gradient opening quote mark */
+  content: "\201C";
+  font-family: var(--disp);
+  font-weight: 900;
+  font-size: 3.2rem;
+  line-height: 0.1;
+  margin-right: 0.06em;
+  vertical-align: -0.42em;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.grove-quote__cap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+.grove-quote__cite {
+  color: var(--ink-2);
+}
+.grove-quote__cite::before {
+  content: "— ";
+  color: var(--ink-3);
+}
+.grove-quote__src {
+  color: var(--accent);
+  white-space: nowrap;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: 0.12s;
+}
+.grove-quote__src:hover {
+  border-bottom-color: var(--accent);
+}
+.grove-quote__cap .grove-wikilink {    /* keep broken/self fallback on-scale */
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
 /* code block */
 .grove-codeblock {
   background: var(--panel);

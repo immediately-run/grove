@@ -51,6 +51,19 @@ forwarder, so a re-render of the wiki never loses the conversation.
 
 ## The interface: semantic patches, not file writes
 
+> *(Superseded 2026-06-27 by `AGENT_AUTHORING_ARCHITECTURE.md` §3/§7. The semantic-patch interface
+> is **dropped**: the workbench agent writes Grove's filesystem directly (an ordinary
+> editing-session write), and Grove does not validate/apply patches. The motivation below — the
+> agent needs no write authority because Grove is the gatekeeper — is replaced by: the agent has
+> the workbench's existing tree-write authority, and the security backstop is the **gate** (commit
+> for git; for a non-git space, a local pre-publish diff review + LWW publish with
+> **detect-after-clobber** via `RemoteOverwriteEmitter` — **not** a preventing CAS, FirestoreFS has
+> no etag), not a Grove validator. Grove's contract (taxonomy, link integrity, frontmatter schema)
+> becomes **feedback** via `diagnostics:read` + a Layer-3 drift flag, not a pre-write reject.
+> Conflict is file-level (`buffer.ts` block-on-dirty + a **content-comparison token** — git blob
+> SHA / Firestore `!sameData`), not a Grove-run conflict chain.)*
+
+>>>>>>> 7ad89b3 (docs(agent-authoring): fix stale CAS terminology in reconciliation notes (D2))
 The agent speaks Grove's schema over the IPC edge, in two verbs:
 
 - `patch(target, fieldOps)` for a **wiki entry** (an `.mdx` file: typed frontmatter + MDX body).
@@ -125,11 +138,21 @@ and a remote collaborator all become writes to the content mount, surfaced to ev
 `GroveAgent.tsx` today runs `chat()` **text-only, ambient in Grove's tree**, and hands writes off
 to the platform editor via `requestEdit`. The target architecture:
 
-1. **Externalize the agent** into a mini-app under the self-authoring principal (own appKey);
-   keep the in-DOM "Ask Grove…" line as a grant-less IPC forwarder.
-2. **Replace the text-only loop with the patch interface** — the agent proposes `patch`/`putAsset`;
-   Grove validates against the contract and applies.
-3. **Apply through a conflict chain** with Grove's contract-aware resolver on top of MDX/text merge.
+> *(Corrected 2026-06-27 per `AGENT_AUTHORING_ARCHITECTURE.md` §3/§7 — steps 1–3 below are
+> superseded. The agent is the platform **workbench agent** (editing-session principal), not a
+> Grove self-authoring mini-app; it **writes Grove's filesystem directly**, so there is no patch
+> interface and no Grove-run conflict chain. Grove becomes a read-only renderer; its contract
+> surfaces as `diagnostics:read` + a Layer-3 drift flag (feedback), and conflict is file-level
+> (`buffer.ts` block-on-dirty + a **content-comparison token**, detect-after-clobber on non-git via
+> `RemoteOverwriteEmitter` — not a preventing CAS) reconciled at the gate, not inside Grove.)*
+
+1. ~~**Externalize the agent** into a mini-app under the self-authoring principal~~ → **use the
+   platform workbench agent** (own appKey, editing-session principal). Keep the in-DOM "Ask
+   Grove…" line as a grant-less forwarder of the prompt to the workbench agent.
+2. ~~**Replace the text-only loop with the patch interface**~~ → the workbench agent **writes
+   Grove's filesystem directly**; Grove does not validate/apply patches.
+3. ~~**Apply through a conflict chain** inside Grove~~ → conflict is **file-level at the working
+   tree / the gate** (not a Grove-run resolver chain in V1).
 4. **Wire observation** — `diagnostics:read` (+ optional `render:read`), context re-derived from
    the manifest/`GROVE.md`/entries plus IPC nav deltas.
 5. **Consider the FS-1/FS-2 split** — content in a separate mount by default (no standing write

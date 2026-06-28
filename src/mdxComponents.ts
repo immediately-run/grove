@@ -9,6 +9,7 @@ import TagCloud from './components/TagCloud';
 import TagList from './components/TagList';
 import Directory from './components/Directory';
 import WikiLink from './components/WikiLink';
+import Quote from './components/Quote';
 import Toc from './components/Toc';
 import Backlinks from './components/Backlinks';
 import PageMeta from './components/PageMeta';
@@ -34,6 +35,7 @@ export const GROVE_MDX = {
   TagCloud,
   TagList,
   Directory,
+  Quote,
   Toc,
   Backlinks,
   PageMeta,
