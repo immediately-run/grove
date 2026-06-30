@@ -11,8 +11,9 @@ worked example you can copy.
   into any `.mdx` entry.
 - **[building-with-the-in-browser-agent.md](./building-with-the-in-browser-agent.md)**
   — do the same work by *driving the platform's in-browser coding agent* (the
-  "Agents" main-pane), including bringing your own OpenRouter key and selecting a
-  model. Covers the setup that works today and the rough edges to expect.
+  "Agents" main-pane): it authors Grove's working tree through the host-mediated
+  `llm.chat` service (no per-app key). Covers the setup that works today, how to
+  verify it, and the rough edges to expect.
 
 > The platform-wide tutorials (browser debugging, local dev, changing a UI
 > component, the MCP bridge) live in the **docs repo** under `docs/tutorials/`.
