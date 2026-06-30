@@ -1,15 +1,21 @@
 # Building a Grove component with the in-browser coding agent
 
 Grove's content is meant to be changed *by asking an agent*. The platform also
-ships a general **in-browser coding agent** (the "Agents" activity) that can read,
-search, and **edit the running app's files** with a real tool-calling loop — the
-same `<Quote>` component from
+ships a general **in-browser coding agent** (the "Agents" activity) that reads,
+searches, and **edits the running app's files** with a real tool-calling loop —
+the same `<Quote>` component from
 [creating-a-component.md](./creating-a-component.md), built by talking instead of
 typing.
 
 This guide is two things at once: the **steps that work today**, and an honest
-log of **what's still missing** (this doc was produced by actually driving the
-agent end-to-end with GLM 5.2 over OpenRouter and writing down where it broke).
+log of **what's still rough** (it was produced by actually driving the agent
+end-to-end against Grove with GLM 5.2 over OpenRouter and writing down where it
+broke).
+
+> **Status, 2026-06-30.** This flow now works end-to-end: the agent reads and
+> writes **Grove's** working tree and Grove re-renders. That last sentence used to
+> be false — the agent was mounted on *its own* repo and every Grove path read
+> `not found`. That was the AA-23 gap, now fixed (site-main #208 + agent-demo #11).
 
 ## How the agent is wired
 
@@ -17,13 +23,21 @@ agent end-to-end with GLM 5.2 over OpenRouter and writing down where it broke).
   registry to two regions: **`panel.agent`** (the conversation list, left) and
   **`stage.conversation`** (the main pane — where you type and the agent runs).
   Open it with the **"Agents"** button in the left activity rail (edit mode).
-- In `stage.conversation` the agent is granted a **read-write, copy-on-write
-  mount of the app's working tree**, plus filesystem tools (`read_file`,
-  `write_file`, `list_dir`, `glob`, `grep`, `stat`, `delete_file`) merged with the
-  app's capability catalog ("24 tools (catalog + files)" in the header).
-- It is **bring-your-own-key**: it calls the model provider directly via
-  `net:fetch`, with the host **injecting** your stored key per request — the app
-  never sees the secret value. The default provider is **OpenRouter**.
+- **It authors the *stage app's* working tree, not its own (AA-23).** While Grove
+  is the loaded app, the host confers Grove's working tree to the agent as a
+  scoped, read-write `worktree` mount — the **editor's cross-repo grant kind**, not
+  "self-access." The agent's filesystem tools (`read_file`, `write_file`,
+  `list_dir`, `glob`, `grep`, `stat`, `delete_file`) are chrooted to **that** tree,
+  merged with the app's capability catalog (the header shows "22 tools (catalog +
+  files)"). Switch which app is loaded and the prior port is torn down and a new
+  one minted.
+- **Inference goes through the platform `llm.chat` service, not a per-app key.**
+  The agent calls the host-mediated `chat()` and needs only the **`llm:chat`**
+  capability — *no* `net:fetch`, no bring-your-own-key powerbox. The app names no
+  vendor and no model; the **host** resolves your provider/model preference and
+  injects the key per request, so the app never sees the secret. (This replaced the
+  old BYOK/`net:fetch` design — if you find docs mentioning an "Add OpenRouter key"
+  button or `modelClient.ts`, they're historical.)
 
 ## The happy path (what works)
 
@@ -31,8 +45,8 @@ agent end-to-end with GLM 5.2 over OpenRouter and writing down where it broke).
 
 `immediately.run dev` (local provider) is **read-only by construction**, so the
 agent can't persist edits to a locally-served tree. Load Grove **from GitHub**
-instead — that gives the agent a writable copy-on-write mount, and you persist
-with the normal Contribute / PR flow:
+instead — that gives a writable copy-on-write mount, and you persist with the
+normal Contribute / PR flow:
 
 ```
 https://local.immediately.run/edit/github/immediately-run/grove/main/
@@ -41,87 +55,106 @@ https://local.immediately.run/edit/github/immediately-run/grove/main/
 (Use `local.immediately.run` for the local host, or `immediately.run` for prod —
 never `localhost`; config is keyed by hostname.)
 
-### 2. Open the agent and connect your key
+### 2. Set the provider and model (one-time)
 
-1. Click **Agents** in the left rail. The main pane becomes the conversation.
-2. Click **"Add OpenRouter key"**. The host draws a **"Share a secret with this
-   app"** powerbox; pick your stored **OpenRouter** key. This mints the per-app
-   use-grant — the app receives only a handle, never the value.
-   - No OpenRouter key stored yet? The powerbox offers to add one: origin
-     `https://openrouter.ai`, type **bearer-token**. You enter the key in the
-     *host* dialog (sealed with your passkey) — never in the app.
+There is **no Settings UI yet** (see the gaps below), so the provider/model
+preference is set with a dev hook. In the host's top-frame console:
 
-### 3. Ask for the component
+```js
+await window.__irLlmPref.set({ providerId: 'llm.chat.openrouter', model: 'z-ai/glm-5.2' })
+// read it back: await window.__irLlmPref.get()
+```
 
-Type a self-contained prompt and **Run**. Give it the conventions up front so it
-doesn't have to guess — point it at the same rules humans follow:
+This writes `/etc/config/llm-provider.json` in the host's ZenFS. The OpenRouter
+key itself is stored once, host-side, sealed with your passkey — the app never
+sees it. GLM 5.2's OpenRouter slug is `z-ai/glm-5.2`.
 
-> Create a new MDX component `<Quote>` … First read `CLAUDE.md`,
-> `src/mdxComponents.ts`, and the existing `Callout.tsx` / `WikiLink.tsx` /
-> `index.css` to match conventions. Then create `src/components/Quote.tsx`
-> (default export, **only** the component), add `.grove-quote` styles to
-> `GroveApp.css` using the design tokens, register it in `GROVE_MDX`, and add a
-> demo `<Quote>` to `content/home.mdx`. Reuse `<WikiLink>` for the source link.
+### 3. Open the agent and ask for the component
 
-The agent reads the files with its tools, writes the new files into the CoW
-mount, and the preview hot-reloads. Review the diff, then **Contribute** to open a
-PR. (See [creating-a-component.md](./creating-a-component.md) for the five edits
-the agent should end up making — that's your review checklist.)
+1. Click **Agents** in the left rail. The main pane becomes the conversation; the
+   header should read "… tools (catalog + files)".
+2. Type a self-contained prompt and **Run**. Give it the conventions up front so
+   it doesn't have to guess — point it at the same rules humans follow:
 
-## What's missing today (findings)
+   > Create a new MDX component `<Quote>` … First read `CLAUDE.md`,
+   > `src/mdxComponents.ts`, and the existing `Callout.tsx` / `WikiLink.tsx` /
+   > `index.css` to match conventions. Then create `src/components/Quote.tsx`
+   > (default export, **only** the component), add `.grove-quote` styles using the
+   > design tokens, register it in the MDX component map, and add a demo `<Quote>`
+   > to `content/home.mdx`. Reuse `<WikiLink>` for the source link.
 
-Driving this flow with **GLM 5.2 over OpenRouter** surfaced real gaps. Until they
-land, prefer the manual flow in
-[creating-a-component.md](./creating-a-component.md), or use the stock agent on
-its default model.
+3. **Approve the passkey prompt.** The first `chat()` of a session raises a native
+   WebAuthn / Touch-ID dialog to unseal the model key. A human has to tap it once;
+   it can't be automated (see the gaps). After that the loop runs unattended.
 
-1. **You can't pick the model in the UI.** The model is hard-coded in
-   `agent-demo/src/lib/modelClient.ts` (`PROVIDERS.openrouter.model`, default
-   `openai/gpt-4o-mini`); `createModelClient` takes only a provider id. To run a
-   specific model (e.g. `z-ai/glm-5.2`) you must **edit that source and run the
-   modified agent-demo as a region override**:
+The agent reads the files with its tools, writes the new files into the CoW mount,
+and the preview hot-reloads. Review the diff, then **Contribute** to open a PR.
+(See [creating-a-component.md](./creating-a-component.md) for the five edits the
+agent should end up making — that's your review checklist.)
 
-   ```bash
-   # in a checkout of immediately-run/agent-demo, set the model in
-   # src/lib/modelClient.ts, then:
-   immediately.run dev . --region stage.conversation \
-     --preview immediately-run/grove@main \
-     --origin https://local.immediately.run --json
-   ```
+## Verifying / iterating (driving it yourself)
 
-   Open the printed link but switch `/present/` → `/edit/` (the Agents rail only
-   exists in edit mode; `--preview` currently resolves to a `/present/` route).
-   *Wanted: a model selector on the conversation (provider + model slug).*
+The honest way to confirm any of this — and to catch the "works locally, breaks on
+the host" failures — is to drive a real browser and watch the SDK channel.
 
-2. **The region-override path hangs on the first model call.** Running the
-   modified (GLM 5.2) agent as a `stage.conversation` override — which gets a
-   **fresh dev appKey** — the agent connects the key and accepts the prompt, then
-   sits on **"Running…" forever**: no request to `openrouter.ai` ever leaves the
-   browser, and no consent prompt, error, or timeout is shown (a backend
-   `security-events` entry is logged, consistent with the first `net:fetch` being
-   gated for the fresh appKey). Net effect: **selecting a model and actually
-   running it via the agent is currently blocked end-to-end.** *Wanted: surface
-   the gate outcome (consent or `forbidden`) instead of hanging; a turn timeout
-   with a visible error.*
+- **Chrome DevTools MCP** (`mcp__chrome-devtools__*`): take an accessibility
+  **snapshot** for element `uid`s, fill/click, then read the **console** and
+  **network**. The decisive signal for *this* flow is a
+  `POST https://openrouter.ai/api/v1/chat/completions` carrying
+  `"model":"z-ai/glm-5.2"` with a `tools` array, and a `read_file` tool result that
+  returns **real Grove file content** (not `not found`).
+- **Controlled-input gotcha:** the prompt box is a React controlled input.
+  Programmatically *setting* its value (e.g. Chrome MCP `fill`) does **not** arm
+  **Run** — only real keystrokes (`type_text`) sync React state. Type, don't set.
+- **Testing an unmerged agent-demo:** to run a local agent-demo build *as the
+  workbench* (e.g. before a change is merged), dev-override the `stage.conversation`
+  region with Grove still the previewed app:
 
-3. **The Settings rail is a stub** ("SETTINGS — SOON") and does not navigate to
-   `/settings`. Secrets are managed only through an app's own powerbox (the
-   agent's "Add … key"), so there is no standalone place to add/inspect an
-   OpenRouter key before opening the agent.
+  ```bash
+  # in a checkout of immediately-run/agent-demo
+  immediately.run dev --region stage.conversation \
+    --preview "edit/github/immediately-run/grove/main/" \
+    --origin https://local.immediately.run --json
+  ```
 
-4. **Small UX papercuts.** The connect button reads "Add OpenRouter key" even
-   when a key is already stored (it matches by bound-origin substring); the
-   connected state is in-memory React state, so a reload shows the button again
-   and re-prompts the powerbox.
+  Open the printed deep link. The region shows a **"Customized binding"** badge and
+  loads your source over the loopback; the binding's working-tree exposure is
+  re-derived from the build default, so the AA-23 `rw` port still applies. (If the
+  override doesn't take on first load, reload once — the directive is persisted to
+  `sessionStorage` and applies on the next resolve.)
+
+## What's still rough (findings)
+
+Driving this with **GLM 5.2 over OpenRouter** surfaced real gaps. None of them
+break the architecture; they're UX and model-reliability edges.
+
+1. **The first `chat()` parks silently on the passkey unseal.** Chrome-MCP (and
+   any automation) can't tap the native WebAuthn dialog, so an unattended run sits
+   on "Running…" with **no request, no error, no timeout**. Keep a human on the
+   keyboard for that one tap. *Wanted: a visible "waiting for unlock" state and a
+   turn timeout instead of a silent hang.*
+2. **GLM-via-OpenRouter sometimes announces tool calls but emits none.** On some
+   turns the model writes "I'll read the files…", reasons through it, then finishes
+   with `stop` and **zero** `tool_calls`; and after a tool error it can return an
+   empty `stop` (no text, no call) — a silent give-up. *Wanted: a harness nudge
+   ("you said you'd call X — emit the call"), or a more reliable provider route.*
+3. **No model picker in the UI.** Provider + model is a host preference set via the
+   `window.__irLlmPref` dev hook (step 2); the **Settings** rail is still a stub
+   ("SETTINGS — SOON") and doesn't navigate to `/settings`. *Wanted: a real
+   provider+model selector on the conversation.*
+4. **A dead-end shows nothing.** When the model stops with empty content, the stage
+   renders only the (failed) tool chips — no "I stopped because…" line. *Wanted: a
+   terminal-without-result state.*
 
 ## Recommendation
 
-The agent's *architecture* is right — RW working-tree mount, real file tools,
-host-injected BYOK, capability-scoped tool catalog. The blockers are **model
-selection** and the **dev-override `net:fetch` hang**. Until both land:
+The agent's architecture is right — a scoped rw working-tree port over the *stage*
+app (AA-23), real file tools, host-mediated `llm.chat` (no per-app key), and a
+capability-scoped tool catalog. The happy path works end-to-end today with a human
+for the one passkey tap. The rough edges are **model selection UX** and **GLM
+tool-call reliability**, not the wiring.
 
-- To use the **default** model, the stock agent (no override) is the smooth path.
-- To use a **specific** model (GLM 5.2, etc.), or when the agent stalls, fall
-  back to the manual steps in
-  [creating-a-component.md](./creating-a-component.md) — which is how the
-  `<Quote>` shipped in this repo was ultimately built.
+- For a smooth run, use a provider/model you've found reliable for tool-calling.
+- When the agent stalls mid-task or skips its tool calls, fall back to the manual
+  steps in [creating-a-component.md](./creating-a-component.md) — which is how the
+  `<Quote>` shipped in this repo was originally built.
