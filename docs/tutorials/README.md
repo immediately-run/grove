@@ -22,3 +22,5 @@ worked example you can copy.
 > The platform-wide tutorials (browser debugging, local dev, changing a UI
 > component, the MCP bridge) live in the **docs repo** under `docs/tutorials/`.
 > These Grove-scoped guides assume that baseline and focus on Grove specifics.
+
+<!-- freshness-escape live test 491525d -->
