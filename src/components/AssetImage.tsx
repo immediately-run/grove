@@ -1,12 +1,14 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useMemo } from 'react';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import fs from 'fs';
+import { MountImage } from '@immediately-run/sdk';
+import type { SandboxMount } from '@immediately-run/sdk';
 import { toFsPath } from '../lib/content';
 
-// MDX `img` override: resolve a mount-relative image path to a displayable object
-// URL by reading its bytes off the sandbox fs (the opaque-origin iframe can't
-// fetch a relative path). Resolves relative to the entry currently being rendered
-// (navigationState.sandboxPath) and revokes the object URL on unmount.
+// MDX `img` override: display a mount-relative image by reading its bytes off the
+// sandbox fs (the opaque-origin iframe can't fetch a relative path). Resolves the
+// src relative to the entry currently being rendered (navigationState.sandboxPath),
+// then hands the file to the SDK's `MountImage`, which owns the read → object URL →
+// revoke lifecycle we used to hand-roll here.
 
 function resolvePath(basePath: string, relativePath: string): string {
   if (relativePath.startsWith('/')) return relativePath;
@@ -20,15 +22,10 @@ function resolvePath(basePath: string, relativePath: string): string {
   return parts.join('/');
 }
 
-const MIME: Record<string, string> = {
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  avif: 'image/avif',
-};
+// The whole sandbox fs, `/`-rooted. The resolved asset path is already absolute
+// (`/app/content/…`), so anchor at root and pass it as the mount-relative path
+// (leading slash stripped) — preserving the exact paths the old `fs.readFile` read.
+const ROOT_MOUNT: SandboxMount = { path: '/', type: 'repo' };
 
 interface Props {
   src?: string;
@@ -39,39 +36,23 @@ interface Props {
 export default function AssetImage({ src = '', alt = '', className }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { navigationState } = useContext(TinkerableContext) as any;
-  const [url, setUrl] = useState<string | null>(null);
-  const [missing, setMissing] = useState(false);
 
-  const abs = useMemo(() => {
+  const relPath = useMemo(() => {
     // The entry's absolute fs path (/app/content/...) is the base for relative assets.
     const base = toFsPath(navigationState?.sandboxPath || '/');
-    return resolvePath(base, src);
+    return resolvePath(base, src).replace(/^\/+/, '');
   }, [navigationState?.sandboxPath, src]);
 
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    const ext = (src.split('.').pop() || '').toLowerCase();
-    fs.promises
-      .readFile(abs)
-      .then((bytes: unknown) => {
-        if (!active) return;
-        const arr = bytes instanceof Uint8Array ? bytes : new TextEncoder().encode(String(bytes));
-        objectUrl = URL.createObjectURL(
-          new Blob([arr as BlobPart], { type: MIME[ext] || 'application/octet-stream' })
-        );
-        setUrl(objectUrl);
-      })
-      .catch(() => {
-        if (active) setMissing(true);
-      });
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [abs, src]);
-
-  if (missing) return <span className="grove-img__cap">missing asset: {src}</span>;
-  if (!url) return <span className="grove-img__box" style={{ display: 'block', minHeight: 80 }} />;
-  return <img className={className || 'grove-img__el'} src={url} alt={alt} />;
+  return (
+    <MountImage
+      mount={ROOT_MOUNT}
+      relPath={relPath}
+      alt={alt}
+      className={className || 'grove-img__el'}
+      placeholder={
+        <span className="grove-img__box" style={{ display: 'block', minHeight: 80 }} />
+      }
+      fallback={<span className="grove-img__cap">missing asset: {src}</span>}
+    />
+  );
 }
