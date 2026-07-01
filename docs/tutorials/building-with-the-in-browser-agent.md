@@ -159,9 +159,14 @@ break the architecture; they're UX and model-reliability edges.
    error it can return an empty `stop` (no text, no call) — a silent give-up. It is
    **not deterministic**: the 2026-07-01 re-verify (`<Kbd>`) ran fully clean — every
    turn returned `finish_reason: tool_calls` and all 6 reads + 5 writes fired.
-   Because it's flaky, a harness backstop is the right fix rather than betting on the
-   model. *Wanted: a nudge ("you said you'd call X — emit the call"), auto-retry of a
-   `stop`-with-intent turn, or a more reliable provider route.*
+   **Mitigated (agent-demo #14):** the loop now has a bounded stall backstop — a
+   no-tool-call turn that is empty or announces work without a call gets **one**
+   directive nudge ("emit the tool call now") before it gives up, shown live as a
+   muted "↺ nudging the model to continue…" row. It's conservative (a genuine
+   wrap-up is never nudged) and bounded (max one nudge per stall episode, reset by
+   any tool-executing turn), so it recovers the common stalls without ever looping.
+   *Still wanted for the tail: auto-retry heuristics beyond a single nudge, or a more
+   reliable provider route.*
 3. **No model picker in the UI.** Provider + model is a host preference set via the
    `window.__irLlmPref` dev hook (step 2); the **Settings** rail is still a stub
    ("SETTINGS — SOON") and doesn't navigate to `/settings`. *Wanted: a real
