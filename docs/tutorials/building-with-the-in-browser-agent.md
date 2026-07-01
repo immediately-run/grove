@@ -16,6 +16,17 @@ broke).
 > writes **Grove's** working tree and Grove re-renders. That last sentence used to
 > be false — the agent was mounted on *its own* repo and every Grove path read
 > `not found`. That was the AA-23 gap, now fixed (site-main #208 + agent-demo #11).
+>
+> **Re-verified 2026-07-01** on `local.immediately.run` with GLM 5.2 over
+> OpenRouter, driving a *fresh* `<Kbd>` component end-to-end: 6 real `read_file`s
+> (not `not found`), then `write_file` + `edit_file`×4, and Grove's preview
+> hot-reloaded to render the new component. GLM ran **clean this time** — every
+> turn emitted its tool calls (`finish_reason: tool_calls`), so the "announces but
+> emits none" edge (findings §2) is **intermittent, not deterministic**. The only
+> human step was the one passkey tap (§1). Also fixed on the same day: the file
+> explorer now labels Grove's working tree `immediately-run/grove` read-only
+> (was mislabeled as the explorer's own repo, read-write — site-main #212 +
+> file-explorer #20).
 
 ## How the agent is wired
 
@@ -27,10 +38,11 @@ broke).
   is the loaded app, the host confers Grove's working tree to the agent as a
   scoped, read-write `worktree` mount — the **editor's cross-repo grant kind**, not
   "self-access." The agent's filesystem tools (`read_file`, `write_file`,
-  `list_dir`, `glob`, `grep`, `stat`, `delete_file`) are chrooted to **that** tree,
-  merged with the app's capability catalog (the header shows "22 tools (catalog +
-  files)"). Switch which app is loaded and the prior port is torn down and a new
-  one minted.
+  `edit_file`, `list_dir`, `glob`, `grep`, `stat`, `delete_file`) are chrooted to
+  **that** tree, merged with the app's capability catalog (the header shows the
+  merged count, e.g. "23 tools (catalog + files)" — the exact number tracks the
+  catalog and drifts, so read the "catalog + files" suffix, not the digit). Switch
+  which app is loaded and the prior port is torn down and a new one minted.
 - **Inference goes through the platform `llm.chat` service, not a per-app key.**
   The agent calls the host-mediated `chat()` and needs only the **`llm:chat`**
   capability — *no* `net:fetch`, no bring-your-own-key powerbox. The app names no
@@ -83,6 +95,14 @@ sees it. GLM 5.2's OpenRouter slug is `z-ai/glm-5.2`.
    > design tokens, register it in the MDX component map, and add a demo `<Quote>`
    > to `content/home.mdx`. Reuse `<WikiLink>` for the source link.
 
+   > **Pick a component that doesn't already exist.** `<Quote>` (and `<Callout>`,
+   > `<WikiLink>`, `<KeyValue>`, …) already ship in this repo and are registered in
+   > `src/mdxComponents.ts` — asking for one of those has the agent *rewrite* an
+   > existing file, so you can't tell a real create from a no-op. For a clean run
+   > pick a fresh name and swap it through the prompt (the 2026-07-01 re-verify used
+   > `<Kbd>` — a keycap: `src/components/Kbd.tsx`, `.grove-kbd`, a `<Kbd>⌘K</Kbd>`
+   > demo). Skim `src/components/` first to see what's taken.
+
 3. **Approve the passkey prompt.** The first `chat()` of a session raises a native
    WebAuthn / Touch-ID dialog to unseal the model key. A human has to tap it once;
    it can't be automated (see the gaps). After that the loop runs unattended.
@@ -133,11 +153,15 @@ break the architecture; they're UX and model-reliability edges.
    on "Running…" with **no request, no error, no timeout**. Keep a human on the
    keyboard for that one tap. *Wanted: a visible "waiting for unlock" state and a
    turn timeout instead of a silent hang.*
-2. **GLM-via-OpenRouter sometimes announces tool calls but emits none.** On some
-   turns the model writes "I'll read the files…", reasons through it, then finishes
-   with `stop` and **zero** `tool_calls`; and after a tool error it can return an
-   empty `stop` (no text, no call) — a silent give-up. *Wanted: a harness nudge
-   ("you said you'd call X — emit the call"), or a more reliable provider route.*
+2. **GLM-via-OpenRouter sometimes announces tool calls but emits none —
+   *intermittent*.** On some turns the model writes "I'll read the files…", reasons
+   through it, then finishes with `stop` and **zero** `tool_calls`; and after a tool
+   error it can return an empty `stop` (no text, no call) — a silent give-up. It is
+   **not deterministic**: the 2026-07-01 re-verify (`<Kbd>`) ran fully clean — every
+   turn returned `finish_reason: tool_calls` and all 6 reads + 5 writes fired.
+   Because it's flaky, a harness backstop is the right fix rather than betting on the
+   model. *Wanted: a nudge ("you said you'd call X — emit the call"), auto-retry of a
+   `stop`-with-intent turn, or a more reliable provider route.*
 3. **No model picker in the UI.** Provider + model is a host preference set via the
    `window.__irLlmPref` dev hook (step 2); the **Settings** rail is still a stub
    ("SETTINGS — SOON") and doesn't navigate to `/settings`. *Wanted: a real
