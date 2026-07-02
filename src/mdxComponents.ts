@@ -1,4 +1,3 @@
-import { DEFAULT_MDX_COMPONENTS } from '@immediately-run/sdk';
 import AssetImage from './components/AssetImage';
 import Callout from './components/Callout';
 import Lede from './components/Lede';
@@ -23,8 +22,12 @@ import FamilyTree from './components/FamilyTree';
 // components" tier). Registered into the MDXProvider by boot(), so MDX uses them
 // with no import line. `a` is overridden with the wiki-link resolver (resolved /
 // broken / self states); `img` resolves mount-relative assets off the fs.
+//
+// boot() merges this map OVER the SDK's DEFAULT_MDX_COMPONENTS (@immediately-run/sdk
+// ≥ 0.23.0, MARKDOWN_SYNTAX_SPEC §11.3), so the platform defaults (default `a`,
+// `Admonition`, `WikiLink`) are inherited automatically — do NOT re-add a manual
+// `...DEFAULT_MDX_COMPONENTS` spread here (redundant under merge semantics).
 export const GROVE_MDX = {
-  ...DEFAULT_MDX_COMPONENTS,
   a: WikiLink,
   img: AssetImage,
   Callout,
