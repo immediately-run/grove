@@ -2,7 +2,7 @@
 import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, keyToHref, sandboxPathToKey } from '../lib/content';
+import { CONTENT_DIR, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
 import { namespaceOf, queryPaths } from '../lib/wiki';
 
 // `<ChildPages/>` — the entries that live under the current entry's namespace, as
@@ -18,7 +18,7 @@ export default function ChildPages() {
     (fm: Record<string, any>) =>
       Object.keys(fm)
         .filter((p) => {
-          if (!p.startsWith(CONTENT_DIR) || !/\.mdx?$/.test(p) || p === currentKey) return false;
+          if (!isContentEntry(p) || p === currentKey) return false;
           return namespaceOf(p) === scope;
         })
         .sort(),

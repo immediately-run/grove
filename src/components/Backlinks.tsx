@@ -3,7 +3,7 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import fs from 'fs';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, keyToFsPath, keyToHref, sandboxPathToKey } from '../lib/content';
+import { isContentEntry, keyToFsPath, keyToHref, sandboxPathToKey } from '../lib/content';
 import { backlinkSnippet, bodyLinksTo, crumb, queryPaths } from '../lib/wiki';
 
 interface Hit {
@@ -33,7 +33,7 @@ export default function Backlinks() {
   const currentKey = sandboxPathToKey(ctx?.navigationState?.sandboxPath || '/');
 
   const allKeys = useCallback(
-    (fm: Record<string, any>) => Object.keys(fm).filter((p) => p.startsWith(CONTENT_DIR) && /\.mdx?$/.test(p)),
+    (fm: Record<string, any>) => Object.keys(fm).filter(isContentEntry),
     []
   );
   const q = useMetadataQuery(allKeys);

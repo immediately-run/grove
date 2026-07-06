@@ -17,6 +17,10 @@ import DocsByTag from './components/DocsByTag';
 import ChildPages from './components/ChildPages';
 import Timeline from './components/Timeline';
 import FamilyTree from './components/FamilyTree';
+import Outlet from './components/Outlet';
+import GroveNav from './components/GroveNav';
+import GroveFooter from './components/GroveFooter';
+import Sidebar from './components/Sidebar';
 
 // The import-free component vocabulary every entry shares (Grove's "engine
 // components" tier). Registered into the MDXProvider by boot(), so MDX uses them
@@ -47,4 +51,10 @@ export const GROVE_MDX = {
   ChildPages,
   Timeline,
   FamilyTree,
+  // Layout primitives — a `_layout.mdx` arranges the shell out of these around an
+  // <Outlet/>, so the site chrome is content (see src/lib/layout.ts).
+  Outlet,
+  GroveNav,
+  GroveSidebar: Sidebar,
+  GroveFooter,
 };

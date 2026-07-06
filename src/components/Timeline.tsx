@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
-import { CONTENT_DIR, keyToHref } from '../lib/content';
+import { isContentEntry, keyToHref } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 
 // One dated entry on the axis: mono date · node · card.
@@ -34,7 +34,7 @@ export default function Timeline() {
   const queryFn = useCallback(
     (fm: Record<string, any>) =>
       Object.keys(fm)
-        .filter((p) => p.startsWith(CONTENT_DIR) && /\.mdx?$/.test(p) && fm[p]?.date && !fm[p]?.view)
+        .filter((p) => isContentEntry(p) && fm[p]?.date && !fm[p]?.view)
         .sort((a, b) => String(fm[b].date).localeCompare(String(fm[a].date))),
     []
   );

@@ -1,0 +1,24 @@
+---
+layoutRole: root
+description: The site shell (nav, sidebar, footer) as content — wraps every entry.
+---
+
+{/*
+  The site shell, as content. This `_layout.mdx` at the content root wraps EVERY
+  entry (the outermost link in the layout chain), so no entry has to include the
+  nav, sidebar, or footer itself — it renders the page at `<Outlet/>`.
+
+  It's plain MDX using the import-free layout primitives (`GroveNav`,
+  `GroveSidebar`, `GroveFooter`, `Outlet`). Rearranging the shell — dropping the
+  sidebar, moving the footer, adding a banner — is editing THIS file, not the
+  engine. Delete this file and the engine falls back to the same built-in shell.
+*/}
+
+<GroveNav />
+<GroveSidebar />
+
+<main className="grove-content">
+  <Outlet />
+</main>
+
+<GroveFooter />

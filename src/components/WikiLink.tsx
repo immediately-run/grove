@@ -2,7 +2,7 @@
 import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { APP_PREFIX, CONTENT_DIR, isEntryKey, sandboxPathToKey } from '../lib/content';
+import { APP_PREFIX, isContentEntry, isEntryKey, sandboxPathToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -33,7 +33,7 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
   // Resolve existence against the whole in-memory index (so a missing target is
   // *definitively* broken, not a load-time flash).
   const allKeysQuery = useCallback(
-    (fm: Record<string, any>) => Object.keys(fm).filter((p) => p.startsWith(CONTENT_DIR) && /\.mdx?$/.test(p)),
+    (fm: Record<string, any>) => Object.keys(fm).filter(isContentEntry),
     []
   );
   const q = useMetadataQuery(allKeysQuery);

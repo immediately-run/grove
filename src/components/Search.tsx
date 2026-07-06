@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
-import { CONTENT_DIR, keyToHref } from '../lib/content';
+import { isContentEntry, keyToHref } from '../lib/content';
 import { crumb, queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -24,7 +24,7 @@ export default function Search({ onClose }: { onClose: () => void }) {
   const queryFn = useCallback(
     (fm: Record<string, any>) =>
       Object.keys(fm)
-        .filter((p) => p.startsWith(CONTENT_DIR) && /\.mdx?$/.test(p))
+        .filter(isContentEntry)
         .map((p) =>
           [p, fm[p]?.title || '', fm[p]?.description || '', (fm[p]?.tags || []).filter((t: string) => !t.startsWith('ui/')).join(',')].join(SEP)
         ),
