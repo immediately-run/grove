@@ -23,6 +23,22 @@ export function isEntryKey(key: string): boolean {
   return key.startsWith(CONTENT_DIR) && /\.mdx?$/.test(key);
 }
 
+/** Is this a folder-convention layout file (`…/_layout.mdx`)? These are structure,
+ *  not entries: they wrap pages at an `<Outlet/>` and are excluded from every
+ *  content enumeration (routing, nav, sidebar tree, index, search, backlinks). */
+export function isLayoutKey(key: string): boolean {
+  return /(^|\/)_layout\.mdx?$/.test(key);
+}
+
+/** Is this a *content entry* — an `.mdx` under content that a reader can navigate to?
+ *  Excludes layout files and any other `_`-prefixed structural file. This is the
+ *  single predicate every enumeration (nav, sidebar, 404 index, search, indexes)
+ *  should filter on, so layout files never leak into reader-facing surfaces. */
+export function isContentEntry(key: string): boolean {
+  if (!key.startsWith(CONTENT_DIR) || !/\.mdx?$/.test(key)) return false;
+  return !(key.split('/').pop() || '').startsWith('_');
+}
+
 /** `handbook/onboarding` → `/app/content/handbook/onboarding.mdx` (the canonical key). */
 export function slugToKey(slug: string): string {
   return CONTENT_DIR + slug.replace(/^\//, '') + '.mdx';

@@ -1,0 +1,29 @@
+---
+layoutRole: section
+description: Shared header + "more people" rail for every profile in content/people.
+---
+
+{/*
+  A SECTION layout, nested under the root shell. It wraps every entry in
+  `content/people/` — each profile renders at `<Outlet/>` below the shared hero,
+  so no individual bio has to carry the section header or the "more people" rail.
+  This is the nesting the URL never sees: the address bar still names the profile
+  file (e.g. /content/people/ada-lovelace.mdx), and this frame is resolved around
+  it by folder convention. Drop a `frame: none` in a profile's frontmatter to opt
+  it out.
+*/}
+
+<section className="grove-section" data-section="people">
+  <header className="grove-section__hero">
+    <p className="grove-section__eyebrow">Meridian people</p>
+    <h2 className="grad">The people directory.</h2>
+    <p className="grove-section__lede">Every teammate has an entry. This header is shared by every profile — not one of them includes it.</p>
+  </header>
+
+  <Outlet />
+
+  <nav className="grove-section__more">
+    <p className="grove-section__more-h">More people</p>
+    <ChildPages />
+  </nav>
+</section>

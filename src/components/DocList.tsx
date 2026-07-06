@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
-import { CONTENT_DIR, keyToHref, slugToKey } from '../lib/content';
+import { isContentEntry, keyToHref, slugToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 
 interface Props {
@@ -64,7 +64,7 @@ export default function DocList({ shape = 'feed', title, slugs, tag, limit, sort
   const queryFn = useCallback(
     (fm: Record<string, any>) => {
       const keys = Object.keys(fm).filter((p) => {
-        if (!p.startsWith(CONTENT_DIR) || !/\.mdx?$/.test(p)) return false;
+        if (!isContentEntry(p)) return false;
         const m = fm[p] || {};
         if (m.view) return false;
         if (tag && !(Array.isArray(m.tags) && m.tags.includes(tag))) return false;

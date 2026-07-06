@@ -2466,3 +2466,56 @@ a.gdl-row {
   border-right: 0;
   background: transparent;
 }
+
+/* Section layouts — chrome shared by a folder of entries via `_layout.mdx`
+   (see src/lib/layout.ts). The section wrapper aligns its hero and "more" rail
+   to the reading column while the page (<Outlet/>) keeps its own layout. */
+.grove-section {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.grove-section > .grove-page {
+  padding: 0;
+  margin: 0;
+  max-width: 100%;
+}
+.grove-section__hero {
+  margin-bottom: 30px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.grove-section__eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--ink-3);
+  margin: 0 0 8px;
+}
+.grove-section__hero h2 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+.grove-section__lede {
+  margin: 10px 0 0;
+  max-width: 60ch;
+  color: var(--ink-2);
+}
+.grove-section__more {
+  margin-top: 40px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.grove-section__more-h {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--ink-3);
+  margin: 0 0 12px;
+}
+.grove-root[data-vw="mobile"] .grove-section {
+  padding: 0 18px;
+}

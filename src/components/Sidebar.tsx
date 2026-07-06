@@ -2,7 +2,7 @@
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, keyToHref, sandboxPathToKey } from '../lib/content';
+import { CONTENT_DIR, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -78,7 +78,7 @@ export default function Sidebar() {
   const queryFn = useCallback(
     (fm: Record<string, any>) =>
       Object.keys(fm)
-        .filter((p) => p.startsWith(CONTENT_DIR) && /\.mdx?$/.test(p))
+        .filter(isContentEntry)
         .map((p) => [p, fm[p]?.title || '', (fm[p]?.tags || []).join(','), fm[p]?.nav || ''].join(SEP)),
     []
   );

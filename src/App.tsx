@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useContext, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import fs from 'fs';
 import {
   Include,
-  Link,
-  requestEdit,
+  useAllMetadata,
   useFileMetadata,
   useMetadataQuery,
   useMounts,
@@ -13,17 +13,18 @@ import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import {
   CONTENT_DIR,
   HOME_KEY,
+  isContentEntry,
   keyToFsPath,
   keyToHref,
   keyToInclude,
-  keyToRepoRel,
   sandboxPathToKey,
 } from './lib/content';
-import { crumb, queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
-import Icon from './components/Icon';
-import Toc from './components/Toc';
-import Backlinks from './components/Backlinks';
-import Sidebar from './components/Sidebar';
+import { queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
+import { layoutChainForKey } from './lib/layout';
+import { GroveShellContext, OutletContext } from './lib/shell';
+import type { GroveShell, NavItem } from './lib/shell';
+import PageView from './components/PageView';
+import DefaultLayout from './components/DefaultLayout';
 import Search from './components/Search';
 import Drawer from './components/Drawer';
 import GroveAgent from './components/GroveAgent';
@@ -45,45 +46,24 @@ function writePref(k: string, v: string): void {
   }
 }
 
-const THEMES = [
-  { id: 'default', label: 'immediately.run', swatch: 'linear-gradient(96deg,#f6f1fb,#f49ad4 46%,#b285f2)' },
-  { id: 'pixies', label: 'Pixies', swatch: 'linear-gradient(96deg,#ffe14d,#ff2d8e 50%,#9d29ff)' },
-  { id: 'family', label: 'Family journal', swatch: 'linear-gradient(96deg,#f3cf9a,#e09a6a 50%,#c8744f)' },
-  { id: 'lotr', label: 'Middle-earth', swatch: 'linear-gradient(96deg,#b89a56,#8a6a36 50%,#4a5a38)' },
-];
-
-function EntryHeader({ entryKey, writable, mins }: { entryKey: string; writable: boolean; mins: number }) {
-  const meta = useFileMetadata(entryKey) as any;
-  const [busy, setBusy] = useState(false);
-  if (!meta) return null;
-  const tags: string[] = Array.isArray(meta.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
-  const cr = crumb(entryKey);
-  const edit = () => {
-    setBusy(true);
-    requestEdit({ path: keyToRepoRel(entryKey) })
-      .catch(() => undefined)
-      .finally(() => setBusy(false));
-  };
-  return (
-    <header className="grove-entry-header">
-      {cr.includes('/') ? <nav className="crumb">{cr}</nav> : null}
-      <h1 className={meta.grad ? 'grad' : ''}>{meta.title || cr}</h1>
-      <div className="grove-meta">
-        {meta.date && <span>{meta.date}</span>}
-        {mins ? <span>→ {mins} min read</span> : null}
-        {tags.length ? <span className="dot">·</span> : null}
-        {tags.map((t) => (
-          <span key={t} className="grove-tag">#{t}</span>
-        ))}
-        {writable && (
-          <button className="grove-edit-affordance" data-busy={busy ? '1' : '0'} onClick={edit}>
-            <Icon name="pencil" />
-            {busy ? 'Opening editor…' : 'Edit'}
-          </button>
-        )}
-      </div>
-    </header>
-  );
+// Build the nested render for a layout chain (outermost first). Each layer wraps
+// its `_layout.mdx` (or the built-in <DefaultLayout/>) in an OutletContext whose
+// value is the node one level inward — so `<Outlet/>` inside a layer renders the
+// next layer, and the innermost <Outlet/> renders the page (<PageView/>).
+function renderLayers(chain: string[], useDefault: boolean): ReactNode {
+  let node: ReactNode = <PageView />;
+  if (useDefault) {
+    return <OutletContext.Provider value={node}><DefaultLayout /></OutletContext.Provider>;
+  }
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const inner = node;
+    node = (
+      <OutletContext.Provider value={inner} key={chain[i]}>
+        <Include filename={chain[i]} baseModule={module} />
+      </OutletContext.Provider>
+    );
+  }
+  return node;
 }
 
 export default function App() {
@@ -132,15 +112,21 @@ export default function App() {
   const siteTitle: string = meta?.site || 'Grove';
   const showRails = layout === 'doc' && !meta?.view;
 
-  // Existence / 404: the whole index tells us if a followed link is dead.
-  const allKeysQuery = useCallback(
-    (fm: Record<string, any>) => Object.keys(fm).filter((p) => p.startsWith(CONTENT_DIR) && /\.mdx?$/.test(p)),
-    []
-  );
+  // Existence / 404: the whole index tells us if a followed link is dead. Layout
+  // files are structure, not entries, so they're excluded here (and everywhere).
+  const allKeysQuery = useCallback((fm: Record<string, any>) => Object.keys(fm).filter(isContentEntry), []);
   const idx = useMetadataQuery(allKeysQuery);
   const keys: string[] = queryPaths(idx);
   const indexLoaded = keys.length > 0;
   const missing = indexLoaded && !keys.includes(entryKey);
+
+  // The layout chain wrapping this entry (outermost first). Needs the full
+  // frontmatter map (folder convention + `frame` override), so it reads the whole
+  // metadata store and re-derives when the content set or the entry changes.
+  const allMeta = useAllMetadata() as Record<string, Record<string, unknown>>;
+  const chain: string[] = layoutChainForKey(entryKey, allMeta);
+  const frameNone = meta?.frame === 'none' || meta?.frame === false;
+  const useDefault = chain.length === 0 && !frameNone;
 
   // Reading time: read the entry body once per entry.
   useEffect(() => {
@@ -161,14 +147,14 @@ export default function App() {
   const navQuery = useCallback(
     (fm: Record<string, any>) =>
       Object.keys(fm)
-        .filter((p) => p.startsWith(CONTENT_DIR) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
+        .filter((p) => isContentEntry(p) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
         .sort((a, b) => (fm[a].order ?? 999) - (fm[b].order ?? 999))
         .map((p) => [p, fm[p]?.nav || (fm[p]?.title || '').replace(/\.$/, '')].join('\t')),
     []
   );
   const navResult = useMetadataQuery(navQuery);
   const navRows: string[] = queryPaths(navResult);
-  const navItems = navRows.map((r) => {
+  const navItems: NavItem[] = navRows.map((r) => {
     const [key, label] = r.split('\t');
     return { key, href: keyToHref(key), label };
   });
@@ -180,151 +166,57 @@ export default function App() {
         .sort((a, b) => b.score - a.score)[0]?.k
     : undefined;
 
-  const askGrove = () => {
-    const el = (document.querySelector('.ga-foot input') || document.querySelector('.ga-line input')) as HTMLElement | null;
-    el?.focus();
+  const shell: GroveShell = {
+    theme,
+    setTheme,
+    light,
+    setLight,
+    menuOpen,
+    setMenuOpen,
+    searchOpen,
+    setSearchOpen,
+    drawerOpen,
+    setDrawerOpen,
+    vw,
+    navMode,
+    writable,
+    siteTitle,
+    navItems,
+    entryKey,
+    includePath,
+    layout,
+    showRails,
+    mins,
+    missing,
+    suggestion,
   };
-  const newEntry = () => requestEdit({ path: 'content/untitled.mdx' }).catch(() => undefined);
 
   return (
-    <div
-      className="grove-root"
-      data-vw={vw}
-      data-nav={navMode}
-      data-grove-theme={theme === 'default' ? undefined : theme}
-      data-theme={theme === 'default' && light ? 'light' : undefined}
-    >
-      <div className="device__scroll">
-        <div className="grove-shell" data-nav={navMode}>
-          <nav className="grove-nav">
-            <button className="grove-hamburger icbtn" aria-label="Menu" onClick={() => setDrawerOpen(true)}>
-              <Icon name="list" />
-            </button>
-            <Link href="/" className="grove-brand">
-              <span className="tile" style={{ background: 'var(--grad)' }} />
-              {siteTitle}
-            </Link>
-            <div className="grove-nav__links">
-              {navItems.map((n) => (
-                <Link key={n.key} href={n.href} data-cur={n.key === entryKey ? '1' : '0'}>
-                  {n.label}
-                </Link>
-              ))}
-            </div>
-            <div className="grove-nav__cluster">
-              <button className="icbtn" aria-label="Search" onClick={() => setSearchOpen(true)}>
-                <Icon name="search" />
-              </button>
-              {writable && (
-                <button className="icbtn" aria-label="New entry" onClick={newEntry}>
-                  <Icon name="plus" />
-                </button>
-              )}
-              <button className="icbtn" aria-label="Ask Grove" onClick={askGrove}>
-                <Icon name="message" />
-              </button>
-              <div className="grove-nav__more">
-                <button className="icbtn" title="Theme" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
-                  ☀
-                </button>
-                {menuOpen ? (
-                  <>
-                    <div className="gtm__scrim" onClick={() => setMenuOpen(false)} />
-                    <div className="grove-theme-menu" role="menu">
-                      <div className="gtm__h">Theme</div>
-                      <div className="gtm__list">
-                        {THEMES.map((t) => (
-                          <button
-                            key={t.id}
-                            className="gtm__row"
-                            data-cur={theme === t.id ? '1' : '0'}
-                            onClick={() => setTheme(t.id)}
-                          >
-                            <span className="gtm__sw" style={{ background: t.swatch }} />
-                            <span className="gtm__name">{t.label}</span>
-                            {theme === t.id ? <span className="gtm__ck"><Icon name="check" /></span> : null}
-                          </button>
-                        ))}
-                      </div>
-                      {theme === 'default' ? (
-                        <div className="gtm__appearance">
-                          <div className="gtm__sub">Appearance</div>
-                          <div className="gtm__seg">
-                            <button data-on={!light ? '1' : '0'} onClick={() => setLight(false)}>
-                              <Icon name="moon" /> Dark
-                            </button>
-                            <button data-on={light ? '1' : '0'} onClick={() => setLight(true)}>
-                              <Icon name="sun" /> Light
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </nav>
-
-          {navMode === 'side' ? <Sidebar /> : null}
-
-          <main className="grove-content">
-            {missing ? (
-              <div className="grove-state">
-                <div className="grove-state__art" />
-                <h2>No entry at <code>{keyToRepoRel(entryKey).replace(/^content/, '')}</code>.</h2>
-                <p>
-                  That link points to an entry that doesn’t exist yet.
-                  {suggestion ? <> Did you mean <Link className="grove-wikilink" data-state="ok" href={keyToHref(suggestion)}>{crumb(suggestion)}</Link>?</> : null}
-                </p>
-                <div className="grove-state__actions">
-                  <Link className="btn-ghost" href="/"><Icon name="chevron-right" /> Back to home</Link>
-                  {writable ? <button className="btn-primary" onClick={() => requestEdit({ path: keyToRepoRel(entryKey) }).catch(() => undefined)}><Icon name="file-plus" /> Create it</button> : null}
-                </div>
-              </div>
-            ) : (
-              <article className="grove-page" data-layout={layout}>
-                <div className="gp-main">
-                  <EntryHeader entryKey={entryKey} writable={writable} mins={mins} />
-                  {showRails && vw === 'mobile' ? (
-                    <details className="grove-toc__disclosure">
-                      <summary>On this page</summary>
-                      <Toc entryKey={entryKey} />
-                    </details>
-                  ) : null}
-                  <div className="grove-prose">
-                    <Include filename={includePath} baseModule={module} />
-                  </div>
-                  {showRails ? <Backlinks /> : null}
-                </div>
-                {showRails && vw === 'desktop' ? <Toc entryKey={entryKey} /> : null}
-              </article>
-            )}
-          </main>
-
-          <footer className="grove-footer">
-            <div className="grove-footer__links">
-              {navItems.slice(0, 4).map((n) => (
-                <Link key={n.key} href={n.href}>
-                  {n.label}
-                </Link>
-              ))}
-            </div>
-            <div className="grove-footer__meta">built with grove</div>
-          </footer>
+    <GroveShellContext.Provider value={shell}>
+      <div
+        className="grove-root"
+        data-vw={vw}
+        data-nav={navMode}
+        data-grove-theme={theme === 'default' ? undefined : theme}
+        data-theme={theme === 'default' && light ? 'light' : undefined}
+      >
+        <div className="device__scroll">
+          <div className="grove-shell" data-nav={frameNone ? undefined : navMode}>
+            {renderLayers(chain, useDefault)}
+          </div>
         </div>
-      </div>
 
-      {searchOpen ? <Search onClose={() => setSearchOpen(false)} /> : null}
-      {drawerOpen ? (
-        <Drawer
-          siteTitle={siteTitle}
-          nav={navItems.map((n) => ({ href: n.href, label: n.label, cur: n.key === entryKey }))}
-          onClose={() => setDrawerOpen(false)}
-        />
-      ) : null}
-      <GroveAgent writable={writable} entryKey={entryKey} entryTitle={(meta?.title || 'this entry').replace(/\.$/, '')} />
-    </div>
+        {searchOpen ? <Search onClose={() => setSearchOpen(false)} /> : null}
+        {drawerOpen ? (
+          <Drawer
+            siteTitle={siteTitle}
+            nav={navItems.map((n) => ({ href: n.href, label: n.label, cur: n.key === entryKey }))}
+            onClose={() => setDrawerOpen(false)}
+          />
+        ) : null}
+        <GroveAgent writable={writable} entryKey={entryKey} entryTitle={(meta?.title || 'this entry').replace(/\.$/, '')} />
+      </div>
+    </GroveShellContext.Provider>
   );
 }
 
