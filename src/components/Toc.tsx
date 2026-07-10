@@ -23,7 +23,21 @@ export default function Toc({ entryKey }: { entryKey?: string }) {
       const prose = document.querySelector('.grove-prose');
       const nodes = prose ? Array.from(prose.querySelectorAll('h2, h3')) : [];
       const found: Head[] = nodes.map((n) => {
-        const text = n.textContent || '';
+        // The kernel prepends an autolink `<a class="ir-heading-anchor">#</a>`
+        // (SDK HeadingAnchor, §15.4) as the heading's first child, so `textContent`
+        // would include its `#`. Read the heading text WITHOUT the anchor for both
+        // the visible TOC label and the id fallback.
+        const anchor = n.querySelector('.ir-heading-anchor');
+        const text = (
+          anchor
+            ? Array.from(n.childNodes)
+                .filter((c) => c !== anchor)
+                .map((c) => c.textContent ?? '')
+                .join('')
+            : n.textContent || ''
+        ).trim();
+        // Prefer the kernel-emitted id (§15.5); the local `headingId` fallback
+        // reproduces the same algorithm for a heading with no kernel id.
         const id = n.id || headingId(text);
         n.id = id;
         return { id, text, level: n.tagName === 'H3' ? 3 : 2 };
