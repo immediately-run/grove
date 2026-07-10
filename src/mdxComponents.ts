@@ -9,6 +9,8 @@ import TagList from './components/TagList';
 import Directory from './components/Directory';
 import WikiLink from './components/WikiLink';
 import Quote from './components/Quote';
+import KeyValue from './components/KeyValue';
+import Kbd from './components/Kbd';
 import Toc from './components/Toc';
 import Backlinks from './components/Backlinks';
 import PageMeta from './components/PageMeta';
@@ -43,6 +45,8 @@ export const GROVE_MDX = {
   TagList,
   Directory,
   Quote,
+  KeyValue,
+  Kbd,
   Toc,
   Backlinks,
   PageMeta,
