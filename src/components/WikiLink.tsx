@@ -2,7 +2,7 @@
 import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { APP_PREFIX, isContentEntry, isEntryKey, sandboxPathToKey } from '../lib/content';
+import { hrefKeyCandidates, isContentEntry, keyToHref, linkKind, sandboxPathToKey, splitFragment } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -12,23 +12,14 @@ interface Props {
   className?: string;
 }
 
-// The MDX `a` override. A link into the content space renders as a wiki-link with
-// one of three states (brief 00) — resolved / broken / self; everything else
-// (http, mailto, #anchor) renders as an ordinary markdown link so the two are
-// distinguishable at a glance.
+// The MDX `a` override. A link into the content space renders as a wiki-link with one of
+// three states (brief 00) — resolved / broken / self; an external scheme or a bare
+// `#anchor` renders as an ordinary markdown link, so the two are distinguishable at a
+// glance. Those are the ONLY two shapes: an in-app href that resolves to nothing renders
+// broken, never as a bare `<a>` (see `linkKind` — R3-252).
 export default function WikiLink({ href = '', children, ...rest }: Props) {
   const ctx = useContext(TinkerableContext) as any;
   const currentKey = sandboxPathToKey(ctx?.navigationState?.sandboxPath || '/');
-
-  // Normalize an in-app content href (`/content/x.mdx` or `/files/content/x.mdx`)
-  // to its canonical metadata key; null for external/anchor links.
-  const targetKey = (() => {
-    if (!href) return null;
-    if (/^(https?:|mailto:|tel:|#)/.test(href)) return null;
-    const path = href.replace(/^\/files/, '');
-    const key = path.startsWith('/content/') ? APP_PREFIX + path : null;
-    return key && isEntryKey(key) ? key : null;
-  })();
 
   // Resolve existence against the whole in-memory index (so a missing target is
   // *definitively* broken, not a load-time flash).
@@ -40,17 +31,45 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
   const keys: string[] = queryPaths(q);
   const loaded = keys.length > 0;
 
+  // Normalize an in-app content href to its canonical metadata key; null for
+  // external/anchor links. Handles the ABSOLUTE forms (`/content/x.mdx`,
+  // `/files/content/x.mdx`) and the RELATIVE form an author actually writes
+  // (`roadmap/index.mdx`, `../specs/FOO.mdx`), which is resolved against the current
+  // entry the same way `check-docs-wiki` resolves `[[…]]` links. A relative href used
+  // to land here as `null` and render as a bare `<a>`, so clicking it made the sandbox
+  // perform a real navigation instead of routing — the "Failed to construct 'URL'"
+  // crash. Candidates are tried in order so a pre-cutover `foo.md` still finds `foo.mdx`
+  // even though the corpus itself no longer carries those names.
+  const candidates = hrefKeyCandidates(href, currentKey);
+  const targetKey = candidates.find((k) => keys.includes(k)) ?? candidates[0] ?? null;
+  // Route on the RESOLVED key, not the author's text: handing `<Link>` a relative href
+  // would make it resolve against the outer page URL rather than the content tree.
+  const [, fragment] = splitFragment(href);
+  const resolvedHref = targetKey ? keyToHref(targetKey) + fragment : href;
+
+  // Only an href that MEANS to leave the document becomes a real `<a>` — see `linkKind`.
+  // An unresolvable in-app href renders broken rather than falling through to an anchor
+  // that would navigate the sandboxed frame away and kill the app (R3-252).
   if (!targetKey) {
-    const external = /^https?:/.test(href);
+    const kind = linkKind(href);
+    if (kind !== 'content') {
+      const web = /^https?:/i.test(href);
+      return (
+        <a
+          className="mdlink"
+          href={href}
+          {...(web ? { target: '_blank', rel: 'noreferrer' } : {})}
+          {...rest}
+        >
+          {children}
+        </a>
+      );
+    }
     return (
-      <a
-        className="mdlink"
-        href={href}
-        {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
-        {...rest}
-      >
+      <span className="grove-wikilink" data-state="broken" title={`No entry at ${href}`}>
+        <Icon name="unlink" />
         {children}
-      </a>
+      </span>
     );
   }
 
@@ -73,7 +92,7 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
   }
 
   return (
-    <Link href={href} className="grove-wikilink" data-state="ok" {...rest}>
+    <Link href={resolvedHref} className="grove-wikilink" data-state="ok" {...rest}>
       {children}
     </Link>
   );

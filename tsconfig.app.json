@@ -21,5 +21,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The test files run under vitest in NODE, not in the browser bundle, so they are
+  // type-checked by tsconfig.test.json (which carries the node types) rather than here.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

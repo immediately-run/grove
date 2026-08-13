@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import mdx from '@mdx-js/rollup'
 import { devFs } from '@immediately-run/dev-fs'
@@ -24,6 +24,17 @@ export default defineConfig({
   build: {
     rollupOptions: {
       external: ['fs', 'node:fs'],
+    },
+  },
+  test: {
+    include: ['src/**/*.test.{ts,tsx}'],
+    server: {
+      // The SDK's own dist uses extensionless relative imports (`./SafeContent`),
+      // which a bundler resolves and raw node ESM does not. Inlining it makes the
+      // safe-renderer tests exercise the REAL published package — the same bytes the
+      // sandbox resolves on immediately.run — instead of a stub. Without this the
+      // suite fails at import with "Cannot find module …/safeContent/SafeContent".
+      deps: { inline: ['@immediately-run/sdk'] },
     },
   },
 })
