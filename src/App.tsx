@@ -24,6 +24,7 @@ import { layoutChainForKey } from './lib/layout';
 import { GroveShellContext, OutletContext } from './lib/shell';
 import type { GroveShell, NavItem } from './lib/shell';
 import PageView from './components/PageView';
+import SafeLayout from './components/SafeLayout';
 import DefaultLayout from './components/DefaultLayout';
 import Search from './components/Search';
 import Drawer from './components/Drawer';
@@ -50,7 +51,14 @@ function writePref(k: string, v: string): void {
 // its `_layout.mdx` (or the built-in <DefaultLayout/>) in an OutletContext whose
 // value is the node one level inward — so `<Outlet/>` inside a layer renders the
 // next layer, and the innermost <Outlet/> renders the page (<PageView/>).
-function renderLayers(chain: string[], useDefault: boolean): ReactNode {
+//
+// `safe` picks the RENDERER for each layer, exactly as it does for entry bodies in
+// <PageView/> (R3-263). Before this, every layer went through <Include> whatever the wiki
+// declared — so an interpreter-mode wiki still EXECUTED author JavaScript out of its
+// `_layout.mdx`, and the non-executable guarantee had a hole in the shell rather than in
+// the entries. It is also what makes the chain work at all under dispatch: <Include>
+// evaluates an app-source module, which a layout resident in a content mount is not.
+function renderLayers(chain: string[], useDefault: boolean, safe: boolean): ReactNode {
   let node: ReactNode = <PageView />;
   if (useDefault) {
     return <OutletContext.Provider value={node}><DefaultLayout /></OutletContext.Provider>;
@@ -59,7 +67,7 @@ function renderLayers(chain: string[], useDefault: boolean): ReactNode {
     const inner = node;
     node = (
       <OutletContext.Provider value={inner} key={chain[i]}>
-        <Include filename={chain[i]} baseModule={module} />
+        {safe ? <SafeLayout layoutKey={chain[i]} /> : <Include filename={chain[i]} baseModule={module} />}
       </OutletContext.Provider>
     );
   }
@@ -217,7 +225,7 @@ export default function App() {
       >
         <div className="device__scroll">
           <div className="grove-shell" data-nav={frameNone ? undefined : navMode}>
-            {renderLayers(chain, useDefault)}
+            {renderLayers(chain, useDefault, safe)}
           </div>
         </div>
 

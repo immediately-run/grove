@@ -94,3 +94,36 @@ would assert nothing — and the sweeps carry non-vacuity guards (`checked > 0`)
 deterministic here; the docs wiki keeps the large-corpus sweep, which is what R3-252 says that
 harness is for. Do not "fix" a fixture by pointing it back at the corpus, and do not delete a
 non-vacuity guard to make a sweep green.
+
+## 6. Authoring a layout under the interpreter (R3-263)
+
+`_layout.mdx` renders through the **safe** renderer whenever the wiki declares `render: safe`
+— it used to go through `<Include>` (the compiled path) regardless, which meant an
+"interpreter" wiki still executed author JavaScript out of its shell. Four things an author
+needs to know, all of which fail *quietly*:
+
+1. **Literal attributes only.** The renderer copies literal attributes and drops expression
+   ones, so `<Foo n={3}/>` arrives with no `n`.
+2. **Only allow-listed structural tags render as elements.** `src/lib/safeIntrinsics.tsx`
+   holds the closed set (`main`, `section`, `div`, …) with an attribute allow-list
+   (`className`, `id`, `data-*`, `aria-*`, …). A tag outside it collapses to a Fragment that
+   **keeps its children** — content survives, the wrapper and its class do not.
+3. **`import` lines are not resolved — and they are not silently dropped either.** The ESM
+   extension is off, so no ESM node is produced and the line renders as ordinary paragraph
+   **text, printed on the page**. Layouts are import-free by design; the vocabulary arrives
+   through the component map.
+4. **A block tag must open on its own line.** `<main className="x">text</main>` on one line is
+   consumed by micromark as an **HTML block** and renders as literal angle brackets; the same
+   tag opened on its own line parses as JSX. The symptom is "my layout is visible as markup"
+   with no error anywhere, and the fix is a line break, which nobody guesses.
+
+**Why the allow-list rather than raw tags.** The SDK's `literalProps` does no name filtering
+and no URL sanitizing — it copies every literal attribute verbatim onto whatever the map
+resolves. Measured against React 19: `onclick=` and `onerror=` are dropped by React, and a
+`javascript:` URL is blocked by React — but `style="…"` **throws** ("expects a mapping … not a
+string"), `dangerouslySetInnerHTML="…"` **throws**, and `iframe srcdoc="<script>…"` **passes
+straight through**. The two throwing cases are worse than they look: the throw is in the
+*layout*, so one content file takes down the shell for every page. So the barrier is the
+allow-list, and React's own defenses are a second layer rather than the only one.
+`src/lib/safeIntrinsics.test.tsx` pins every one of those cases, including the raw-tag
+behaviour that motivates the wrapper.

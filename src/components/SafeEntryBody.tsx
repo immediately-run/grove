@@ -1,15 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense, use } from 'react';
 import {
-  openAppFs,
   SafeContent,
-  DEFAULT_MDX_COMPONENTS,
   RenderExportedComponentContext,
   useFileMetadata,
 } from '@immediately-run/sdk';
-import { GROVE_MDX } from '../mdxComponents';
+import { SAFE_MDX } from '../mdxComponents';
 import { keyToRepoRel } from '../lib/content';
-import { createSourceCache } from '../lib/sourceCache';
+import { safeSources } from '../lib/safeSources';
 import ScrollToFragment from './ScrollToFragment';
 
 // The NON-EXECUTABLE (interpreter) body renderer — TRUST_MODES §5.1 / R3-213. It reads
@@ -20,21 +17,15 @@ import ScrollToFragment from './ScrollToFragment';
 // mode. The engine keeps BOTH; the wiki declares which via the home entry's `render:` flag,
 // so a trusted first-party grove deployment can still use standard, executable MDX.
 //
-// Uniformity (R3-213): the component map is the SDK's DEFAULT_MDX_COMPONENTS (the platform
-// Admonition / WikiLink / HeadingAnchor, carrying the R3-212 deep-link resolver) merged
-// UNDER the Grove vocabulary — the SAME merge `boot()` does for the compiled path — so the
-// admonitions / wiki-links / `sec-…` heading ids the shared remark plugins emit render
-// identically in both standards. We publish `RenderExportedComponentContext` with this
-// entry's path so the WikiLink resolver learns the current file and a relative `[[target]]`
-// (and its `#sec-…` fragment) resolves exactly as it does under `<Include>`.
-
-const SAFE_COMPONENTS = { ...(DEFAULT_MDX_COMPONENTS as Record<string, any>), ...GROVE_MDX };
-
-// React `use` needs a stable promise, so the raw-source read is memoised per path. The
-// cache lives in `lib/sourceCache` because the interesting part is its FAILURE behaviour:
-// a rejected read must not be memoised, or the entry stays blank for the rest of the
-// session (see that module).
-const sources = createSourceCache((repoRel) => openAppFs().readFile(repoRel, 'utf8') as Promise<string>);
+// Uniformity (R3-213): the component map is `SAFE_MDX` — the SDK's DEFAULT_MDX_COMPONENTS
+// (the platform Admonition / WikiLink / HeadingAnchor, carrying the R3-212 deep-link
+// resolver) merged UNDER the Grove vocabulary, the SAME merge `boot()` does for the compiled
+// path — so the admonitions / wiki-links / `sec-…` heading ids the shared remark plugins emit
+// render identically in both standards. Since R3-263 that map lives in `mdxComponents.ts` and
+// is shared with `SafeLayout`, so the body and the shell around it cannot resolve differently.
+// We publish `RenderExportedComponentContext` with this entry's path so the WikiLink resolver
+// learns the current file and a relative `[[target]]` (and its `#sec-…` fragment) resolves
+// exactly as it does under `<Include>`.
 
 /** Strip a leading YAML frontmatter block (and an optional BOM) so only the body reaches
  *  the safe renderer. */
@@ -43,7 +34,7 @@ function stripFrontmatter(src: string): string {
 }
 
 function SafeBody({ entryKey }: { entryKey: string }) {
-  const raw = use(sources.read(keyToRepoRel(entryKey)));
+  const raw = use(safeSources.read(keyToRepoRel(entryKey)));
   // Consume the entry's metadata so this re-renders if frontmatter changes (parity with
   // the compiled path's reactivity); the body itself is the stripped source.
   useFileMetadata(entryKey);
@@ -60,7 +51,7 @@ function SafeBody({ entryKey }: { entryKey: string }) {
           the DOM, and a scroll fired at navigation time lands on the wrong page's section
           and is then thrown away by the re-render (R3-249). */}
       <div className="grove-entry-body" data-entry={entryKey}>
-        <SafeContent source={body} components={SAFE_COMPONENTS as never} fallback={<div className="grove-prose__loading" />} />
+        <SafeContent source={body} components={SAFE_MDX as never} fallback={<div className="grove-prose__loading" />} />
         {/* Deep-link landing lives INSIDE the committed body, not outside watching for it.
             Mounted anywhere above this boundary it is unmounted by the very transition it
             is waiting on — measured on the real host: it polled 159 times and was torn

