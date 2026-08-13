@@ -107,9 +107,23 @@ export default function App() {
   const entryKey = sandboxPathToKey(sandboxPath) || HOME_KEY;
   const includePath = keyToInclude(entryKey);
   const meta = useFileMetadata(entryKey) as any;
+  // The site brand is a wiki-wide constant, so read it from the home entry's
+  // `site` frontmatter — not the current entry's (which only home would carry),
+  // else the brand flips to the 'Grove' fallback on every sub-page.
+  const homeMeta = useFileMetadata(HOME_KEY) as any;
   const layout: string = meta?.layout || 'doc';
   const navMode: 'top' | 'side' = 'side';
-  const siteTitle: string = meta?.site || 'Grove';
+  const siteTitle: string = meta?.site || homeMeta?.site || 'Grove';
+  // Interpreter mode (TRUST_MODES §5 / R3-213): render this entry's body through the
+  // non-executable safe renderer instead of the compiled `<Include>` path.
+  //
+  // Read from the HOME entry (wiki-wide) OR this entry (per-entry), because the two
+  // answer different questions. Wiki-wide is the interpreter declaration — a Grove
+  // rendering foreign content sets it there. Per-entry exists because this corpus has
+  // one document, the non-executable proof page, whose whole point is planted code that
+  // must NOT execute: on the compiled path that page doesn't just look wrong, it runs
+  // (R3-252). A document that is only correct as data says so itself.
+  const safe: boolean = homeMeta?.render === 'safe' || meta?.render === 'safe';
   const showRails = layout === 'doc' && !meta?.view;
 
   // Existence / 404: the whole index tells us if a followed link is dead. Layout
@@ -181,6 +195,7 @@ export default function App() {
     navMode,
     writable,
     siteTitle,
+    safe,
     navItems,
     entryKey,
     includePath,

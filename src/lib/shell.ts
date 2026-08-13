@@ -34,6 +34,11 @@ export interface GroveShell {
   navMode: 'top' | 'side';
   writable: boolean;
   siteTitle: string;
+  /** Interpreter mode (TRUST_MODES §5): render this entry's body through the
+   *  non-executable safe renderer (R3-213) instead of the compiled/executable `<Include>`
+   *  path. Driven by `render: safe` on the HOME entry (wiki-wide) or on the entry itself
+   *  (per-entry, R3-252); default false (compiled MDX). */
+  safe: boolean;
   navItems: NavItem[];
   // Current entry (the page the innermost <Outlet/> renders)
   entryKey: string;

@@ -12,10 +12,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify": "npm run lint && npm run build && npm run test"
   },
   "dependencies": {
-    "@immediately-run/sdk": "^0.28.0",
+    "@immediately-run/sdk": "^0.38.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
@@ -23,7 +24,7 @@
     "@eslint/js": "^9.39.4",
     "@immediately-run/dev-fs": "^0.1.0",
     "@mdx-js/rollup": "^3.1.0",
-    "@types/node": "^24.12.2",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
