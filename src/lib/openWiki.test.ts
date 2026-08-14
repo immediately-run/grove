@@ -133,6 +133,25 @@ describe('routing — the URL space follows the packaging', () => {
     expect(sandboxPathToKey(keyToHref(dispatched))).toBe(dispatched);
   });
 
+  it('refuses a traversal that keeps the content-root PREFIX — the shipped-fork shape', () => {
+    // ⚠ This is the pre-existing defect, and it is a FORK bug too, not only a dispatch one.
+    // The escape needs the `..` to come AFTER the content segment, so the raw-text check
+    // passes while the path resolves elsewhere:
+    //
+    //   /files/content/../../src/App.tsx  →  /app/content/../../src/App.tsx  →  /src/App.tsx
+    //   /content/../../../spaces/s1/x.md  →  …                              →  /spaces/s1/x.md
+    //
+    // The second is the one that matters: it leaves the app's own repo for ANOTHER MOUNT.
+    // The resulting key is what `fs.readFile` gets (bodies, reading time, backlinks) and
+    // what `<Include filename>` gets on the compiled path — where it is EVALUATED.
+    expect(sandboxPathToKey('/files/content/../../src/App.tsx')).toBe('/app/content/home.mdx');
+    expect(sandboxPathToKey('/content/../../../spaces/s1/private.md')).toBe('/app/content/home.mdx');
+    expect(sandboxPathToKey('/content/../.claude/memory/x.md')).toBe('/app/content/home.mdx');
+    // A `..` that stays inside the corpus is not an escape and still resolves.
+    expect(sandboxPathToKey('/content/plot/../home.mdx')).toBe('/app/content/home.mdx');
+    expect(sandboxPathToKey('/content/plot/../themes.mdx')).toBe('/app/content/themes.mdx');
+  });
+
   it('sends a path OUTSIDE the corpus home rather than reading it', () => {
     // Under dispatch this is the guard that stops a crafted URL from naming a file outside
     // the delegation: it can only ever resolve to an entry inside the content root.
