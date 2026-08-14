@@ -13,7 +13,7 @@
 // The `frame` frontmatter key OVERRIDES the convention on a per-entry basis; the
 // existing `layout` field (the CSS `data-layout` variant) is unrelated and
 // untouched.
-import { CONTENT_DIR, slugToKey, isLayoutKey } from './content';
+import { contentDir, slugToKey, isLayoutKey } from './content';
 
 /** The `_layout.mdx` key for a directory key (which ends in `/`). */
 function layoutKeyForDir(dir: string): string {
@@ -35,7 +35,7 @@ function optsOut(meta: Record<string, unknown> | undefined): boolean {
  * Rules, in precedence order:
  *   1. `frame: none` / `frame: false` on the entry → `[]` (render bare, no chrome).
  *   2. `frame: '<slug>'` on the entry → exactly that one layout, if it exists.
- *   3. Otherwise folder convention: every `_layout.mdx` from `CONTENT_DIR` down to
+ *   3. Otherwise folder convention: every `_layout.mdx` from the content root down to
  *      the entry's own directory that exists in `allKeys`. A `_layout.mdx` whose
  *      own frontmatter opts out (`frame: none`) becomes a new root — layouts above
  *      it are dropped.
@@ -60,13 +60,14 @@ export function layoutChainForKey(
   }
 
   const present = new Set(allKeys.filter(isLayoutKey));
-  if (!entryKey.startsWith(CONTENT_DIR)) return [];
+  const root = contentDir();
+  if (!entryKey.startsWith(root)) return [];
 
   // Directories from the content root down to (but not including) the entry file.
-  const rel = entryKey.slice(CONTENT_DIR.length); // e.g. "people/ada.mdx"
+  const rel = entryKey.slice(root.length); // e.g. "people/ada.mdx"
   const segs = rel.split('/').slice(0, -1); // e.g. ["people"]
-  const dirs = [CONTENT_DIR];
-  let dir = CONTENT_DIR;
+  const dirs = [root];
+  let dir = root;
   for (const s of segs) {
     dir = dir + s + '/';
     dirs.push(dir);

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
-import { CONTENT_DIR } from '../lib/content';
+import { contentDir } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 
 // Import-free engine component: every tag across the site, sized by frequency.
@@ -10,7 +10,7 @@ export default function TagCloud() {
   const queryFn = useCallback((filesMetadata: Record<string, any>) => {
     const counts: Record<string, number> = {};
     Object.entries(filesMetadata).forEach(([p, m]) => {
-      if (!p.startsWith(CONTENT_DIR)) return;
+      if (!p.startsWith(contentDir())) return;
       if (m && Array.isArray(m.tags)) {
         m.tags.forEach((t: string) => {
           if (t.startsWith('ui/')) return;

@@ -1,6 +1,6 @@
 // Pure wiki helpers — no React, no components (kept out of component files per the
 // Fast-Refresh rule). Shared by the reading-view, index, and agent surfaces.
-import { CONTENT_DIR, keyToHref } from './content';
+import { contentDir, keyToHref } from './content';
 
 /** Extract the path strings from a `useMetadataQuery` result. The hook returns a
  *  `{ path, meta }[]` array directly (or `{ error }`), NOT a `{ result }` wrapper —
@@ -60,7 +60,7 @@ export function headingId(text: string): string {
  *  `/app/content/handbook/onboarding.mdx` → `handbook / onboarding`. */
 export function crumb(key: string): string {
   return key
-    .replace(CONTENT_DIR, '')
+    .replace(contentDir(), '')
     .replace(/\.mdx?$/, '')
     .split('/')
     .join(' / ');
@@ -68,7 +68,7 @@ export function crumb(key: string): string {
 
 /** The namespace folder of a key, e.g. `handbook` (or '' for a root entry). */
 export function namespaceOf(key: string): string {
-  const rel = key.replace(CONTENT_DIR, '').replace(/\.mdx?$/, '');
+  const rel = key.replace(contentDir(), '').replace(/\.mdx?$/, '');
   const parts = rel.split('/');
   return parts.length > 1 ? parts.slice(0, -1).join('/') : '';
 }

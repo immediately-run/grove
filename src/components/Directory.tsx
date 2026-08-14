@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
-import { CONTENT_DIR, keyToHref } from '../lib/content';
+import { contentDir, keyToHref } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 
 interface Props {
@@ -34,7 +34,7 @@ export default function Directory({ team, compact }: Props) {
   const queryFn = useCallback(
     (filesMetadata: Record<string, any>) =>
       Object.keys(filesMetadata)
-        .filter((p) => p.startsWith(CONTENT_DIR) && isPerson(filesMetadata[p]))
+        .filter((p) => p.startsWith(contentDir()) && isPerson(filesMetadata[p]))
         .filter((p) => !team || filesMetadata[p].team === team)
         .sort((a, b) => (filesMetadata[a].name < filesMetadata[b].name ? -1 : 1)),
     [team]

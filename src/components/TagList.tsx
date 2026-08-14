@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
-import { CONTENT_DIR } from '../lib/content';
+import { contentDir } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 
 // `<TagList/>` — every content tag, sorted, as plain chips (the "related tags"
@@ -10,7 +10,7 @@ export default function TagList() {
   const queryFn = useCallback((fm: Record<string, any>) => {
     const set = new Set<string>();
     Object.entries(fm).forEach(([p, m]: [string, any]) => {
-      if (!p.startsWith(CONTENT_DIR)) return;
+      if (!p.startsWith(contentDir())) return;
       (Array.isArray(m?.tags) ? m.tags : []).forEach((t: string) => {
         if (!t.startsWith('ui/')) set.add(t);
       });

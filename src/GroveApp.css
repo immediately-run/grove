@@ -2519,3 +2519,21 @@ a.gdl-row {
 .grove-root[data-vw="mobile"] .grove-section {
   padding: 0 18px;
 }
+
+/* Boot gate (R3-169) — shown only while a dispatched viewer resolves its delegated
+   corpus, or when that delegation never arrived. Deliberately plain: at this point the
+   corpus is not readable, so none of its theming applies. */
+.grove-boot {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: 2rem;
+}
+
+.grove-boot__msg {
+  color: var(--muted, #8b8f98);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  text-align: center;
+  max-width: 32rem;
+}

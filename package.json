@@ -5,7 +5,13 @@
   "type": "module",
   "main": "src/main.tsx",
   "immediately.run": {
-    "$schema": "https://immediately.run/immediately-run-config.schema.json"
+    "$schema": "https://immediately.run/immediately-run-config.schema.json",
+    "provides": [
+      {
+        "task": "open-wiki",
+        "version": "1.0"
+      }
+    ]
   },
   "scripts": {
     "dev": "vite",
