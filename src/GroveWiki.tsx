@@ -117,12 +117,20 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
     return () => window.removeEventListener('keydown', on);
   }, []);
 
-  // Editing is a FORK-only affordance today. Under dispatch the writable thing is the
-  // content mount, but `keyToRepoRel`/`requestEdit` still write into the app repo — i.e.
-  // into GROVE, not the corpus the reader is looking at — so the honest degradation is to
-  // offer nothing until R3-265 defines that target. A read-only delegation is off for the
-  // same reason one layer up, which makes "a read-only mount degrades cleanly" true by
-  // construction rather than by a second code path.
+  // ⚠ TEMPORARY, and not a design: dispatched content IS writable — R3-266.
+  //
+  // The affordance below calls `requestEdit`, which is **self-scoped by contract** ("v1
+  // supports only a repo-relative path in the CURRENT repo … editing a file in one of your
+  // mounts is the `edit-file` task, not this"). Under dispatch the corpus is a mount, so
+  // that call would edit GROVE rather than the corpus on screen. Offering it would be
+  // wrong; withholding it *as a design* is also wrong, and this comment exists so the next
+  // reader does not conclude the second from the first.
+  //
+  // The fix is a verb swap, not a withheld capability: delegate the entry to
+  // `invokeTask('edit-file', { file: capFile({ mountId, relPath }, { mode: 'rw' }) })`,
+  // declare `invokes: edit-file`, and gate on the CORPUS MOUNT's mode rather than on the
+  // packaging. A task callee already holds the minted delegated grant, so nothing new has
+  // to be minted. Tracked in R3-266; `docs/specs/REPO_CONTENT_DISPATCH_SPEC.mdx` §5.
   const writable =
     !isDispatched() && !readOnly && (mounts?.some((m) => m.type === 'worktree' && m.mode !== 'ro') ?? false);
 
