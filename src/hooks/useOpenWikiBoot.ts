@@ -37,7 +37,6 @@ export function useOpenWikiBoot(): OpenWikiBoot {
   const input = useTaskInput();
   const mounts = useMounts();
   const [failed, setFailed] = useState('');
-  const [gaveUp, setGaveUp] = useState(false);
 
   const resolution = resolveOpenWiki(input, mounts ?? [], getAppMountPath());
   if (resolution.ok) {
@@ -54,29 +53,27 @@ export function useOpenWikiBoot(): OpenWikiBoot {
   // read — and it needs no ref, which the render rules would not allow anyway.
   const resolved = isDispatched();
 
-  // ⚠ The repo-load form has a race the task form does not, and getting it wrong shows the
-  // reader the WRONG CORPUS.
+  // ⚠ THE COLD-LOAD RACE, and why this does NOT wait for it.
   //
   // A task callee always has a `useTaskInput()`, so "no input" reliably meant "a fork". On a
-  // cold URL load there is no input either way, and the corpus mount is announced by a host
-  // effect — so at first render "fork" and "dispatched, mount not yet announced" are the
-  // same observation. Rendering the fork answer means flashing the VIEWER's own corpus at
-  // someone who asked for a different one.
+  // cold URL load there is no input either way, so at first render "fork" and "dispatched,
+  // mount not yet announced" look identical.
   //
-  // The mount set itself disambiguates: the app's own repo mount is always announced, so an
-  // EMPTY set means the announcement has not happened yet, not that there is nothing to
-  // announce. Wait for it — and if it never comes, fall through to the fork rather than
-  // hanging, because a fork with an unusual mount story is still a wiki we can render.
-  const mountsAnnounced = (mounts?.length ?? 0) > 0;
-  const undecided = !resolved && !resolution.ok && !input && !mountsAnnounced && !gaveUp;
+  // The obvious guard — hold the render until the mount set is non-empty — is WRONG here,
+  // and measurably so: a plain present-mode fork publishes **no mounts at all** (only
+  // worktrees, spaces and dispatched corpora are published; the app's own repo arrives as
+  // `/app` through the bundler, not through the mount channel). So "wait for mounts" would
+  // block every ordinary wiki for the full grace period on a guess that never pays off.
+  //
+  // Instead: answer immediately, and let a late mark CORRECT the answer. `resolveOpenWiki`
+  // re-runs on every mount change and `setContentRoot` latches, so a corpus announced after
+  // first paint still flips this to `ready`. The residual is a brief flash of the viewer's
+  // own corpus IF the host announces late — which it does not in practice, because the host
+  // publishes from a React effect long before the sandboxed app's bundler has finished
+  // loading it. **That ordering is a requirement on the host, not a hope**: publish the
+  // corpus mount before the app boots, exactly as task delegations are minted before the
+  // callee boots (`runTaskInvoke`).
   const pendingReason = resolved || resolution.ok || !input ? null : resolution.reason;
-
-  // The cold-load wait: bounded, and it ends in the FORK answer rather than an error.
-  useEffect(() => {
-    if (!undecided) return;
-    const t = setTimeout(() => setGaveUp(true), MOUNT_GRACE_MS);
-    return () => clearTimeout(t);
-  }, [undecided]);
 
   useEffect(() => {
     if (!pendingReason) return;
@@ -93,7 +90,6 @@ export function useOpenWikiBoot(): OpenWikiBoot {
 
   if (failed) return { status: 'failed', message: failed, readOnly: false };
   if (resolved) return { status: 'ready', message: '', readOnly: isContentReadOnly() };
-  if (undecided) return { status: 'waiting', message: '', readOnly: false };
   if (!input) return { status: 'fork', message: '', readOnly: false };
   return { status: 'waiting', message: '', readOnly: false };
 }

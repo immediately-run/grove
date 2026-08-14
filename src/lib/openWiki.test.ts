@@ -80,6 +80,14 @@ describe('repo-load dispatch — a cold URL load, with no task input at all', ()
     expect(r).toMatchObject({ ok: true, readOnly: true, via: 'repo-load' });
   });
 
+  it('answers FORK immediately when there are no mounts at all', () => {
+    // Measured, not assumed: a plain present-mode fork publishes NO mounts — worktrees,
+    // spaces and dispatched corpora are published, the app's own repo arrives as `/app`
+    // through the bundler. So an empty set must mean "fork, render now", never "wait and
+    // see", or every ordinary wiki pays a grace period for a guess that never pays off.
+    expect(resolveOpenWiki(null, [])).toEqual({ ok: false, reason: 'not-a-callee' });
+  });
+
   it('is NOT fooled by an unmarked foreign mount when there is no task', () => {
     // The whole reason the host marks it: a reader who holds a space has a foreign mount
     // that is not a corpus. Guessing here would render somebody's space as a wiki.
