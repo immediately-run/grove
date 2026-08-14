@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { resolveOpenWiki, OPEN_WIKI_TASK } from './openWiki';
 import { getContentRoot, setContentRoot, resetContentRoot, isDispatched, APP_CONTENT_ROOT } from './contentRoot';
-import { slugToKey, isContentEntry, homeKey, contentDir } from './content';
+import { slugToKey, isContentEntry, homeKey, contentDir, keyToHref, sandboxPathToKey } from './content';
 import { layoutChainForKey } from './layout';
 import type { SandboxMount } from '@immediately-run/sdk/mounts';
 
@@ -100,5 +100,54 @@ describe('contentRoot — the corpus location is a runtime value', () => {
       '/task/t1/dir/_layout.mdx',
       '/task/t1/dir/plot/_layout.mdx',
     ]);
+  });
+});
+
+describe('routing — the URL space follows the packaging', () => {
+  it('leaves a FORK\'s URLs byte-identical', () => {
+    // These are published, cited and deep-linked. A "tidy-up" here breaks every shared
+    // link into the docs wiki, so the fork mapping is pinned rather than merely tested.
+    expect(keyToHref('/app/content/specs/TRUST_MODES_SPEC.mdx')).toBe('/content/specs/TRUST_MODES_SPEC.mdx');
+    expect(sandboxPathToKey('/content/specs/TRUST_MODES_SPEC.mdx')).toBe('/app/content/specs/TRUST_MODES_SPEC.mdx');
+    expect(sandboxPathToKey('/files/content/home.mdx')).toBe('/app/content/home.mdx');
+    expect(sandboxPathToKey('/')).toBe('/app/content/home.mdx');
+  });
+
+  it('makes a DISPATCHED viewer\'s URLs corpus-relative', () => {
+    // The mount is chrooted AT the content directory, so the mount root IS the corpus
+    // root — there is no app-root left to measure from.
+    setContentRoot('/task/t1/dir');
+    expect(keyToHref('/task/t1/dir/plot/the-rail.mdx')).toBe('/plot/the-rail.mdx');
+    expect(sandboxPathToKey('/plot/the-rail.mdx')).toBe('/task/t1/dir/plot/the-rail.mdx');
+    expect(sandboxPathToKey('/files/plot/the-rail.mdx')).toBe('/task/t1/dir/plot/the-rail.mdx');
+    expect(sandboxPathToKey('/')).toBe('/task/t1/dir/home.mdx');
+  });
+
+  it('round-trips key → href → key under both packagings', () => {
+    // The pair has to be symmetric or a link renders to a URL that resolves to a different
+    // entry — the R3-252 class of failure, where navigation lands on the wrong document.
+    const fork = '/app/content/plot/the-rail.mdx';
+    expect(sandboxPathToKey(keyToHref(fork))).toBe(fork);
+    setContentRoot('/task/t1/dir');
+    const dispatched = '/task/t1/dir/plot/the-rail.mdx';
+    expect(sandboxPathToKey(keyToHref(dispatched))).toBe(dispatched);
+  });
+
+  it('sends a path OUTSIDE the corpus home rather than reading it', () => {
+    // Under dispatch this is the guard that stops a crafted URL from naming a file outside
+    // the delegation: it can only ever resolve to an entry inside the content root.
+    setContentRoot('/task/t1/dir');
+    // Traversal resolves and lands outside → home. The check must run on the RESOLVED
+    // path: `/task/t1/dir/../../app/src/App.tsx` starts with the content root as a string
+    // and is a different file as a path, and this key is what `fs.readFile` receives.
+    expect(sandboxPathToKey('/../../app/src/App.tsx')).toBe('/task/t1/dir/home.mdx');
+    expect(sandboxPathToKey('/plot/../../../etc/passwd')).toBe('/task/t1/dir/home.mdx');
+
+    // A URL that merely LOOKS like the viewer's own app path is not one: under dispatch
+    // `/app` has no special meaning, so this is an ordinary corpus-relative path that
+    // stays inside the delegation and simply has no entry (the 404 index).
+    const key = sandboxPathToKey('/app/content/home.mdx');
+    expect(key.startsWith('/task/t1/dir/')).toBe(true);
+    expect(key).toBe('/task/t1/dir/app/content/home.mdx');
   });
 });

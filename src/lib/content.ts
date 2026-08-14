@@ -13,7 +13,7 @@
 // `keyToHref` strips `/app` (the runtime <Link> then prepends `/files`), and
 // `keyToRepoRel` strips `/app/` for requestEdit. Pure helpers — no components.
 
-import { getContentRoot } from './contentRoot';
+import { getContentRoot, isDispatched } from './contentRoot';
 
 export const APP_PREFIX = '/app';
 export const FILES_PREFIX = '/files';
@@ -56,11 +56,32 @@ export function slugToKey(slug: string): string {
   return contentDir() + slug.replace(/^\//, '') + '.mdx';
 }
 
-/** Canonical key → href for the runtime <Link>. The key is the absolute fs path
- *  (`/app/content/x.mdx`); the URL space drops `/app` and <Link> prepends `/files`
- *  itself, so we hand it the APP_ROOT-relative path (`/content/x.mdx`). */
+/**
+ * The prefix the URL space is measured FROM — the one place the two packagings differ in
+ * how a key becomes a link, and vice versa.
+ *
+ * A FORK's URLs are anchored at the app root, so a key `/app/content/x.mdx` is the href
+ * `/content/x.mdx` — `content/` included. That is not a detail to tidy up: those URLs are
+ * published, cited and deep-linked, so the fork's mapping must stay byte-identical.
+ *
+ * A DISPATCHED viewer has no app-root to measure from — the corpus is a chroot minted AT
+ * the content directory, so the mount root IS the corpus root and hrefs are corpus-relative
+ * (`/plot/the-rail.mdx`). Nothing is published against that space yet, which is why it can
+ * be defined here rather than negotiated.
+ *
+ * (The repo-load URL space — where a dispatched entry's URL must name a path in the CONTENT
+ * repo, `content/` segment and all — is R3-172's, and is decided when that space exists.
+ * Under the task/overlay dispatch that ships today there is no external URL to preserve.)
+ */
+function urlAnchor(): string {
+  return isDispatched() ? contentDir().replace(/\/+$/, '') : APP_PREFIX;
+}
+
+/** Canonical key → href for the runtime <Link>. The key is the absolute fs path; the URL
+ *  space drops the anchor and <Link> prepends `/files` itself. */
 export function keyToHref(key: string): string {
-  return key.startsWith(APP_PREFIX) ? key.slice(APP_PREFIX.length) : key;
+  const anchor = urlAnchor();
+  return key.startsWith(anchor) ? key.slice(anchor.length) : key;
 }
 
 /** Canonical key → the absolute fs/module path for <Include> / dynamicImport /
@@ -150,10 +171,20 @@ export function linkKind(href: string): 'external' | 'anchor' | 'content' {
 /** Current navigation sandboxPath → the canonical metadata/Include key. */
 export function sandboxPathToKey(sandboxPath: string): string {
   if (!sandboxPath || sandboxPath === '/') return homeKey();
+  const anchor = urlAnchor();
   let p = sandboxPath;
   if (p.startsWith(FILES_PREFIX)) p = p.slice(FILES_PREFIX.length); // /files/content/x → /content/x
-  if (!p.startsWith(APP_PREFIX + '/')) p = APP_PREFIX + p; // /content/x → /app/content/x (and /app/content/x stays)
-  if (p === APP_PREFIX || p === APP_PREFIX + '/') return homeKey();
+  if (!p.startsWith(anchor + '/')) p = anchor + p; // relative → anchored (an anchored path stays)
+  // NORMALIZE BEFORE CHECKING. The containment test below used to run on the raw text, so
+  // `/../../app/src/App.tsx` anchored to `/task/t1/dir/../../app/src/App.tsx` — which
+  // starts with the content root as a STRING and resolves somewhere else entirely as a
+  // PATH. The key flows straight into `fs.readFile` (entry bodies, reading time,
+  // backlinks), and under dispatch the URL is attacker-influenceable: a link in foreign
+  // content, or a crafted address. Resolve the traversal first, then ask where it landed.
+  p = normalizeKey(p);
+  if (p === anchor || p === anchor + '/') return homeKey();
+  // The guard, not a formality: anything that does not land inside the corpus resolves
+  // HOME rather than becoming a key that reads some other file.
   return p.startsWith(contentDir()) ? p : homeKey();
 }
 
