@@ -2,7 +2,7 @@
 import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
+import { contentDir, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
 import { namespaceOf, queryPaths } from '../lib/wiki';
 
 // `<ChildPages/>` — the entries that live under the current entry's namespace, as
@@ -10,7 +10,7 @@ import { namespaceOf, queryPaths } from '../lib/wiki';
 export default function ChildPages() {
   const ctx = useContext(TinkerableContext) as any;
   const currentKey = sandboxPathToKey(ctx?.navigationState?.sandboxPath || '/');
-  const rel = currentKey.replace(CONTENT_DIR, '').replace(/\.mdx?$/, '');
+  const rel = currentKey.replace(contentDir(), '').replace(/\.mdx?$/, '');
   // The folder this entry indexes: its own slug if it's a section index, else its namespace.
   const scope = rel.replace(/\/?(index|home)$/, '');
 
@@ -32,7 +32,7 @@ export default function ChildPages() {
     <div className="grove-doclist" data-shape="feed">
       {paths.map((p) => (
         <Link key={p} href={keyToHref(p)} className="gdl-row">
-          <div className="gdl-row__t">{p.replace(CONTENT_DIR, '').replace(/\.mdx?$/, '').split('/').pop()}</div>
+          <div className="gdl-row__t">{p.replace(contentDir(), '').replace(/\.mdx?$/, '').split('/').pop()}</div>
         </Link>
       ))}
     </div>

@@ -2,7 +2,7 @@
 import { useCallback, useContext } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, sandboxPathToKey } from '../lib/content';
+import { contentDir, sandboxPathToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 
 interface Node {
@@ -24,7 +24,7 @@ export default function FamilyTree() {
   const queryFn = useCallback((fm: Record<string, any>) => {
     const out: { key: string; label: string; group: string }[] = [];
     Object.entries(fm).forEach(([p, m]: [string, any]) => {
-      if (!p.startsWith(CONTENT_DIR)) return;
+      if (!p.startsWith(contentDir())) return;
       const group = m?.house || m?.team || m?.parent || m?.manager;
       if (group && (m?.name || m?.title)) {
         out.push({ key: p, label: (m.name || m.title).replace(/\.$/, ''), group: String(group) });

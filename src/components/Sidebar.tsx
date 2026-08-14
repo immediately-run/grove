@@ -2,7 +2,7 @@
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { CONTENT_DIR, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
+import { contentDir, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -16,7 +16,7 @@ interface TreeNode {
 }
 
 function insert(root: TreeNode, key: string, title: string) {
-  const rel = key.replace(CONTENT_DIR, '').replace(/\.mdx?$/, '');
+  const rel = key.replace(contentDir(), '').replace(/\.mdx?$/, '');
   const parts = rel.split('/');
   let node = root;
   parts.forEach((part, i) => {

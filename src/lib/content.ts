@@ -13,14 +13,26 @@
 // `keyToHref` strips `/app` (the runtime <Link> then prepends `/files`), and
 // `keyToRepoRel` strips `/app/` for requestEdit. Pure helpers — no components.
 
+import { getContentRoot } from './contentRoot';
+
 export const APP_PREFIX = '/app';
 export const FILES_PREFIX = '/files';
-export const CONTENT_DIR = '/app/content/';
-export const HOME_KEY = '/app/content/home.mdx';
+
+/** Where this instance's corpus lives — `/app/content/` for a fork, the delegated
+ *  directory for a dispatched viewer. A FUNCTION, not a constant: see
+ *  [[contentRoot]] for why capturing it at module scope is the bug it replaces. */
+export function contentDir(): string {
+  return getContentRoot();
+}
+
+/** The site root entry — the home page of whichever corpus is mounted. */
+export function homeKey(): string {
+  return `${getContentRoot()}home.mdx`;
+}
 
 /** Is this a content-entry metadata key? */
 export function isEntryKey(key: string): boolean {
-  return key.startsWith(CONTENT_DIR) && /\.mdx?$/.test(key);
+  return key.startsWith(contentDir()) && /\.mdx?$/.test(key);
 }
 
 /** Is this a folder-convention layout file (`…/_layout.mdx`)? These are structure,
@@ -35,13 +47,13 @@ export function isLayoutKey(key: string): boolean {
  *  single predicate every enumeration (nav, sidebar, 404 index, search, indexes)
  *  should filter on, so layout files never leak into reader-facing surfaces. */
 export function isContentEntry(key: string): boolean {
-  if (!key.startsWith(CONTENT_DIR) || !/\.mdx?$/.test(key)) return false;
+  if (!key.startsWith(contentDir()) || !/\.mdx?$/.test(key)) return false;
   return !(key.split('/').pop() || '').startsWith('_');
 }
 
 /** `handbook/onboarding` → `/app/content/handbook/onboarding.mdx` (the canonical key). */
 export function slugToKey(slug: string): string {
-  return CONTENT_DIR + slug.replace(/^\//, '') + '.mdx';
+  return contentDir() + slug.replace(/^\//, '') + '.mdx';
 }
 
 /** Canonical key → href for the runtime <Link>. The key is the absolute fs path
@@ -137,12 +149,12 @@ export function linkKind(href: string): 'external' | 'anchor' | 'content' {
 
 /** Current navigation sandboxPath → the canonical metadata/Include key. */
 export function sandboxPathToKey(sandboxPath: string): string {
-  if (!sandboxPath || sandboxPath === '/') return HOME_KEY;
+  if (!sandboxPath || sandboxPath === '/') return homeKey();
   let p = sandboxPath;
   if (p.startsWith(FILES_PREFIX)) p = p.slice(FILES_PREFIX.length); // /files/content/x → /content/x
   if (!p.startsWith(APP_PREFIX + '/')) p = APP_PREFIX + p; // /content/x → /app/content/x (and /app/content/x stays)
-  if (p === APP_PREFIX || p === APP_PREFIX + '/') return HOME_KEY;
-  return p.startsWith(CONTENT_DIR) ? p : HOME_KEY;
+  if (p === APP_PREFIX || p === APP_PREFIX + '/') return homeKey();
+  return p.startsWith(contentDir()) ? p : homeKey();
 }
 
 /** A sandboxPath → the absolute fs base for resolving relative assets. */
