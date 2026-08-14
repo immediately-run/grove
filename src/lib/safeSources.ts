@@ -1,4 +1,4 @@
-import { openAppFs } from '@immediately-run/sdk';
+import fs from 'fs';
 import { createSourceCache } from './sourceCache';
 
 // The ONE raw-source cache the interpreter path reads through — entry bodies
@@ -13,6 +13,13 @@ import { createSourceCache } from './sourceCache';
 // is EVICTED rather than memoised, because the host↔sandbox RPC drops requests during a
 // navigation and a rejected promise left in the cache is returned to every later render —
 // which made an entry permanently blank for the rest of the session.
+// Keyed by the ABSOLUTE path, not a repo-relative one (R3-265). `openAppFs()` is scoped to
+// the APP's repo, which is right for a fork and wrong for a dispatched viewer — the corpus
+// then lives at a host-minted chroot, and an app-scoped read would either miss it or find
+// the viewer's own entry of the same name. The unified `fs` namespace addresses both: a
+// fork's `/app/content/x.mdx` and a dispatched `/task/<slot>/dir/x.mdx` are the same kind of
+// path, which is also the key the metadata index uses, so one identifier now reads a body
+// and its metadata.
 export const safeSources = createSourceCache(
-  (repoRel) => openAppFs().readFile(repoRel, 'utf8') as Promise<string>
+  (absPath) => fs.promises.readFile(absPath, 'utf8') as Promise<string>
 );

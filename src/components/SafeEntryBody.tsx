@@ -5,7 +5,6 @@ import {
   useFileMetadata,
 } from '@immediately-run/sdk';
 import { SAFE_MDX } from '../mdxComponents';
-import { keyToRepoRel } from '../lib/content';
 import { safeSources } from '../lib/safeSources';
 import ScrollToFragment from './ScrollToFragment';
 
@@ -34,7 +33,7 @@ function stripFrontmatter(src: string): string {
 }
 
 function SafeBody({ entryKey }: { entryKey: string }) {
-  const raw = use(safeSources.read(keyToRepoRel(entryKey)));
+  const raw = use(safeSources.read(entryKey));
   // Consume the entry's metadata so this re-renders if frontmatter changes (parity with
   // the compiled path's reactivity); the body itself is the stripped source.
   useFileMetadata(entryKey);
