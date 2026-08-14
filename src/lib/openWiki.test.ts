@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { resolveOpenWiki, OPEN_WIKI_TASK } from './openWiki';
+import { resolveOpenWiki, OPEN_WIKI_TASK, CONTENT_MOUNT_TYPE } from './openWiki';
 import { getContentRoot, setContentRoot, resetContentRoot, isDispatched, APP_CONTENT_ROOT } from './contentRoot';
 import { slugToKey, isContentEntry, homeKey, contentDir, keyToHref, sandboxPathToKey } from './content';
 import { layoutChainForKey } from './layout';
@@ -13,14 +13,14 @@ afterEach(resetContentRoot);
 describe('resolveOpenWiki — the delegated corpus', () => {
   it('resolves the dir param mounted at the host-minted chroot', () => {
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/app'), mount('/task/t1/dir')]);
-    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: false });
+    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: false, via: 'task' });
   });
 
   it('reports a read-only delegation without refusing it', () => {
     // Sharing a corpus read-only is legitimate — the reader still reads. Only the WRITE
     // affordances may consult this; refusing the whole open would break the ordinary case.
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/task/t1/dir', { mode: 'ro' })]);
-    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: true });
+    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: true, via: 'task' });
   });
 
   it('is not a callee when there is no task input — the ordinary fork boot', () => {
@@ -48,7 +48,7 @@ describe('resolveOpenWiki — the delegated corpus', () => {
     // The host owns the `/task/<slot>/<param>` grammar; if it ever renames the segment,
     // suffix-matching alone would cancel a task the user really asked for.
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/app'), mount('/mnt/abc123')]);
-    expect(r).toEqual({ ok: true, root: '/mnt/abc123', readOnly: false });
+    expect(r).toEqual({ ok: true, root: '/mnt/abc123', readOnly: false, via: 'task' });
   });
 
   it('does not guess between two foreign mounts', () => {
@@ -61,6 +61,42 @@ describe('resolveOpenWiki — the delegated corpus', () => {
     // one. Hardcoding /app here would read the viewer's own corpus as the delegation.
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/mnt/self')], '/mnt/self');
     expect(r).toEqual({ ok: false, reason: 'no-mount' });
+  });
+});
+
+describe('repo-load dispatch — a cold URL load, with no task input at all', () => {
+  it('resolves the corpus from the MARKED mount', () => {
+    // R3-172: the URL named a content repo; the host resolved this viewer through the
+    // binding table and published the corpus stamped `type: 'content'`.
+    const r = resolveOpenWiki(null, [
+      mount('/app'),
+      mount('/mnt/deadbeef', { type: CONTENT_MOUNT_TYPE, name: 'neumark/book-nine-from-here' }),
+    ]);
+    expect(r).toEqual({ ok: true, root: '/mnt/deadbeef', readOnly: false, via: 'repo-load' });
+  });
+
+  it('carries a read-only delegation through', () => {
+    const r = resolveOpenWiki(null, [mount('/mnt/x', { type: CONTENT_MOUNT_TYPE, mode: 'ro' })]);
+    expect(r).toMatchObject({ ok: true, readOnly: true, via: 'repo-load' });
+  });
+
+  it('is NOT fooled by an unmarked foreign mount when there is no task', () => {
+    // The whole reason the host marks it: a reader who holds a space has a foreign mount
+    // that is not a corpus. Guessing here would render somebody's space as a wiki.
+    expect(resolveOpenWiki(null, [mount('/app'), mount('/spaces/s1', { type: 'firestore' })]))
+      .toEqual({ ok: false, reason: 'not-a-callee' });
+    expect(resolveOpenWiki(null, [mount('/app'), mount('/mnt/wt', { type: 'worktree' })]))
+      .toEqual({ ok: false, reason: 'not-a-callee' });
+  });
+
+  it('prefers the marked mount over a task delegation, and says which', () => {
+    // Both present is not a real shape today, but the precedence must be decided rather
+    // than emergent: the mark is the host's explicit statement about THIS load.
+    const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [
+      mount('/task/t1/dir'),
+      mount('/mnt/marked', { type: CONTENT_MOUNT_TYPE }),
+    ]);
+    expect(r).toMatchObject({ root: '/mnt/marked', via: 'repo-load' });
   });
 });
 
