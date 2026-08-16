@@ -18,11 +18,34 @@
 // Hence the split: this file resolves, `GroveWiki` renders.
 
 import { use } from 'react';
+import * as sdk from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useCorpusMetadata } from './hooks/useCorpusMetadata';
 import { getContentRoot } from './lib/contentRoot';
+import { sandboxPathToKey, isEntryKey, keyToRepoRel, FILES_PREFIX } from './lib/content';
 import GroveWiki from './GroveWiki';
+
+// R3-268 — the viewed-document rule, registered ONCE at module load: every
+// `navigate()`/`<Link>` navigation declares which WORKING-TREE file the
+// destination renders, so the host's file explorer can highlight it. An entry
+// route maps through the existing (traversal-hardened) `sandboxPathToKey`
+// — content-root-joined, i.e. the CORPUS path under dispatch, which the host
+// could never derive from the URL's key space — and every non-entry view
+// declares `null` (clear the highlight). Resolved PER NAVIGATION, not captured:
+// the content root is a function of dispatch state (see `contentRoot`).
+// Guarded with `?.` so Grove still runs against an SDK generation without the
+// hook (the host then falls back to the URL convention, which under dispatch
+// simply yields no highlight). Highlight-only by contract — this never scrolls,
+// never moves focus, never opens the editor.
+(sdk as { setViewedDocumentResolver?: (r: (href: string) => string | null | undefined) => void })
+  .setViewedDocumentResolver?.((targetHref) => {
+    const path = new URL(targetHref, 'https://placeholder.invalid').pathname;
+    const i = path.indexOf(`${FILES_PREFIX}/`);
+    const sandboxPath = i >= 0 ? path.slice(i) : '';
+    const key = sandboxPathToKey(sandboxPath);
+    return isEntryKey(key) ? keyToRepoRel(key) : null;
+  });
 
 export default function App() {
   const host = use(TinkerableContext);
