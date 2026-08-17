@@ -17,8 +17,9 @@
 //
 // Hence the split: this file resolves, `GroveWiki` renders.
 
-import { use } from 'react';
+import { use, useEffect, useRef } from 'react';
 import * as sdk from '@immediately-run/sdk';
+import { sendMessage } from '@immediately-run/sdk/sandboxUtils';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useCorpusMetadata } from './hooks/useCorpusMetadata';
@@ -43,6 +44,27 @@ import GroveWiki from './GroveWiki';
 export default function App() {
   const host = use(TinkerableContext);
   const boot = useOpenWikiBoot();
+  // R3-268 deep links: declare the INITIALLY rendered document once at boot. A
+  // fresh page load performs no navigation, so without this the host records no
+  // viewed document for a deep link and the explorer shows no highlight (nor
+  // ancestor dot) until the first in-app click. Carries no gesture: the host
+  // records it userInitiated=false — highlight-only, never a reveal. Waits for
+  // the boot resolution because the content root (and so the mapping) is a
+  // function of dispatch state. Fire-and-forget: no transport (plain `vite dev`)
+  // must not crash the wiki.
+  const declaredBootRef = useRef(false);
+  const outerHref = host?.outerHref;
+  useEffect(() => {
+    if (declaredBootRef.current) return;
+    if (boot.status !== 'ready' && boot.status !== 'fork') return;
+    if (!outerHref) return;
+    declaredBootRef.current = true;
+    try {
+      sendMessage('viewed-document-declare', { value: viewedDocumentForTarget(outerHref) });
+    } catch {
+      /* no host transport — a standalone dev server render */
+    }
+  }, [boot.status, outerHref]);
   // Only a dispatched viewer scans; a fork's index is already in the context.
   const corpus = useCorpusMetadata(boot.status === 'ready' ? getContentRoot() : null);
 
