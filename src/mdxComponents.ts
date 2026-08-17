@@ -1,5 +1,3 @@
-import { DEFAULT_MDX_COMPONENTS } from '@immediately-run/sdk';
-import { SAFE_INTRINSICS } from './lib/safeIntrinsics';
 import AssetImage from './components/AssetImage';
 import Callout from './components/Callout';
 import Lede from './components/Lede';
@@ -63,23 +61,4 @@ export const GROVE_MDX = {
   GroveNav,
   GroveSidebar: Sidebar,
   GroveFooter,
-};
-
-// The map the INTERPRETER (safe) renderer consumes — one definition, used by both
-// `SafeEntryBody` (entry bodies) and `SafeLayout` (the `_layout.mdx` chain), so the two
-// halves of a safe-rendered page can never drift apart in what they resolve. (R3-263)
-//
-// Layered exactly as `boot()` layers the compiled path, so a document renders identically
-// under either standard: the SDK's platform defaults (Admonition / WikiLink / HeadingAnchor,
-// carrying the deep-link resolver) UNDER the Grove vocabulary above — plus the sanitizing
-// structural tags (`src/lib/safeIntrinsics.tsx`), which the compiled path gets for free from
-// JSX and the safe path must be handed explicitly.
-//
-// Precedence is deliberate: intrinsics go on the BOTTOM. `GROVE_MDX` overrides `a` and `img`
-// with <WikiLink>/<AssetImage>, and those must win — SAFE_INTRINSICS does not register `a`
-// or `img` at all, but ordering it last would be a trap for whoever adds them.
-export const SAFE_MDX = {
-  ...SAFE_INTRINSICS,
-  ...(DEFAULT_MDX_COMPONENTS as Record<string, unknown>),
-  ...GROVE_MDX,
 };
