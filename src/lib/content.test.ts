@@ -138,3 +138,55 @@ describe('linkKind — which hrefs may become a navigating <a>', () => {
     expect(linkKind('plans/https-migration.mdx')).toBe('content');
   });
 });
+
+// R3-268 under dispatch — the viewed-document declaration's PATH SPACE. The regression:
+// `keyToRepoRel` only knows the fork's `/app/` anchor, so a dispatched key leaked its
+// sandbox mount path (`mnt/<hash>/themes.mdx`) into the declaration; the host's existence
+// check (against the corpus repo's real `/content/themes.mdx`) missed, and the explorer
+// highlight silently degraded to none. The contract now: fork declares REPO-relative,
+// dispatch declares CORPUS-relative (the host joins its chroot prefix — the corpus's
+// repo-side location is host knowledge this app cannot see).
+import { viewedDocumentForTarget } from './content';
+import { setContentRoot, resetContentRoot } from './contentRoot';
+import { afterEach } from 'vitest';
+
+describe('viewedDocumentForTarget — the R3-268 declaration path space', () => {
+  afterEach(resetContentRoot);
+
+  const HOST = 'https://immediately.run/edit/github/ns/repo/main';
+
+  it('fork: an entry target declares the REPO-relative path (the /app anchor strips)', () => {
+    // Fork URL keys are REPO-relative (`files/content/…`) — the engine repo is the tree.
+    expect(viewedDocumentForTarget(`${HOST}/files/content/themes.mdx`)).toBe('content/themes.mdx');
+    expect(viewedDocumentForTarget(`${HOST}/files/content/plot/index.mdx`)).toBe('content/plot/index.mdx');
+  });
+
+  it('dispatch: an entry target declares the CORPUS-relative path — never the mount path', () => {
+    setContentRoot('/mnt/0a1b2c3d');
+    expect(viewedDocumentForTarget(`${HOST}/files/themes.mdx`)).toBe('themes.mdx');
+    expect(viewedDocumentForTarget(`${HOST}/files/plot/index.mdx`)).toBe('plot/index.mdx');
+    // The regression shape: the mount path must not leak into the declaration.
+    expect(viewedDocumentForTarget(`${HOST}/files/themes.mdx`)).not.toMatch(/^mnt\//);
+  });
+
+  it('the wiki root declares the HOME entry (the root route renders home.mdx)', () => {
+    expect(viewedDocumentForTarget(`${HOST}/files/`)).toBe('content/home.mdx');
+    setContentRoot('/mnt/0a1b2c3d');
+    expect(viewedDocumentForTarget(`${HOST}/files/`)).toBe('home.mdx');
+  });
+
+  it('a non-entry target (not .mdx) declares null, in both packagings', () => {
+    expect(viewedDocumentForTarget(`${HOST}/files/content/llms.txt`)).toBeNull();
+    setContentRoot('/mnt/0a1b2c3d');
+    expect(viewedDocumentForTarget(`${HOST}/files/llms.txt`)).toBeNull();
+  });
+
+  it('a traversal in the target degrades to HOME — an out-of-tree path never leaks', () => {
+    // sandboxPathToKey resolves traversals BEFORE the containment check; anything
+    // outside the corpus resolves to the home key, so the declaration is home, never
+    // a `..`-bearing or out-of-corpus path.
+    setContentRoot('/mnt/0a1b2c3d');
+    const declared = viewedDocumentForTarget(`${HOST}/files/../../app/src/App.tsx`);
+    expect(declared).toBe('home.mdx');
+  });
+});

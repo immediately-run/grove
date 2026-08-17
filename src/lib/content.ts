@@ -100,6 +100,33 @@ export function keyToRepoRel(key: string): string {
   return key.replace(/^\/app\//, '').replace(/^\//, '');
 }
 
+/**
+ * R3-268 — the viewed-document declaration for a navigation target (the value the
+ * resolver hands the SDK): the destination entry's path in this app's VISIBLE tree.
+ *
+ * Two path spaces, one per packaging:
+ *  - **Fork**: the engine repo IS the working tree, so the `/app/`-anchored key strips
+ *    to a repo-relative path (`content/themes.mdx`) — `keyToRepoRel`, unchanged.
+ *  - **Dispatch**: the delegated corpus mount is ALL this app can see or name, so the
+ *    declaration is CORPUS-relative (`themes.mdx` — the key minus the content root).
+ *    The host owns the corpus→repo translation and joins its chroot prefix before the
+ *    existence check. `keyToRepoRel` here was the bug: it only knows the `/app/`
+ *    anchor, so a dispatched key leaked its sandbox MOUNT path (`mnt/<hash>/…`) into
+ *    the declaration, the host's existence check missed, and the highlight silently
+ *    degraded to none.
+ *
+ * A non-entry view declares `null` (clear the highlight).
+ */
+export function viewedDocumentForTarget(targetHref: string): string | null {
+  const path = new URL(targetHref, 'https://placeholder.invalid').pathname;
+  const i = path.indexOf(`${FILES_PREFIX}/`);
+  const sandboxPath = i >= 0 ? path.slice(i) : '';
+  const key = sandboxPathToKey(sandboxPath);
+  if (!isEntryKey(key)) return null;
+  // isEntryKey guarantees the key starts with the content root, so the slice is total.
+  return isDispatched() ? key.slice(getContentRoot().length) : keyToRepoRel(key);
+}
+
 /** Split a link target into its path part and its `#fragment` (the `#` kept), e.g.
  *  `"FOO.mdx#sec-8-9"` → `["FOO.mdx", "#sec-8-9"]`. Only the FIRST `#` splits. */
 export function splitFragment(href: string): [string, string] {
