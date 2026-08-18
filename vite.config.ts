@@ -28,6 +28,9 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
+    // Installs the stub host transport the SDK's root module needs at import time —
+    // see src/test/setup.ts. Without it a component test dies before it runs.
+    setupFiles: ['src/test/setup.ts'],
     server: {
       // The SDK's own dist uses extensionless relative imports (`./SafeContent`),
       // which a bundler resolves and raw node ESM does not. Inlining it makes the

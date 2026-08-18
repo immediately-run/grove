@@ -1073,9 +1073,32 @@ a.gdl-row {
   position: sticky;
   top: 78px;
   font-size: 13px;
+  /* Its OWN scroll container — the whole point of <TableOfContents>. A list taller than
+     the viewport has to scroll somewhere, and if it is not here it is the page, which is
+     how a contents rail ends up showing §1 while the reader is in §12. */
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* `offsetTop` is measured from the nearest POSITIONED ancestor; `position: sticky`
+     already makes this one, and the comment is here so nobody "cleans up" the sticky
+     into a plain block and silently moves the scroll arithmetic's origin. */
+  scrollbar-width: thin;
+}
+/* A ToC that scrolls needs a visible edge to scroll to, and the default overlay bar is
+   invisible until moved. Keep the gutter reserved so entries don't reflow on hover. */
+.grove-toc::-webkit-scrollbar {
+  width: 6px;
+}
+.grove-toc::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: var(--r-pill);
 }
 .grove-root[data-vw="mobile"] .grove-toc {
   position: static;
+  /* Inside the mobile <details> disclosure the rail is already in a bounded box and the
+     page scrolls; a second nested scroller there traps the touch gesture. */
+  max-height: none;
+  overflow-y: visible;
 }
 .grove-toc__h {
   font-family: var(--mono);
@@ -1084,6 +1107,14 @@ a.gdl-row {
   letter-spacing: .1em;
   color: var(--ink-3);
   margin-bottom: 10px;
+  /* Sticky INSIDE the rail's own scroller: once the list scrolls, the label that says
+     what the list is would otherwise be the first thing to leave. Needs an opaque
+     background or the entries read through it. */
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding-bottom: 6px;
+  z-index: 1;
 }
 .grove-toc a {
   display: block;

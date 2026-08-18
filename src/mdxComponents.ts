@@ -14,6 +14,7 @@ import Quote from './components/Quote';
 import KeyValue from './components/KeyValue';
 import Kbd from './components/Kbd';
 import Toc from './components/Toc';
+import TableOfContents from './components/TableOfContents';
 import Backlinks from './components/Backlinks';
 import PageMeta from './components/PageMeta';
 import RecentlyUpdated from './components/RecentlyUpdated';
@@ -50,6 +51,7 @@ export const GROVE_MDX = {
   KeyValue,
   Kbd,
   Toc,
+  TableOfContents,
   Backlinks,
   PageMeta,
   RecentlyUpdated,
