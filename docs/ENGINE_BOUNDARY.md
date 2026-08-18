@@ -40,7 +40,13 @@ Anything that renders *any* corpus, and holds no opinion about what the corpus i
   (`lib/sourceCache.ts`);
 - the layout chain (`lib/layout.ts`, `_layout.mdx` + `<Outlet/>`) and the shell primitives;
 - the generic content vocabulary registered in `mdxComponents.ts` — `<DocList>`, `<TagCloud>`,
-  `<Backlinks>`, `<Timeline>`, `<FamilyTree>`, and friends.
+  `<Backlinks>`, `<Timeline>`, `<FamilyTree>`, `<DirectoryList>`, and friends;
+- **folder routing** (`lib/directory.ts`, `hooks/useDirectoryListing`, `<DirectoryView>`):
+  a URL naming a directory renders its `index.mdx` if the corpus wrote one, else the
+  generated listing. The route resolves `DirectoryList` **through the MDX component map**
+  rather than importing it, so a fork's or (with R3-174) a corpus's replacement reaches the
+  route as well as the tag — a half-override that only reached MDX bodies would be
+  invisible to whoever installed it.
 
 ## 3. What is corpus furniture
 

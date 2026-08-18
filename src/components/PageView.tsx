@@ -4,6 +4,7 @@ import { useShell } from '../lib/shell';
 import { keyToHref, keyToRepoRel } from '../lib/content';
 import { crumb } from '../lib/wiki';
 import { requestEdit } from '@immediately-run/sdk';
+import DirectoryView from './DirectoryView';
 import EntryHeader from './EntryHeader';
 import SafeEntryBody from './SafeEntryBody';
 import ScrollToFragment from './ScrollToFragment';
@@ -19,7 +20,13 @@ declare const module: any;
 // site chrome (nav / sidebar / footer) — that's the layout's job — so the page
 // stays free of shell concerns.
 export default function PageView() {
-  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, vw, safe } = useShell();
+  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, vw, safe, directory } = useShell();
+
+  // A folder URL. `checking` renders nothing rather than the 404: the readdir that
+  // decides between them is one RPC away, and a 404 that appears and then turns into a
+  // listing reads as a broken link that healed itself.
+  if (directory.status === 'checking') return <div className="grove-state" data-state="checking" />;
+  if (directory.status === 'ready') return <DirectoryView />;
 
   if (missing) {
     return (

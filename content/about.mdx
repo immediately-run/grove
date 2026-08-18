@@ -22,5 +22,24 @@ This is a Grove — a wiki where every entry is one MDX file and the chrome is c
 - `<DocList>` — the index feed and grid
 - `<Backlinks>` — who links here
 - `<Directory>` — the phone book (agent-added view)
+- `<DirectoryList>` — the files in a folder, with their frontmatter
+
+## Folder URLs
+
+Every folder in the corpus is an address of its own. Open [handbook](handbook) and Grove
+lists what is in it — entries with their title, description, tags and date, subfolders,
+and any assets that live alongside them. Columns appear only for frontmatter the entries
+actually carry, so a folder of plain markdown gets a plain table.
+
+Two ways to change what a folder URL shows:
+
+- **Write `index.mdx` in the folder.** Grove renders your page instead of the generated
+  listing — curation beats generation, no engine change needed.
+- **Replace `<DirectoryList>` in the MDX component map.** The folder route resolves the
+  table by name, so an override reaches the route as well as the tag.
+
+You can also drop the table into any entry:
+
+<DirectoryList path="/handbook" title="Everything in handbook/"/>
 
 <Callout variant="note" title="For the next agent">These conventions also live in `GROVE.md` at the content root, kept in sync by Grove's agent. Read it before changing structure.</Callout>
