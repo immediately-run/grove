@@ -1,10 +1,32 @@
+import { SLUG_PARITY_FIXTURE } from '@immediately-run/mdx-plugins';
 import { describe, it, expect } from 'vitest';
 import { headingId, sectionId, textSlug } from './wiki';
 
 // The heading ids Grove computes MUST match the kernel's heading-slug plugin
-// (`@immediately-run/transpiler` remarkHeadingAnchors, MARKDOWN_SYNTAX_SPEC §15.1 /
+// (`@immediately-run/mdx-plugins` remarkHeadingAnchors, MARKDOWN_SYNTAX_SPEC §15.1 /
 // R3-186 + R3-211) so a `<Toc>` link and the heading's own autolink anchor resolve
-// to the same target (§15.5). These cases mirror the transpiler's golden suite.
+// to the same target (§15.5).
+//
+// Since R3-277 that is true by CONSTRUCTION — `wiki.ts` re-exports the canon rather
+// than reproducing it — and the fixture below is what makes the claim testable
+// instead of merely structural: if a future change reintroduces a local copy, or the
+// canon moves under us, this fails here rather than in a reader's broken TOC link.
+describe('the shared slug parity fixture (R3-277)', () => {
+  it('grove agrees with the canon on every case', () => {
+    for (const c of SLUG_PARITY_FIXTURE) {
+      expect(textSlug(c.text), c.why).toBe(c.slug);
+      expect(sectionId(c.text), c.why).toBe(c.section);
+      expect(headingId(c.text), c.why).toBe(c.id);
+    }
+  });
+
+  it('the fixture actually arrived (a vacuous loop would pass silently)', () => {
+    expect(SLUG_PARITY_FIXTURE.length).toBeGreaterThan(10);
+  });
+});
+
+// The cases below predate the fixture and are kept: they read as documentation of
+// the grammar at the call site, and they would catch a fixture that lost a case.
 describe('headingId — byte-identical with the kernel (§15.5)', () => {
   it('prose heading → GitHub text slug', () => {
     expect(headingId('Getting started')).toBe('getting-started');
