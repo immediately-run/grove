@@ -145,7 +145,9 @@ describe('parseFrontmatter — the grammar the authoring contract documents', ()
 
   it('treats an unterminated block as no frontmatter, keeping the body whole', () => {
     const src = '---\ntitle: X\n\n# body';
-    expect(parseFrontmatter(src)).toEqual({ data: {}, body: src });
+    // `hadFrontmatter` distinguishes this from `---\n---` (a block WITH no keys) —
+    // carried by the shared parser since R3-277a, where Grove's port had dropped it.
+    expect(parseFrontmatter(src)).toEqual({ data: {}, body: src, hadFrontmatter: false });
   });
 
   it('does not mistake a horizontal rule mid-document for frontmatter', () => {

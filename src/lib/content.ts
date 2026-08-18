@@ -1,3 +1,5 @@
+import { isContentEntryPath } from '@immediately-run/mdx-plugins';
+
 // Path conventions for Grove content.
 //
 // The CANONICAL KEY in this app is the file's ABSOLUTE module/fs path, e.g.
@@ -47,8 +49,12 @@ export function isLayoutKey(key: string): boolean {
  *  single predicate every enumeration (nav, sidebar, 404 index, search, indexes)
  *  should filter on, so layout files never leak into reader-facing surfaces. */
 export function isContentEntry(key: string): boolean {
-  if (!key.startsWith(contentDir()) || !/\.mdx?$/.test(key)) return false;
-  return !(key.split('/').pop() || '').startsWith('_');
+  // The ROOTING is this viewer's (a metadata key under whichever corpus is mounted);
+  // the ENTRY RULE is shared with the corpus tooling (R3-277a), because a file that
+  // counts as an entry in one and not the other is a page that exists but cannot be
+  // found — or an index row pointing at a layout wrapper.
+  if (!key.startsWith(contentDir())) return false;
+  return isContentEntryPath(key);
 }
 
 /** `handbook/onboarding` → `/app/content/handbook/onboarding.mdx` (the canonical key). */
