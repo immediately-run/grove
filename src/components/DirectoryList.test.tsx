@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import type { ReactNode } from 'react';
 import { MDXProvider } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { resetContentRoot } from '../lib/contentRoot';
+import { resetContentRoot, setContentRoot } from '../lib/contentRoot';
 import { GroveShellContext, type GroveShell } from '../lib/shell';
 
 // `useDirectoryListing` reads the real `fs` module — the one the host supplies inside the
@@ -181,5 +181,95 @@ describe('<DirectoryList/>', () => {
     );
     expect(el.querySelector('.grove-dirlist__table')).not.toBeNull();
     expect(el.querySelector('h1')?.textContent).toContain('handbook');
+  });
+});
+
+// ── The DISPATCH packaging ────────────────────────────────────────────────────────────
+//
+// A dispatched Grove renders SOMEBODY ELSE'S corpus, mounted at a host-minted chroot
+// (`/mnt/<hash>/`), while the engine itself is loaded from Grove's own repo. Every path
+// helper is a function of that root — which is why `contentRoot.ts` warns "call it, don't
+// capture it": a helper that froze `/app/content/` at module scope renders the VIEWER's
+// corpus while claiming to render yours, and corrects itself never.
+//
+// Directory listings touch both path spaces at once — they READ through the mount and
+// LINK through the URL space — so they are exactly where the two can be got backwards.
+// Verified live against a dispatched corpus on the local host (2026-08-18); these pin it.
+describe('<DirectoryList/> under dispatch', () => {
+  const MOUNT = '/mnt/abc123def456/';
+  const CORPUS_META = {
+    '/mnt/abc123def456/context/ways_of_working.mdx': {
+      title: 'Ways of working.',
+      description: 'The engineering practices behind the product values.',
+      updated: '2026-07-11',
+    },
+  };
+
+  function dispatched(children: ReactNode, sandboxPath: string) {
+    setContentRoot(MOUNT);
+    const value = {
+      outerHref: `https://local.immediately.run/present/local/ns/corpus/live${sandboxPath}`,
+      navigationState: { mode: 'present', namespace: 'local', provider: 'local', repository: 'ns/corpus', ref: 'live', sandboxPath, hash: '', search: '' },
+      routingSpec: { routes: [] },
+      filesMetadata: CORPUS_META,
+    };
+    return <TinkerableContext.Provider value={value as never}>{children}</TinkerableContext.Provider>;
+  }
+
+  beforeEach(() => {
+    readdir.mockReset();
+    readdir.mockResolvedValue([dirent('ways_of_working.mdx'), dirent('diagram.svg')]);
+  });
+
+  it('reads through the MOUNT, not the fork root', async () => {
+    await render(dispatched(<DirectoryList />, '/files/context'));
+    // `/app/content/context` here would be the viewer rendering its own corpus.
+    expect(readdir).toHaveBeenCalledWith('/mnt/abc123def456/context', { withFileTypes: true });
+  });
+
+  it('links in CORPUS-relative URL space — the mount path never reaches the DOM', async () => {
+    const el = await render(
+      dispatched(
+        <GroveShellContext.Provider value={shell('/mnt/abc123def456/context')}>
+          <DirectoryView />
+        </GroveShellContext.Provider>,
+        '/files/context'
+      )
+    );
+    const hrefs = [...el.querySelectorAll('tbody a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toHaveLength(1); // the asset is listed, not linked
+    expect(hrefs[0]?.endsWith('/files/context/ways_of_working.mdx')).toBe(true);
+
+    // The load-bearing assertion, and the one that would have caught the R3-268 bug this
+    // same mapping already had once: the chroot prefix is HOST knowledge. Grove can read
+    // through it but must never publish it — a `/mnt/<hash>/…` href is a URL no router
+    // resolves and a path the host's existence check misses.
+    expect(el.innerHTML).not.toContain('mnt');
+    expect(el.innerHTML).not.toContain('abc123def456');
+    expect(el.innerHTML).not.toContain('/app/');
+  });
+
+  it('measures breadcrumbs from the corpus root, not from `/`', async () => {
+    const el = await render(
+      dispatched(
+        <GroveShellContext.Provider value={shell('/mnt/abc123def456/plans/ui-as-apps')}>
+          <DirectoryView />
+        </GroveShellContext.Provider>,
+        '/files/plans/ui-as-apps'
+      )
+    );
+    const crumb = el.querySelector('.crumb')?.textContent ?? '';
+    expect(crumb).toContain('plans');
+    expect(crumb).not.toContain('mnt');
+    expect(el.querySelector('h1')?.textContent).toContain('ui-as-apps');
+  });
+
+  it('resolves `path` against the mounted corpus, and confines traversal to it', async () => {
+    await render(dispatched(<DirectoryList path="/specs" />, '/files/context'));
+    expect(readdir).toHaveBeenCalledWith('/mnt/abc123def456/specs', { withFileTypes: true });
+    readdir.mockClear();
+    // Foreign content authored the href; `..` must not become a readdir of the host's fs.
+    await render(dispatched(<DirectoryList path="../../.." />, '/files/context'));
+    expect(readdir).toHaveBeenCalledWith('/mnt/abc123def456', { withFileTypes: true });
   });
 });

@@ -65,7 +65,20 @@ describe('buildDirectoryRows', () => {
     expect(rows[0].meta).toBeNull();
   });
 
-  it('sorts directories first, then by the chosen key', () => {
+  it('groups subfolders, then entries, then assets — whatever the sort key', () => {
+    // An asset interleaved with entries by name buries the content: on a real dispatched
+    // corpus `diagram.svg` sorted above every page in the folder purely on its initial.
+    const entries = [file('diagram.svg'), file('product_definition.mdx'), dir('sub')];
+    for (const sort of ['name', 'title', 'updated'] as const) {
+      expect(buildDirectoryRows(ROOT, entries, {}, { sort }).map((r) => r.name)).toEqual([
+        'sub',
+        'product_definition.mdx',
+        'diagram.svg',
+      ]);
+    }
+  });
+
+  it('sorts within a tier by the chosen key', () => {
     const meta: Record<string, Frontmatter> = {
       [`${ROOT}/a.mdx`]: { title: 'Zulu.', updated: '2026-01-01' },
       [`${ROOT}/b.mdx`]: { title: 'Alpha.', updated: '2026-06-01' },

@@ -161,8 +161,14 @@ export function buildDirectoryRows(
   return sortRows(rows, opts.sort ?? 'name');
 }
 
+// Three tiers, always, whatever the sort key: subfolders, then entries, then assets.
+// Interleaving assets with entries by name buries the content — measured on a dispatched
+// corpus where `diagram.svg` sorted above every page in the folder purely on its initial.
+// Folders lead because they are the navigational skeleton a reader scans for.
+const KIND_RANK: Record<DirRowKind, number> = { dir: 0, entry: 1, file: 2 };
+
 function sortRows(rows: DirRow[], sort: NonNullable<BuildOptions['sort']>): DirRow[] {
-  const rank = (r: DirRow): number => (r.kind === 'dir' ? 0 : 1);
+  const rank = (r: DirRow): number => KIND_RANK[r.kind];
   return rows.sort((a, b) => {
     if (rank(a) !== rank(b)) return rank(a) - rank(b);
     if (sort === 'title') return rowLabel(a).localeCompare(rowLabel(b));
