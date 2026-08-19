@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://immediately.run/viewer-manifest.schema.json",
+  "title": "immediately.run viewer component manifest",
+  "description": "The component vocabulary a directory-as-content VIEWER declares. Two-way surface (PLATFORM_LAYERING_SPEC §5 target 3): a corpus checker reads it to know which components a corpus may use, and a thin shell composing the viewer as a library (§1.1 M3) reads it to know which components it may override, with what props. The FORMAT is viewer-generic — a Lodestar manifest with a node/edge vocabulary validates through this same schema; only the entries are per-viewer.",
+  "type": "object",
+  "required": ["schemaVersion", "viewer", "components"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "viewer": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "The package name a shell imports." },
+        "kind": { "type": "string", "description": "The content kind this viewer renders (`wiki`, `board`, …) — display and discovery only; it confers nothing." },
+        "task": { "type": "string", "description": "The task CONTRACT this viewer provides, matching package.json `immediately.run.provides`." }
+      }
+    },
+    "components": {
+      "type": "object",
+      "description": "Component name → its contract. A name absent here is INTERNAL: a corpus using it is flagged, and a shell overriding it fails visibly.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["tier", "overridable"],
+        "additionalProperties": false,
+        "properties": {
+          "tier": {
+            "enum": ["engine", "chrome", "corpus"],
+            "description": "`engine` renders any corpus and holds no opinion about its subject; `chrome` is site furniture a layout arranges; `corpus` is furniture encoding ONE corpus's frontmatter conventions, declared by that corpus rather than the engine (ENGINE_BOUNDARY §3)."
+          },
+          "overridable": {
+            "type": "boolean",
+            "description": "Whether a library-composing shell may replace it. False for components whose behaviour is engine mechanics rather than presentation."
+          },
+          "sanitizing": {
+            "type": "boolean",
+            "description": "Whether this component is a sanitizing wrapper on the interpreter path. An override of a sanitizing component inherits the obligation — that is why the flag is on the contract and not in a comment."
+          },
+          "props": {
+            "type": "object",
+            "description": "Prop name → a short type string (`string?`, `number?`, `node?`, `string[]?`). Documentation for an overriding shell, not a runtime check.",
+            "additionalProperties": { "type": "string" }
+          },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "frontmatter": {
+      "type": "object",
+      "description": "Frontmatter key OWNERSHIP (PLATFORM_LAYERING §5 target 1). Each side validates the keys it owns; pass-through is what keeps a foreign corpus with its own vocabulary renderable.",
+      "additionalProperties": false,
+      "properties": {
+        "engine": { "type": "array", "items": { "type": "string" }, "description": "Keys the ENGINE reads. Changing one changes rendering." },
+        "corpusTooling": { "type": "array", "items": { "type": "string" }, "description": "Keys a corpus's own tooling reads. The engine ignores them." },
+        "passThrough": { "type": "boolean", "description": "Whether unknown keys are allowed (they are carried, unread). False makes the vocabulary closed." }
+      }
+    }
+  }
+}

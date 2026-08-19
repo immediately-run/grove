@@ -27,6 +27,58 @@ That constraint is real and unresolved; it is why the fork is tolerated rather t
 (R3-168/R3-169), `docs` becomes an ordinary content corpus dispatched to this engine and the
 fork can go. Until then, an engine change lands **here first** and is ported to `docs`.
 
+## 1a. What Grove IS (R3-280, recorded 2026-08-19)
+
+Packaging the engine as a library forced the question, so record the answer: **Grove is a
+(plugin-extensible) kit of React components, prebuilt layouts and themes that together make
+a wiki easy to build and good-looking by default — not a wiki engine in the traditional
+sense.**
+
+Most of what a traditional wiki engine owns is not here, and should not be. Routing
+(`Routes`/`Route`, `sandboxPath`), MDX compilation, the frontmatter metadata index and its
+sidecar, link spaces (`corpusRoot` + `$fs:`), `Include`, and heading anchors are all
+**sandbox + SDK**, because they are cross-cutting concerns of *every* immediately.run app,
+not of wikis. What is left for Grove to own — and it is a real thing to own — is the
+component vocabulary, the chrome, the layout chain, the themes, and the defaults that make
+the result look considered without anyone tuning it.
+
+Future scope stays inside that boundary. Author-facing collaboration features (Google-Docs
+style comment threads between authors, say) belong here because they are wiki-shaped
+presentation and interaction. Anything a second viewer would also need belongs one layer
+down — that is `PLATFORM_LAYERING_SPEC §5.1`'s tier test ("would Lodestar need to change it
+to use it?"), and this framing is what makes it decidable rather than a judgement call.
+
+## 1b. The three composition modes, and what each needs from this repo
+
+`PLATFORM_LAYERING_SPEC §1.1` names three modes, and since R3-280 all three are real:
+
+| Mode | What it is | What it needs here |
+|---|---|---|
+| **M1 dispatch** | a content repo's marker resolves to this repo through the binding registry | `immediately.run.provides: open-wiki`, and `src/App.tsx` as the entry |
+| **M2 fork** | engine + corpus in one repo under one identity (the docs wiki) | nothing extra — this is the historical shape (§1, §4) |
+| **M3 library** | a thin shell imports the engine pinned and arranges it | the package name, the `exports` map, and **`viewer.manifest.json`** |
+
+**The manifest is the override contract.** `viewer.manifest.json` declares the component
+vocabulary — name, tier, whether a shell may override it, its props, whether it is a
+sanitizing wrapper — and `composeComponents()` enforces it: overriding a name that is not
+declared, or one declared `overridable: false`, throws rather than silently doing nothing.
+Silence is the accident worth engineering against; a plain `{...base, ...overrides}` accepts
+every typo, and a shell then ships an override that quietly stopped working when the engine
+renamed something. `Outlet` is the standing locked case — replacing it detaches every layout
+layer from the page it wraps, and the symptom is a blank body with no error.
+
+`scripts/check-manifest.mjs` runs first in `npm run verify` and fails on drift in either
+direction: a component in `GROVE_MDX` but not the manifest, or vice versa. It brace-matches
+the object literal over a comment- and string-blanked copy of the source, so reformatting
+`mdxComponents.ts` cannot change the outcome — the property R3-277c asks for, and one the
+first draft of that script got wrong (a `}` inside a comment ended the scan early and the
+gate reported the whole manifest as drifted).
+
+The manifest FORMAT is viewer-generic (`viewer-manifest.schema.json`): a Lodestar manifest
+with a node/edge vocabulary validates through the same schema. Only the entries are
+per-viewer — which is also how corpus furniture (§3) becomes checkable, as `tier: "corpus"`
+entries declared by the corpus rather than by this repo.
+
 ## 2. What is engine
 
 Anything that renders *any* corpus, and holds no opinion about what the corpus is about:
