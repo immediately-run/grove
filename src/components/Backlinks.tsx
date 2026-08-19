@@ -57,8 +57,10 @@ export default function Backlinks() {
       if (!active) return;
       const found: Hit[] = [];
       for (const r of rows) {
-        if (r && bodyLinksTo(r.body, currentKey)) {
-          found.push({ key: r.key, snippet: backlinkSnippet(r.body, currentKey) });
+        // R3-283: the linking entry's own key is part of the question — corpus links
+        // are RELATIVE to the file they are written in, so `r.key` is what resolves them.
+        if (r && bodyLinksTo(r.body, currentKey, r.key)) {
+          found.push({ key: r.key, snippet: backlinkSnippet(r.body, currentKey, r.key) });
         }
       }
       setHits(found.sort((a, b) => (a.key < b.key ? -1 : 1)));

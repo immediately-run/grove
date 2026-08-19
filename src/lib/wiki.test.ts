@@ -1,6 +1,6 @@
 import { SLUG_PARITY_FIXTURE } from '@immediately-run/mdx-plugins';
 import { describe, it, expect } from 'vitest';
-import { headingId, sectionId, textSlug } from './wiki';
+import { backlinkSnippet, bodyLinks, bodyLinksTo, headingId, sectionId, textSlug } from './wiki';
 
 // The heading ids Grove computes MUST match the kernel's heading-slug plugin
 // (`@immediately-run/mdx-plugins` remarkHeadingAnchors, MARKDOWN_SYNTAX_SPEC §15.1 /
@@ -51,5 +51,108 @@ describe('headingId — byte-identical with the kernel (§15.5)', () => {
     expect(textSlug('8.9 Powerbox')).toBe('89-powerbox'); // GitHub drops the dot
     expect(textSlug('Q & A: notes!')).toBe('q-a-notes');
     expect(textSlug('  spaced   out  ')).toBe('spaced-out');
+  });
+});
+
+// ── Backlinks (R3-283) ───────────────────────────────────────────────────────
+//
+// The index was dead: 9,030 wiki-links in the corpus, 0 of 710 entries with a
+// backlink, because `bodyLinksTo` matched three literal link forms the corpus never
+// writes. The failure shape is why it survived — a feature that renders its empty
+// state perfectly, where "nothing links here yet" is indistinguishable from a correct
+// answer. So these assert SPECIFIC counts per supported form: a matcher that resolves
+// only one form fails here rather than looking plausible.
+describe('bodyLinksTo — every link form the corpus actually writes (R3-283)', () => {
+  const FROM = '/app/content/roadmap/R3-283.mdx';
+  const SPEC = '/app/content/specs/PLATFORM_LAYERING_SPEC.mdx';
+  const SIBLING = '/app/content/roadmap/R3-282.mdx';
+
+  const forms: Array<{ why: string; body: string; target: string }> = [
+    { why: 'relative wiki-link with ../ and the extension', body: 'see [[../specs/PLATFORM_LAYERING_SPEC.mdx]]', target: SPEC },
+    { why: '…and with a #fragment', body: 'see [[../specs/PLATFORM_LAYERING_SPEC.mdx#sec-2]]', target: SPEC },
+    { why: '…and with an explicit label (label|target, §13.1 order)', body: 'see [[layering|../specs/PLATFORM_LAYERING_SPEC.mdx#sec-2]]', target: SPEC },
+    { why: 'sibling wiki-link, no path prefix', body: 'see [[R3-282.mdx]]', target: SIBLING },
+    { why: 'extension-less target — the legacy [[slug]] form', body: 'see [[R3-282]]', target: SIBLING },
+    { why: 'markdown link, relative', body: 'see [the spec](../specs/PLATFORM_LAYERING_SPEC.mdx)', target: SPEC },
+    { why: 'markdown link, corpus-absolute', body: 'see [x](/content/specs/PLATFORM_LAYERING_SPEC.mdx)', target: SPEC },
+    { why: 'markdown link, /files-prefixed', body: 'see [x](/files/content/specs/PLATFORM_LAYERING_SPEC.mdx)', target: SPEC },
+    { why: 'markdown link with a fragment', body: 'see [x](../specs/PLATFORM_LAYERING_SPEC.mdx#sec-2)', target: SPEC },
+  ];
+
+  for (const f of forms) {
+    it(`resolves: ${f.why}`, () => {
+      expect(bodyLinksTo(f.body, f.target, FROM)).toBe(true);
+    });
+  }
+
+  it('finds ALL of them in one body — the count is specific, not ">= 1"', () => {
+    const body = forms.map((f) => f.body).join('\n\n');
+    expect(bodyLinks(body)).toHaveLength(forms.length);
+    expect(bodyLinksTo(body, SPEC, FROM)).toBe(true);
+    expect(bodyLinksTo(body, SIBLING, FROM)).toBe(true);
+  });
+});
+
+describe('bodyLinksTo — what must NOT count as a backlink (R3-283)', () => {
+  const FROM = '/app/content/roadmap/R3-283.mdx';
+  const OTHER = '/app/content/specs/OTHER_SPEC.mdx';
+
+  it('a PREFIX of the target key is not the target', () => {
+    // The bug this guards: substring matching would call these the same entry.
+    expect(bodyLinksTo('see [[../specs/OTHER.mdx]]', OTHER, FROM)).toBe(false);
+    expect(bodyLinksTo('see [[../specs/OTHER_SPEC_V2.mdx]]', OTHER, FROM)).toBe(false);
+    expect(bodyLinksTo('see [[../specs/OTHER_SPEC.mdx]]', OTHER, FROM)).toBe(true);
+  });
+
+  it('a link inside a fenced code block is being QUOTED, not written', () => {
+    const body = ['```ts', 'body.includes(`[[../specs/OTHER_SPEC.mdx]]`)', '```'].join('\n');
+    expect(bodyLinksTo(body, OTHER, FROM)).toBe(false);
+  });
+
+  it('a link inside an inline code span is quoted too', () => {
+    // Verbatim from this very item's prose, which documents the forms it fixes.
+    expect(bodyLinksTo('it wants `[[../specs/OTHER_SPEC.mdx]]` instead', OTHER, FROM)).toBe(false);
+  });
+
+  it('a link in the frontmatter is metadata, not body prose', () => {
+    const body = ['---', 'reads-first:', '  - ../specs/OTHER_SPEC.mdx', 'title: "[[../specs/OTHER_SPEC.mdx]]"', '---', 'nothing here'].join('\n');
+    expect(bodyLinksTo(body, OTHER, FROM)).toBe(false);
+  });
+
+  it('an image is not a link, and an external href is not a corpus link', () => {
+    expect(bodyLinksTo('![alt](../specs/OTHER_SPEC.mdx)', OTHER, FROM)).toBe(false);
+    expect(bodyLinksTo('[x](https://example.com/specs/OTHER_SPEC.mdx)', OTHER, FROM)).toBe(false);
+  });
+
+  it('relative means relative TO THE LINKING ENTRY, not to the corpus root', () => {
+    // `[[specs/X.mdx]]` written in roadmap/ denotes roadmap/specs/X.mdx. Reading it as
+    // corpus-relative (what the old matcher did for `[[slug]]`) would credit a backlink
+    // to an entry the link does not navigate to.
+    expect(bodyLinksTo('see [[specs/OTHER_SPEC.mdx]]', OTHER, FROM)).toBe(false);
+    expect(bodyLinksTo('see [[specs/OTHER_SPEC.mdx]]', '/app/content/roadmap/specs/OTHER_SPEC.mdx', FROM)).toBe(true);
+  });
+});
+
+describe('backlinkSnippet — marks the linking phrase, not the first 160 chars (R3-283)', () => {
+  const FROM = '/app/content/roadmap/R3-283.mdx';
+  const SPEC = '/app/content/specs/PLATFORM_LAYERING_SPEC.mdx';
+  const lead = 'A paragraph of preamble that exists only to push the link past the first 160 characters of the entry, so a snippet that fell back to a prefix would be visibly wrong. ';
+
+  it('uses the markdown label', () => {
+    const snip = backlinkSnippet(`${lead}and then [the layering spec](../specs/PLATFORM_LAYERING_SPEC.mdx) closes it.`, SPEC, FROM);
+    expect(snip).toContain('<mark>the layering spec</mark>');
+    expect(snip).toContain('closes it');
+  });
+
+  it('uses the wiki label when one is given', () => {
+    const snip = backlinkSnippet(`${lead}and then [[the layering spec|../specs/PLATFORM_LAYERING_SPEC.mdx]] closes it.`, SPEC, FROM);
+    expect(snip).toContain('<mark>the layering spec</mark>');
+  });
+
+  it('falls back to a prefix only when the phrase is not in the rendered text', () => {
+    const snip = backlinkSnippet(`${lead}[[../specs/PLATFORM_LAYERING_SPEC.mdx]]`, SPEC, FROM);
+    // An unlabelled wiki-link's "phrase" is its target path, which the stripped text
+    // does contain — so this marks it rather than degrading.
+    expect(snip).toContain('<mark>');
   });
 });

@@ -1,6 +1,10 @@
 // Pure wiki helpers — no React, no components (kept out of component files per the
 // Fast-Refresh rule). Shared by the reading-view, index, and agent surfaces.
-import { contentDir, keyToHref } from './content';
+import { contentDir, hrefKeyCandidates, splitFragment } from './content';
+// The canonical `[[label|target]]` grammar (MARKDOWN_SYNTAX_SPEC §13.1) — the SAME
+// parser the safe renderer splits wiki-links with, so the backlink index and the link
+// a reader clicks can never disagree about what a target is.
+import { parseWikiInner } from '@immediately-run/sdk/safeContent/index';
 
 /** Extract the path strings from a `useMetadataQuery` result. The hook returns a
  *  `{ path, meta }[]` array directly (or `{ error }`), NOT a `{ result }` wrapper —
@@ -51,37 +55,98 @@ export function stripFrontmatter(src: string): string {
   return m ? src.slice(m[0].length) : src;
 }
 
-/** Does `body` link to the entry at `targetKey`? Matches the canonical
- *  `/content/….mdx` href the runtime <Link> uses, with or without the prefix. */
-export function bodyLinksTo(body: string, targetKey: string): boolean {
-  const href = keyToHref(targetKey); // /content/….mdx
-  const slug = href.replace(/^\/content\//, '').replace(/\.mdx?$/, '');
-  return (
-    body.includes(`(${href})`) ||
-    body.includes(`(/files${href})`) ||
-    body.includes(`[[${slug}]]`)
-  );
+// ── Backlinks (R3-283) ───────────────────────────────────────────────────────
+//
+// `bodyLinksTo` used to string-match three literal forms — `(/content/X.mdx)`,
+// `(/files/content/X.mdx)` and `[[X]]` (corpus-relative, extension-less). The corpus
+// writes NONE of them: it writes `[[../specs/X.mdx#sec-2]]` and `(ways_of_working.mdx)`,
+// both RELATIVE to the linking entry, with the extension, sometimes with a fragment.
+// Result: 9,030 wiki-links, 0 of 710 entries with a backlink — `<Backlinks/>`, the
+// signature wiki affordance, had never worked on this corpus and rendered its empty
+// state perfectly while doing so.
+//
+// So these do not pattern-match link SYNTAX any more. They EXTRACT each link and
+// resolve it through `hrefKeyCandidates` — the same function the renderer routes
+// clicks through, and the same rule `check-docs-wiki`'s `contentResolve` audits the
+// corpus by. A backlink now means exactly "a link that would navigate here", which is
+// the only definition that cannot drift from the links themselves.
+//
+// Deliberately DROPPED: the old corpus-relative reading of `[[specs/X]]`. Under the one
+// resolution rule that link, written in `content/roadmap/foo.mdx`, denotes
+// `content/roadmap/specs/X.mdx` — so honouring the old reading would credit a backlink
+// to an entry the link does not go to. An extension-less target still works; it is just
+// resolved like every other link.
+
+/** Frontmatter, fenced code and inline code spans removed — the regions where a
+ *  `[[…]]` or `[…](…)` is being QUOTED rather than linked. Without this the roadmap
+ *  items that document link forms would manufacture backlinks out of their own prose. */
+export function linkScannableBody(body: string): string {
+  return stripFrontmatter(body)
+    .replace(/^[ \t]*(```|~~~)[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm, '')
+    .replace(/`[^`\n]*`/g, '');
+}
+
+/** One extracted link: the raw href, plus the text a reader sees (the wiki label or
+ *  the markdown label) — what `backlinkSnippet` marks. */
+export interface BodyLink {
+  href: string;
+  label: string;
+}
+
+/** Every corpus link in `body`, in source order. Wiki targets are parsed with the SDK's
+ *  canonical `parseWikiInner` (`[[label|target]]`, label first — MARKDOWN_SYNTAX §13.1)
+ *  rather than a local regex, so this cannot drift from what the renderer links. */
+export function bodyLinks(body: string): BodyLink[] {
+  const scannable = linkScannableBody(body);
+  const out: BodyLink[] = [];
+  for (const m of scannable.matchAll(/\[\[([^[\]]+)\]\]/g)) {
+    const token = parseWikiInner(m[1]);
+    if (token) out.push({ href: token.target, label: token.label ?? token.target });
+  }
+  // `[label](href)`, skipping images (`![alt](src)`) and an optional "title".
+  for (const m of scannable.matchAll(/(!?)\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g)) {
+    if (m[1] === '!') continue;
+    out.push({ href: m[3], label: m[2] });
+  }
+  return out;
+}
+
+/** The entry keys a body link denotes. An extension-less target also gets an `.mdx`
+ *  candidate, so the legacy `[[slug]]` form keeps resolving — by the same rule, not a
+ *  special case. */
+function linkTargetKeys(href: string, fromKey: string): string[] {
+  const keys = hrefKeyCandidates(href, fromKey);
+  if (keys.length) return keys;
+  const [path, frag] = splitFragment(href);
+  return /\.mdx?$/.test(path) || !path ? [] : hrefKeyCandidates(`${path}.mdx${frag}`, fromKey);
+}
+
+/** Does the entry at `fromKey` link to the entry at `targetKey`? Resolves every link
+ *  in the body the way the renderer does, then compares KEYS — so a near-miss
+ *  (`[[specs/OTHER.mdx]]` against `specs/OTHER_SPEC.mdx`) cannot match. */
+export function bodyLinksTo(body: string, targetKey: string, fromKey: string): boolean {
+  return bodyLinks(body).some((l) => linkTargetKeys(l.href, fromKey).includes(targetKey));
 }
 
 /** A ~160-char snippet of `body` around the first link to `targetKey`, with the
  *  linking phrase wrapped in <mark>… (returned as an HTML string for the snippet). */
-export function backlinkSnippet(body: string, targetKey: string): string {
+export function backlinkSnippet(body: string, targetKey: string, fromKey: string): string {
   const text = stripFrontmatter(body)
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const href = keyToHref(targetKey);
-  // Find a markdown link [label](href) and keep its label as the mark.
-  const re = new RegExp(`\\[([^\\]]+)\\]\\((?:/files)?${href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`);
-  const linkified = stripFrontmatter(body).replace(/\s+/g, ' ');
-  const m = linkified.match(re);
-  if (!m) {
+  // The MARK is the linking phrase as the reader sees it: a wiki label (or its target
+  // when unlabelled), or the markdown label. Matching on the resolved link rather than
+  // on a literal href is what stops every hit falling back to "first 160 chars".
+  const link = bodyLinks(body).find((l) => linkTargetKeys(l.href, fromKey).includes(targetKey));
+  const phrase = link?.label.trim();
+  const idx = phrase ? text.toLowerCase().indexOf(phrase.toLowerCase()) : -1;
+  if (!phrase || idx === -1) {
     return text.slice(0, 160) + (text.length > 160 ? '…' : '');
   }
-  const idx = text.toLowerCase().indexOf(m[1].toLowerCase());
   const start = Math.max(0, idx - 70);
-  const end = Math.min(text.length, idx + m[1].length + 70);
+  const end = Math.min(text.length, idx + phrase.length + 70);
   const before = (start > 0 ? '…' : '') + text.slice(start, idx);
-  const after = text.slice(idx + m[1].length, end) + (end < text.length ? '…' : '');
-  return `${before}<mark>${m[1]}</mark>${after}`;
+  const after = text.slice(idx + phrase.length, end) + (end < text.length ? '…' : '');
+  return `${before}<mark>${phrase}</mark>${after}`;
 }
