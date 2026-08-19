@@ -1,0 +1,26 @@
+---
+title: The thin shell.
+slug: home
+site: Thin shell
+nav: Home
+order: 10
+date: 2026-08-19
+tags: [example]
+description: A corpus small enough to read in one screen, rendered by Grove composed as a library.
+---
+
+This page is rendered by the Grove engine arriving as a **library mount** at
+`/node_modules/@immediately-run/grove`, not by a fork of it. `src/App.tsx` is the whole
+shell: it imports `GroveApp` and renders it.
+
+The corpus exists so mode invariance is testable at all. `PLATFORM_LAYERING_SPEC §1.1` says
+the same corpus renders identically under dispatch, fork and library composition — a claim
+that needs a corpus in each mode to compare. This is the library one.
+
+## What to look at
+
+Nothing here is special to library composition, and that is the point: no frontmatter key,
+no component and no link form is written differently because the engine arrived as a
+dependency. Anything that IS different in only one mode is a contract bug.
+
+See [the second page](/second) for links and an admonition.
