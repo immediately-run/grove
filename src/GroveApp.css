@@ -1156,9 +1156,45 @@ a.gdl-row {
   color: var(--ink-2);
   cursor: pointer;
   list-style: none;
+  /* The native marker is suppressed below, so without a replacement this control has NO
+     affordance at all — on a phone the contents list is the whole navigation, and an
+     unmarked rounded box reads as a caption, not a button. Reported from a real iPhone as
+     "I see no toc": the list was there, collapsed, behind a thing that did not look like
+     it opened. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* Comfortable thumb target — the text alone is 12px tall. */
+  min-height: 44px;
 }
 .grove-toc__disclosure summary::-webkit-details-marker {
   display: none;
+}
+/* A caret drawn in CSS rather than an icon import, so the disclosure stays styling-only
+   and no call site has to change. Points down when closed, up when open. */
+.grove-toc__disclosure summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform .18s ease;
+}
+.grove-toc__disclosure[open] summary::after {
+  transform: translateY(1px) rotate(225deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grove-toc__disclosure summary::after {
+    transition: none;
+  }
+}
+.grove-toc__disclosure summary:hover,
+.grove-toc__disclosure[open] summary {
+  color: var(--ink);
 }
 .grove-toc__disclosure[open] summary {
   border-bottom: 1px solid var(--line);
