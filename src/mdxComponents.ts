@@ -9,11 +9,13 @@ import DocList from './components/DocList';
 import TagCloud from './components/TagCloud';
 import TagList from './components/TagList';
 import Directory from './components/Directory';
+import DirectoryList from './components/DirectoryList';
 import WikiLink from './components/WikiLink';
 import Quote from './components/Quote';
 import KeyValue from './components/KeyValue';
 import Kbd from './components/Kbd';
 import Toc from './components/Toc';
+import TableOfContents from './components/TableOfContents';
 import Backlinks from './components/Backlinks';
 import PageMeta from './components/PageMeta';
 import RecentlyUpdated from './components/RecentlyUpdated';
@@ -46,10 +48,12 @@ export const GROVE_MDX = {
   TagCloud,
   TagList,
   Directory,
+  DirectoryList,
   Quote,
   KeyValue,
   Kbd,
   Toc,
+  TableOfContents,
   Backlinks,
   PageMeta,
   RecentlyUpdated,

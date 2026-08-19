@@ -170,15 +170,32 @@ function normalizeKey(abs: string): string {
  * picks the first candidate that exists, so this stays pure and testable.
  */
 export function hrefKeyCandidates(href: string, fromKey: string): string[] {
-  if (!href) return [];
-  if (/^(https?:|mailto:|tel:|#)/i.test(href)) return [];
+  const abs = hrefTargetKey(href, fromKey);
+  if (!abs || !/\.mdx?$/.test(abs)) return [];
+  return abs.endsWith('.md') ? [abs, abs + 'x'] : [abs];
+}
+
+/**
+ * The corpus path an in-app href denotes — WITHOUT requiring it to name a file. Null for
+ * an external scheme, a bare anchor, or a path that resolves outside the corpus.
+ *
+ * Split out from {@link hrefKeyCandidates} because a folder is a destination now: since
+ * directory listings landed, `[the handbook](handbook)` names something real, and the
+ * extension test that makes an entry an entry would have rendered it as a broken link.
+ * The two callers ask different questions of the same resolution — "which entry?" and
+ * "which path?" — so the resolution lives here once.
+ */
+export function hrefTargetKey(href: string, fromKey: string): string | null {
+  if (!href) return null;
+  if (/^(https?:|mailto:|tel:|#)/i.test(href)) return null;
   const [rawPath] = splitFragment(href);
-  if (!rawPath) return [];
+  if (!rawPath) return null;
   const path = rawPath.replace(/^\/files/, '');
   const dir = fromKey.slice(0, fromKey.lastIndexOf('/'));
   const abs = normalizeKey(path.startsWith('/') ? APP_PREFIX + path : `${dir}/${path}`);
-  if (!isEntryKey(abs)) return [];
-  return abs.endsWith('.md') ? [abs, abs + 'x'] : [abs];
+  // Confinement, not tidiness: an href in foreign content is untrusted, and the result
+  // flows into `fs` reads. Anything that lands outside the corpus denotes nothing.
+  return abs.startsWith(contentDir()) ? abs : null;
 }
 
 /**

@@ -11,99 +11,159 @@
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "href": "string?", "children": "node?" },
+      "props": {
+        "href": "string?",
+        "children": "node?"
+      },
       "summary": "Wiki-link resolver: renders the resolved / broken / self states for an in-corpus href."
     },
     "img": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "src": "string?", "alt": "string?" },
+      "props": {
+        "src": "string?",
+        "alt": "string?"
+      },
       "summary": "Resolves a mount-relative asset off the filesystem."
     },
     "Callout": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "kind": "string?", "title": "string?", "children": "node?" },
-      "summary": "An aside block with a kind (note / warning / …)."
+      "props": {
+        "kind": "string?",
+        "title": "string?",
+        "children": "node?"
+      },
+      "summary": "An aside block with a kind (note / warning / \u2026)."
     },
     "Lede": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "children": "node?" },
+      "props": {
+        "children": "node?"
+      },
       "summary": "The opening paragraph, set apart typographically."
     },
     "Infobox": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "title": "string?", "children": "node?" },
+      "props": {
+        "title": "string?",
+        "children": "node?"
+      },
       "summary": "The boxed summary panel a wiki entry carries beside its lede."
     },
     "More": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "href": "string?", "children": "node?" },
+      "props": {
+        "href": "string?",
+        "children": "node?"
+      },
       "summary": "A 'read more' pointer to a related entry."
     },
     "DocList": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "tag": "string?", "limit": "number?" },
-      "summary": "A queried list of entries — the generic index primitive."
+      "props": {
+        "tag": "string?",
+        "limit": "number?"
+      },
+      "summary": "A queried list of entries \u2014 the generic index primitive."
     },
     "TagCloud": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "limit": "number?" },
+      "props": {
+        "limit": "number?"
+      },
       "summary": "Every tag in the corpus, weighted by use."
     },
     "TagList": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "tags": "string[]?" },
+      "props": {
+        "tags": "string[]?"
+      },
       "summary": "The tags of one entry, as links to their indexes."
     },
     "Directory": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "path": "string?" },
+      "props": {
+        "path": "string?"
+      },
       "summary": "The entries under one corpus directory."
+    },
+    "DirectoryList": {
+      "tier": "engine",
+      "overridable": true,
+      "sanitizing": false,
+      "props": {
+        "path": "string?",
+        "title": "string?",
+        "columns": "string?",
+        "sort": "string?",
+        "hidden": "boolean?"
+      },
+      "summary": "A folder listing as a table, with metadata columns chosen by `columns` and narrowed to those the rows actually carry."
     },
     "Quote": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "cite": "string?", "children": "node?" },
+      "props": {
+        "cite": "string?",
+        "children": "node?"
+      },
       "summary": "A pull quote with an optional citation."
     },
     "KeyValue": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "children": "node?" },
+      "props": {
+        "children": "node?"
+      },
       "summary": "A definition-list row for infobox-style facts."
     },
     "Kbd": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "children": "node?" },
+      "props": {
+        "children": "node?"
+      },
       "summary": "A keyboard key."
     },
     "Toc": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "depth": "number?" },
+      "props": {
+        "depth": "number?"
+      },
       "summary": "The table of contents derived from the entry's heading anchors."
+    },
+    "TableOfContents": {
+      "tier": "engine",
+      "overridable": true,
+      "sanitizing": false,
+      "props": {
+        "entryKey": "string?",
+        "title": "string?",
+        "className": "string?"
+      },
+      "summary": "The on-this-page heading list, which keeps the active entry in view as the reader scrolls."
     },
     "Backlinks": {
       "tier": "engine",
@@ -117,20 +177,24 @@
       "overridable": true,
       "sanitizing": false,
       "props": {},
-      "summary": "The entry's own metadata line (updated, reading time, …)."
+      "summary": "The entry's own metadata line (updated, reading time, \u2026)."
     },
     "RecentlyUpdated": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "limit": "number?" },
+      "props": {
+        "limit": "number?"
+      },
       "summary": "The most recently updated entries."
     },
     "DocsByTag": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "tag": "string?" },
+      "props": {
+        "tag": "string?"
+      },
       "summary": "Entries grouped under one tag."
     },
     "ChildPages": {
@@ -144,14 +208,18 @@
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "children": "node?" },
+      "props": {
+        "children": "node?"
+      },
       "summary": "A dated sequence of entries or events."
     },
     "FamilyTree": {
       "tier": "engine",
       "overridable": true,
       "sanitizing": false,
-      "props": { "children": "node?" },
+      "props": {
+        "children": "node?"
+      },
       "summary": "A relationship graph rendered from frontmatter links."
     },
     "Outlet": {
@@ -159,7 +227,7 @@
       "overridable": false,
       "sanitizing": false,
       "props": {},
-      "summary": "The layout chain's inward slot. NOT overridable — the chain's nesting is engine mechanics, and replacing it detaches every layer from the page it wraps."
+      "summary": "The layout chain's inward slot. NOT overridable \u2014 the chain's nesting is engine mechanics, and replacing it detaches every layer from the page it wraps."
     },
     "GroveNav": {
       "tier": "chrome",
@@ -184,7 +252,16 @@
     }
   },
   "frontmatter": {
-    "engine": ["site", "layout", "view", "frame", "render", "nav", "order", "tags"],
+    "engine": [
+      "site",
+      "layout",
+      "view",
+      "frame",
+      "render",
+      "nav",
+      "order",
+      "tags"
+    ],
     "passThrough": true
   }
 }

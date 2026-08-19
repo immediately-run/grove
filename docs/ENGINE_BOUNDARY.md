@@ -92,7 +92,13 @@ Anything that renders *any* corpus, and holds no opinion about what the corpus i
   (`lib/sourceCache.ts`);
 - the layout chain (`lib/layout.ts`, `_layout.mdx` + `<Outlet/>`) and the shell primitives;
 - the generic content vocabulary registered in `mdxComponents.ts` — `<DocList>`, `<TagCloud>`,
-  `<Backlinks>`, `<Timeline>`, `<FamilyTree>`, and friends.
+  `<Backlinks>`, `<Timeline>`, `<FamilyTree>`, `<DirectoryList>`, and friends;
+- **folder routing** (`lib/directory.ts`, `hooks/useDirectoryListing`, `<DirectoryView>`):
+  a URL naming a directory renders its `index.mdx` if the corpus wrote one, else the
+  generated listing. The route resolves `DirectoryList` **through the MDX component map**
+  rather than importing it, so a fork's or (with R3-174) a corpus's replacement reaches the
+  route as well as the tag — a half-override that only reached MDX bodies would be
+  invisible to whoever installed it.
 
 ## 3. What is corpus furniture
 
@@ -138,6 +144,24 @@ you add to this engine, the test goes in the same commit as the source.
 the sandbox resolves on immediately.run — and proves the non-executable property: planted
 `{fetch()}` / `<script>` / `import` stay inert, unknown components collapse to their children,
 and heading ids exist for citations to land on.
+
+`src/components/DirectoryList.test.tsx` carries a **dispatch packaging** block. The fork and
+dispatch packagings differ in exactly one thing — `getContentRoot()` — and directory listings
+touch both path spaces at once: they READ through the mount and LINK through the URL space.
+Its load-bearing assertion is that the chroot prefix reaches **no** rendered href
+(`expect(el.innerHTML).not.toContain('mnt')`); that is host knowledge the viewer may read
+through but never publish, and the same mapping already leaked it once (R3-268). Proven
+non-vacuous by fault injection — freezing `urlAnchor()` at the fork root, and stopping
+`keyToHref` from stripping the anchor, each fail it.
+
+**Driving the dispatch packaging locally** (how that block was checked against the real host,
+2026-08-18): serve the corpus and the viewer as **two** `immediately.run dev` servers, seed the
+VIEWER's locator into `sessionStorage` under `ir-local-locator:<ns>/<repo>/<ref>` (the fragment
+can only carry one endpoint/token, and it has to be the corpus's), and re-point the binding with
+`#ir-dev-region=task.open-wiki&ir-dev-source=local/<ns>/<repo>/<ref>` — `ContentViewer`'s
+`resolveViewerBinding` honours the §6.8 ephemeral layer for `task.<name>` exactly as it does for
+a chrome region. Without that override, dispatch resolves to *published* Grove and the local
+build is never exercised.
 
 Two of its cases are **fixture-backed here and corpus-backed in `docs`**, deliberately. This
 repo's sample corpus writes no `[[…]]` citations and no `#sec-…` deep-links, so a corpus read

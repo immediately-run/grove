@@ -1073,9 +1073,39 @@ a.gdl-row {
   position: sticky;
   top: 78px;
   font-size: 13px;
+  /* Its OWN scroll container — the whole point of <TableOfContents>. A list taller than
+     the viewport has to scroll somewhere, and if it is not here it is the page, which is
+     how a contents rail ends up showing §1 while the reader is in §12. */
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* `offsetTop` is measured from the nearest POSITIONED ancestor; `position: sticky`
+     already makes this one, and the comment is here so nobody "cleans up" the sticky
+     into a plain block and silently moves the scroll arithmetic's origin. */
+  scrollbar-width: thin;
+}
+/* A ToC that scrolls needs a visible edge to scroll to, and the default overlay bar is
+   invisible until moved. Keep the gutter reserved so entries don't reflow on hover. */
+.grove-toc::-webkit-scrollbar {
+  width: 6px;
+}
+.grove-toc::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: var(--r-pill);
 }
 .grove-root[data-vw="mobile"] .grove-toc {
   position: static;
+  /* Inside the mobile <details> disclosure the rail is already in a bounded box and the
+     page scrolls; a second nested scroller there traps the touch gesture. */
+  max-height: none;
+  overflow-y: visible;
+}
+/* The disclosure's <summary> already says "On this page", so the list's own label is a
+   duplicate there. It always was — but giving it a sticky opaque bar (above) turned a
+   quiet repetition into two stacked headers. The nav keeps its `aria-label`, so nothing
+   is lost for assistive tech. */
+.grove-toc__disclosure .grove-toc__h {
+  display: none;
 }
 .grove-toc__h {
   font-family: var(--mono);
@@ -1084,6 +1114,14 @@ a.gdl-row {
   letter-spacing: .1em;
   color: var(--ink-3);
   margin-bottom: 10px;
+  /* Sticky INSIDE the rail's own scroller: once the list scrolls, the label that says
+     what the list is would otherwise be the first thing to leave. Needs an opaque
+     background or the entries read through it. */
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding-bottom: 6px;
+  z-index: 1;
 }
 .grove-toc a {
   display: block;
@@ -1118,9 +1156,45 @@ a.gdl-row {
   color: var(--ink-2);
   cursor: pointer;
   list-style: none;
+  /* The native marker is suppressed below, so without a replacement this control has NO
+     affordance at all — on a phone the contents list is the whole navigation, and an
+     unmarked rounded box reads as a caption, not a button. Reported from a real iPhone as
+     "I see no toc": the list was there, collapsed, behind a thing that did not look like
+     it opened. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* Comfortable thumb target — the text alone is 12px tall. */
+  min-height: 44px;
 }
 .grove-toc__disclosure summary::-webkit-details-marker {
   display: none;
+}
+/* A caret drawn in CSS rather than an icon import, so the disclosure stays styling-only
+   and no call site has to change. Points down when closed, up when open. */
+.grove-toc__disclosure summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform .18s ease;
+}
+.grove-toc__disclosure[open] summary::after {
+  transform: translateY(1px) rotate(225deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grove-toc__disclosure summary::after {
+    transition: none;
+  }
+}
+.grove-toc__disclosure summary:hover,
+.grove-toc__disclosure[open] summary {
+  color: var(--ink);
 }
 .grove-toc__disclosure[open] summary {
   border-bottom: 1px solid var(--line);
@@ -2536,4 +2610,148 @@ a.gdl-row {
   font-size: 0.9rem;
   text-align: center;
   max-width: 32rem;
+}
+
+/* ============ DIRECTORY LISTING ============ */
+/* <DirectoryList/> — a folder's files as a table. Reuses the .grove-table shell so a
+   listing sits in prose like any other table; the additions here are the name cell
+   (icon + label + on-disk filename) and the folder-vs-file weighting. */
+.grove-dirlist {
+  margin: 22px 0;
+}
+.grove-dirlist[data-state="checking"] {
+  min-height: 44px;
+}
+.grove-dirlist__table {
+  table-layout: auto;
+}
+.grove-dirlist__table td {
+  vertical-align: top;
+}
+.gdir__namebox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.gdir__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--ink-3);
+}
+.gdir__icon svg {
+  width: 16px;
+  height: 16px;
+}
+tr[data-kind="dir"] .gdir__icon {
+  color: var(--accent);
+}
+.gdir__labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+a.gdir__link {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: .14s;
+}
+a.gdir__link:hover {
+  color: var(--accent);
+  border-bottom-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+tr[data-kind="dir"] a.gdir__link::after {
+  content: "/";
+  color: var(--ink-3);
+}
+/* An asset row is listed but not navigable — muted so the absence of a link reads as
+   deliberate rather than as a broken one. */
+.gdir__plain {
+  color: var(--ink-2);
+}
+.gdir__file {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.gdir__desc {
+  color: var(--ink-2);
+  max-width: 52ch;
+}
+.gdir__tagbox {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gdir__tagbox .grove-tag {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.gdir__updated,
+.gdir__status {
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.gdir__title-icon {
+  display: inline-flex;
+  width: .78em;
+  height: .78em;
+  margin-right: .28em;
+  color: var(--accent);
+  vertical-align: baseline;
+}
+.gdir__title-icon svg {
+  width: 100%;
+  height: 100%;
+}
+/* Mobile: the description is the first thing to go — the name, tags and date still
+   answer "what is in this folder", and a four-column table on a phone answers nothing. */
+.grove-root[data-vw="mobile"] .gdir__desc,
+.grove-root[data-vw="mobile"] .gdir__th--description {
+  display: none;
+}
+/* …and the on-disk filename with it: in a phone-width name column it wraps mid-word
+   ("onboarding.md / x"), and the title above it already answers what the row is. An
+   asset row is unaffected — there the filename IS the label. */
+.grove-root[data-vw="mobile"] .gdir__file {
+  display: none;
+}
+.grove-dirlist__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 40px 20px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-shape);
+  text-align: center;
+}
+.grove-dirlist__empty .gdir__icon {
+  width: 26px;
+  height: 26px;
+  margin: 0 0 8px;
+  color: var(--ink-3);
+}
+.grove-dirlist__empty .gdir__icon svg {
+  width: 26px;
+  height: 26px;
+}
+.grove-dirlist__empty-t {
+  font-family: var(--disp);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -.01em;
+  color: var(--ink);
+}
+.grove-dirlist__empty-d {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
 }

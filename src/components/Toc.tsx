@@ -1,98 +1,14 @@
-import { useEffect, useState } from 'react';
-import { headingId } from '../lib/wiki';
+import TableOfContents from './TableOfContents';
 
-interface Head {
-  id: string;
-  text: string;
-  level: number;
-}
-
-// `<Toc/>` — the on-this-page rail. Reads the rendered prose headings from the DOM
-// (the entry is rendered via <Include>, so there's no source to parse), assigns
-// stable ids, and scroll-spies the current section. A MutationObserver re-scans
-// when the prose swaps on navigation, so the rail never shows a stale entry's
-// headings. Renders nothing when an entry has no sub-headings.
+// `<Toc/>` — the on-this-page rail, and the name every existing layout and entry uses.
+//
+// It is now an alias for `<TableOfContents/>`, which is the same list plus "keep the
+// current entry in view". Kept as its own name rather than rewritten at the call sites
+// because `Toc` is registered content vocabulary: a corpus may already say `<Toc/>`, and
+// the engine's names are an interface (spec_style's §-number rule, applied to components).
+//
+// Deliberately NOT a second implementation. The two used to be one copy of the DOM scan
+// each, which is precisely the drift ENGINE_BOUNDARY §4 was written about.
 export default function Toc({ entryKey }: { entryKey?: string }) {
-  const [heads, setHeads] = useState<Head[]>([]);
-  const [cur, setCur] = useState<string>('');
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHeads([]);
-    const scan = () => {
-      const prose = document.querySelector('.grove-prose');
-      const nodes = prose ? Array.from(prose.querySelectorAll('h2, h3')) : [];
-      const found: Head[] = nodes.map((n) => {
-        // The kernel prepends an autolink `<a class="ir-heading-anchor">#</a>`
-        // (SDK HeadingAnchor, §15.4) as the heading's first child, so `textContent`
-        // would include its `#`. Read the heading text WITHOUT the anchor for both
-        // the visible TOC label and the id fallback.
-        const anchor = n.querySelector('.ir-heading-anchor');
-        const text = (
-          anchor
-            ? Array.from(n.childNodes)
-                .filter((c) => c !== anchor)
-                .map((c) => c.textContent ?? '')
-                .join('')
-            : n.textContent || ''
-        ).trim();
-        // Prefer the kernel-emitted id (§15.5); the local `headingId` fallback
-        // reproduces the same algorithm for a heading with no kernel id.
-        const id = n.id || headingId(text);
-        n.id = id;
-        return { id, text, level: n.tagName === 'H3' ? 3 : 2 };
-      });
-      setHeads((prev) =>
-        prev.length === found.length && prev.every((h, i) => h.id === found[i].id) ? prev : found
-      );
-    };
-    scan();
-    // Re-scan as the prose mounts/swaps (Include resolves async on navigation).
-    const prose = document.querySelector('.grove-prose');
-    const obs = prose ? new MutationObserver(scan) : null;
-    if (prose && obs) obs.observe(prose, { childList: true, subtree: true });
-    const timers = [120, 300, 600].map((d) => setTimeout(scan, d));
-    return () => {
-      obs?.disconnect();
-      timers.forEach(clearTimeout);
-    };
-  }, [entryKey]);
-
-  useEffect(() => {
-    if (!heads.length) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length) setCur((visible[0].target as HTMLElement).id);
-      },
-      { rootMargin: '-64px 0px -70% 0px', threshold: 0 }
-    );
-    heads.forEach((h) => {
-      const el = document.getElementById(h.id);
-      if (el) obs.observe(el);
-    });
-    return () => obs.disconnect();
-  }, [heads]);
-
-  if (!heads.length) return null;
-
-  return (
-    <nav className="grove-toc" aria-label="On this page">
-      <div className="grove-toc__h">On this page</div>
-      {heads.map((h) => (
-        <a
-          key={h.id}
-          href={`#${h.id}`}
-          data-cur={cur === h.id ? '1' : '0'}
-          className={h.level === 3 ? 'lvl3' : undefined}
-          onClick={(e) => {
-            e.preventDefault();
-            document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        >
-          {h.text}
-        </a>
-      ))}
-    </nav>
-  );
+  return <TableOfContents entryKey={entryKey} />;
 }
