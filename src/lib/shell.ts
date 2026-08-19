@@ -8,6 +8,7 @@
 // the Fast-Refresh "components-only" rule.
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
+import type { DirectoryListing } from '../hooks/useDirectoryListing';
 
 export interface NavItem {
   key: string;
@@ -48,6 +49,10 @@ export interface GroveShell {
   mins: number;
   missing: boolean;
   suggestion?: string;
+  /** Whether the current URL names a FOLDER rather than an entry, and what is in it.
+   *  `checking` while the readdir is in flight — <PageView> must render neither the
+   *  entry nor the 404 then, or a folder URL flashes "No entry at …" before healing. */
+  directory: DirectoryListing;
 }
 
 export const GroveShellContext = createContext<GroveShell | null>(null);
