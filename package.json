@@ -18,11 +18,15 @@
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
-    "verify": "npm run check:manifest && npm run lint && npm run build && npm run test",
-    "check:manifest": "node scripts/check-manifest.mjs"
+    "verify": "npm run check:manifest && npm run check:deps && npm run lint && npm run build && npm run test",
+    "check:manifest": "node scripts/check-manifest.mjs",
+    "check:deps": "node scripts/check-app-dependencies.mjs --self-test && node scripts/check-app-dependencies.mjs"
   },
   "dependencies": {
-    "@immediately-run/mdx-plugins": "0.3.0"
+    "@immediately-run/mdx-plugins": "0.3.0",
+    "@immediately-run/sdk": "^0.43.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -40,10 +44,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.9",
-    "vitest": "^4.1.9",
-    "@immediately-run/sdk": "^0.43.1",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "vitest": "^4.1.9"
   },
   "description": "The Grove viewer: a kit of React components, layouts and themes for building immediately.run wikis. Composable as a fork, a dispatch target, or a pinned library.",
   "license": "Apache-2.0",
