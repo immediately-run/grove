@@ -1,0 +1,18 @@
+{
+  "name": "grove-thin-shell",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The M3 proof shell: an ordinary App.tsx that composes the Grove engine as a pinned library and overrides one manifest component.",
+  "immediately.run": {
+    "$schema": "https://immediately.run/immediately-run-config.schema.json",
+    "content": ["content"],
+    "render": "app"
+  },
+  "dependencies": {
+    "@immediately-run/grove": "github:immediately-run/grove#main",
+    "@immediately-run/sdk": "^0.43.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  }
+}
