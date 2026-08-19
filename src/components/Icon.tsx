@@ -17,6 +17,7 @@ const PATHS: Record<string, string> = {
   alert: 'M10.3 3.8L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.8a2 2 0 00-3.4 0zM12 9v4M12 17h.01',
   sparkles:
     'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 3v4M21 5h-4M5 17v2M6 18H4',
+  folder: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z',
   file: 'M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8zM14 3v5h5M9 13h6M9 17h6',
   'file-plus': 'M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8zM14 3v5h5M12 12v6M9 15h6',
   check: 'M20 6L9 17l-5-5',

@@ -2,7 +2,8 @@
 import { useCallback, useContext } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { hrefKeyCandidates, isContentEntry, keyToHref, linkKind, sandboxPathToKey, splitFragment } from '../lib/content';
+import { hrefKeyCandidates, hrefTargetKey, isContentEntry, keyToHref, linkKind, sandboxPathToKey, splitFragment } from '../lib/content';
+import { isFolderKey } from '../lib/directory';
 import { queryPaths } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -52,6 +53,18 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
   // that would navigate the sandboxed frame away and kill the app (R3-252).
   if (!targetKey) {
     const kind = linkKind(href);
+    // A FOLDER is a destination too, since directory listings landed: `[the
+    // handbook](handbook)` names something real, and the extension test that decides
+    // what an *entry* is would otherwise call it broken. Judged from the index (no fs
+    // call per link) — see `isFolderKey` for what that trades away.
+    const dirKey = kind === 'content' ? hrefTargetKey(href, currentKey) : null;
+    if (dirKey && loaded && isFolderKey(dirKey, keys)) {
+      return (
+        <Link href={keyToHref(dirKey) + fragment} className="grove-wikilink" data-state="ok" {...rest}>
+          {children}
+        </Link>
+      );
+    }
     if (kind !== 'content') {
       const web = /^https?:/i.test(href);
       return (

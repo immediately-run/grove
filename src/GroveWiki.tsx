@@ -21,6 +21,8 @@ import {
 } from './lib/content';
 import { queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
 import { layoutChainForKey } from './lib/layout';
+import { folderIndexKey } from './lib/directory';
+import { useDirectoryListing } from './hooks/useDirectoryListing';
 import { isDispatched } from './lib/contentRoot';
 import { GroveShellContext, OutletContext } from './lib/shell';
 import type { GroveShell, NavItem } from './lib/shell';
@@ -134,13 +136,33 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
   const writable =
     !isDispatched() && !readOnly && (mounts?.some((m) => m.type === 'worktree' && m.mode !== 'ro') ?? false);
 
-  const entryKey = sandboxPathToKey(sandboxPath) || homeKey();
-  const includePath = keyToInclude(entryKey);
-  const meta = useFileMetadata(entryKey) as any;
+  const routeKey = sandboxPathToKey(sandboxPath) || homeKey();
   // The site brand is a wiki-wide constant, so read it from the home entry's
   // `site` frontmatter — not the current entry's (which only home would carry),
   // else the brand flips to the 'Grove' fallback on every sub-page.
   const homeMeta = useFileMetadata(homeKey()) as any;
+  // Existence / 404: the whole index tells us if a followed link is dead. Layout
+  // files are structure, not entries, so they're excluded here (and everywhere).
+  const allKeysQuery = useCallback((fm: Record<string, any>) => Object.keys(fm).filter(isContentEntry), []);
+  const idx = useMetadataQuery(allKeysQuery);
+  const keys: string[] = queryPaths(idx);
+  const indexLoaded = keys.length > 0;
+
+  // A URL that names a FOLDER is a legitimate address, and there are two right answers
+  // to it — in this order:
+  //
+  //   1. the folder's own `index.mdx`, if the author wrote one. Curation beats
+  //      generation, and it is how a corpus overrides the listing per folder without
+  //      touching the engine;
+  //   2. otherwise the generated <DirectoryView> — the entries and assets that are
+  //      actually there.
+  //
+  // Both used to be "No entry at …", which is the one answer that is false.
+  const folderIndex = indexLoaded && !keys.includes(routeKey) ? folderIndexKey(routeKey, keys) : null;
+  const entryKey = folderIndex ?? routeKey;
+  const includePath = keyToInclude(entryKey);
+  const meta = useFileMetadata(entryKey) as any;
+
   const layout: string = meta?.layout || 'doc';
   const navMode: 'top' | 'side' = 'side';
   const siteTitle: string = meta?.site || homeMeta?.site || 'Grove';
@@ -156,13 +178,14 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
   const safe: boolean = homeMeta?.render === 'safe' || meta?.render === 'safe';
   const showRails = layout === 'doc' && !meta?.view;
 
-  // Existence / 404: the whole index tells us if a followed link is dead. Layout
-  // files are structure, not entries, so they're excluded here (and everywhere).
-  const allKeysQuery = useCallback((fm: Record<string, any>) => Object.keys(fm).filter(isContentEntry), []);
-  const idx = useMetadataQuery(allKeysQuery);
-  const keys: string[] = queryPaths(idx);
-  const indexLoaded = keys.length > 0;
-  const missing = indexLoaded && !keys.includes(entryKey);
+
+  // Ask the filesystem only about a key the ENTRY index already missed: an ordinary page
+  // render performs no extra I/O, and this readdir replaces a 404 that was about to
+  // render anyway. The index cannot answer it — it holds `.md`/`.mdx` only, so a folder
+  // of assets is invisible to it.
+  const unresolved = indexLoaded && !keys.includes(entryKey);
+  const directory = useDirectoryListing(unresolved ? entryKey : null);
+  const missing = unresolved && directory.status === 'none';
 
   // The layout chain wrapping this entry (outermost first). Needs the full
   // frontmatter map (folder convention + `frame` override), so it reads the whole
@@ -234,6 +257,7 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
     mins,
     missing,
     suggestion,
+    directory,
   };
 
   return (

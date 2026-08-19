@@ -2537,3 +2537,147 @@ a.gdl-row {
   text-align: center;
   max-width: 32rem;
 }
+
+/* ============ DIRECTORY LISTING ============ */
+/* <DirectoryList/> — a folder's files as a table. Reuses the .grove-table shell so a
+   listing sits in prose like any other table; the additions here are the name cell
+   (icon + label + on-disk filename) and the folder-vs-file weighting. */
+.grove-dirlist {
+  margin: 22px 0;
+}
+.grove-dirlist[data-state="checking"] {
+  min-height: 44px;
+}
+.grove-dirlist__table {
+  table-layout: auto;
+}
+.grove-dirlist__table td {
+  vertical-align: top;
+}
+.gdir__namebox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.gdir__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--ink-3);
+}
+.gdir__icon svg {
+  width: 16px;
+  height: 16px;
+}
+tr[data-kind="dir"] .gdir__icon {
+  color: var(--accent);
+}
+.gdir__labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+a.gdir__link {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: .14s;
+}
+a.gdir__link:hover {
+  color: var(--accent);
+  border-bottom-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+tr[data-kind="dir"] a.gdir__link::after {
+  content: "/";
+  color: var(--ink-3);
+}
+/* An asset row is listed but not navigable — muted so the absence of a link reads as
+   deliberate rather than as a broken one. */
+.gdir__plain {
+  color: var(--ink-2);
+}
+.gdir__file {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.gdir__desc {
+  color: var(--ink-2);
+  max-width: 52ch;
+}
+.gdir__tagbox {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gdir__tagbox .grove-tag {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.gdir__updated,
+.gdir__status {
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.gdir__title-icon {
+  display: inline-flex;
+  width: .78em;
+  height: .78em;
+  margin-right: .28em;
+  color: var(--accent);
+  vertical-align: baseline;
+}
+.gdir__title-icon svg {
+  width: 100%;
+  height: 100%;
+}
+/* Mobile: the description is the first thing to go — the name, tags and date still
+   answer "what is in this folder", and a four-column table on a phone answers nothing. */
+.grove-root[data-vw="mobile"] .gdir__desc,
+.grove-root[data-vw="mobile"] .gdir__th--description {
+  display: none;
+}
+/* …and the on-disk filename with it: in a phone-width name column it wraps mid-word
+   ("onboarding.md / x"), and the title above it already answers what the row is. An
+   asset row is unaffected — there the filename IS the label. */
+.grove-root[data-vw="mobile"] .gdir__file {
+  display: none;
+}
+.grove-dirlist__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 40px 20px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-shape);
+  text-align: center;
+}
+.grove-dirlist__empty .gdir__icon {
+  width: 26px;
+  height: 26px;
+  margin: 0 0 8px;
+  color: var(--ink-3);
+}
+.grove-dirlist__empty .gdir__icon svg {
+  width: 26px;
+  height: 26px;
+}
+.grove-dirlist__empty-t {
+  font-family: var(--disp);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -.01em;
+  color: var(--ink);
+}
+.grove-dirlist__empty-d {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}

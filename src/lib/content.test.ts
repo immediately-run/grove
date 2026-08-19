@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hrefKeyCandidates, keyToHref, linkKind, splitFragment } from './content';
+import { hrefKeyCandidates, hrefTargetKey, keyToHref, linkKind, splitFragment } from './content';
 
 // `hrefKeyCandidates` is the runtime half of the corpus's link contract: an author writes
 // links RELATIVE to the entry they sit in, and `scripts/lib/wiki.mjs` `contentResolve`
@@ -188,5 +188,31 @@ describe('viewedDocumentForTarget — the R3-268 declaration path space', () => 
     setContentRoot('/mnt/0a1b2c3d');
     const declared = viewedDocumentForTarget(`${HOST}/files/../../app/src/App.tsx`);
     expect(declared).toBe('home.mdx');
+  });
+});
+
+// A folder is a destination since directory listings landed, so link resolution has to
+// answer "which PATH?" as well as "which entry?" — `[the handbook](handbook)` names
+// something real and must not render as a broken link.
+describe('hrefTargetKey — resolution without the entry-file requirement', () => {
+  it('resolves a folder href the entry-candidate list rejects', () => {
+    expect(hrefKeyCandidates('handbook', HOME)).toEqual([]);
+    expect(hrefTargetKey('handbook', HOME)).toBe('/app/content/handbook');
+    expect(hrefTargetKey('../teams', '/app/content/handbook/onboarding.mdx')).toBe('/app/content/teams');
+  });
+
+  it('still resolves entries, identically to the candidate list', () => {
+    expect(hrefTargetKey('roadmap/index.mdx', HOME)).toBe('/app/content/roadmap/index.mdx');
+    expect(hrefTargetKey('/files/content/about.mdx', HOME)).toBe('/app/content/about.mdx');
+  });
+
+  it('denotes nothing for an external scheme, a bare anchor, or an escape', () => {
+    expect(hrefTargetKey('https://example.com', HOME)).toBeNull();
+    expect(hrefTargetKey('#sec-1', HOME)).toBeNull();
+    expect(hrefTargetKey('', HOME)).toBeNull();
+    // Confinement: the result flows into fs reads, and under dispatch the href is
+    // foreign content.
+    expect(hrefTargetKey('../../src/App.tsx', HOME)).toBeNull();
+    expect(hrefTargetKey('/../package.json', HOME)).toBeNull();
   });
 });
