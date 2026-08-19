@@ -1100,6 +1100,13 @@ a.gdl-row {
   max-height: none;
   overflow-y: visible;
 }
+/* The disclosure's <summary> already says "On this page", so the list's own label is a
+   duplicate there. It always was — but giving it a sticky opaque bar (above) turned a
+   quiet repetition into two stacked headers. The nav keeps its `aria-label`, so nothing
+   is lost for assistive tech. */
+.grove-toc__disclosure .grove-toc__h {
+  display: none;
+}
 .grove-toc__h {
   font-family: var(--mono);
   font-size: 10.5px;
