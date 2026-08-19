@@ -128,13 +128,29 @@ export function bodyLinksTo(body: string, targetKey: string, fromKey: string): b
   return bodyLinks(body).some((l) => linkTargetKeys(l.href, fromKey).includes(targetKey));
 }
 
+/** Body prose as a READER sees it: HTML tags dropped, and a link reduced to the text
+ *  it renders as. Without the second half a snippet reads
+ *  `calls the target [[the layering contract|../specs/X.mdx#sec-2]] and carries`, which
+ *  is the source, not the sentence — the noise was invisible while the index was empty
+ *  and appeared the moment backlinks started resolving (R3-283). */
+export function renderedText(body: string): string {
+  return stripFrontmatter(body)
+    .replace(/<[^>]+>/g, ' ')
+    // `[[label|target]]` → label, `[[target]]` → target (the §13.1 order).
+    .replace(/\[\[([^[\]]+)\]\]/g, (_, inner: string) => {
+      const token = parseWikiInner(inner);
+      return token ? (token.label ?? token.target) : inner;
+    })
+    // `[label](href)` → label; an image renders as its alt text.
+    .replace(/!?\[([^\]]*)\]\(\s*[^)\s]+(?:\s+"[^"]*")?\s*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** A ~160-char snippet of `body` around the first link to `targetKey`, with the
  *  linking phrase wrapped in <mark>… (returned as an HTML string for the snippet). */
 export function backlinkSnippet(body: string, targetKey: string, fromKey: string): string {
-  const text = stripFrontmatter(body)
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const text = renderedText(body);
   // The MARK is the linking phrase as the reader sees it: a wiki label (or its target
   // when unlabelled), or the markdown label. Matching on the resolved link rather than
   // on a literal href is what stops every hit falling back to "first 160 chars".

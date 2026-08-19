@@ -156,3 +156,39 @@ describe('backlinkSnippet — marks the linking phrase, not the first 160 chars 
     expect(snip).toContain('<mark>');
   });
 });
+
+describe('backlinkSnippet — a snippet is prose, not source (R3-283)', () => {
+  const FROM = '/app/content/roadmap/R3-283.mdx';
+  const SPEC = '/app/content/specs/TARGET_SPEC.mdx';
+
+  it('drops the link syntax around the marked phrase', () => {
+    const snip = backlinkSnippet(
+      'The link itself calls the target [[the layering contract|../specs/TARGET_SPEC.mdx#sec-2]] and carries a fragment.',
+      SPEC,
+      FROM,
+    );
+    expect(snip).toContain('calls the target <mark>the layering contract</mark> and carries');
+    for (const noise of ['[[', ']]', '../specs/TARGET_SPEC.mdx']) expect(snip).not.toContain(noise);
+  });
+
+  it('does the same for a markdown link', () => {
+    const snip = backlinkSnippet('This entry links to [the target spec](../specs/TARGET_SPEC.mdx) with ordinary markdown.', SPEC, FROM);
+    expect(snip).toContain('links to <mark>the target spec</mark> with ordinary markdown');
+    expect(snip).not.toContain('](');
+  });
+
+  it('an UNLABELLED wiki-link renders as its target, and that is what gets marked', () => {
+    const snip = backlinkSnippet('This entry mentions [[../specs/TARGET_SPEC.mdx]] once.', SPEC, FROM);
+    expect(snip).toContain('mentions <mark>../specs/TARGET_SPEC.mdx</mark> once');
+    expect(snip).not.toContain('[[');
+  });
+
+  it('other links in the same sentence are reduced too, not just the matched one', () => {
+    const snip = backlinkSnippet(
+      'See [the other one](../specs/OTHER.mdx) and then [the target spec](../specs/TARGET_SPEC.mdx).',
+      SPEC,
+      FROM,
+    );
+    expect(snip).toContain('See the other one and then <mark>the target spec</mark>');
+  });
+});
