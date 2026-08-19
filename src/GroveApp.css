@@ -1073,9 +1073,39 @@ a.gdl-row {
   position: sticky;
   top: 78px;
   font-size: 13px;
+  /* Its OWN scroll container — the whole point of <TableOfContents>. A list taller than
+     the viewport has to scroll somewhere, and if it is not here it is the page, which is
+     how a contents rail ends up showing §1 while the reader is in §12. */
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* `offsetTop` is measured from the nearest POSITIONED ancestor; `position: sticky`
+     already makes this one, and the comment is here so nobody "cleans up" the sticky
+     into a plain block and silently moves the scroll arithmetic's origin. */
+  scrollbar-width: thin;
+}
+/* A ToC that scrolls needs a visible edge to scroll to, and the default overlay bar is
+   invisible until moved. Keep the gutter reserved so entries don't reflow on hover. */
+.grove-toc::-webkit-scrollbar {
+  width: 6px;
+}
+.grove-toc::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: var(--r-pill);
 }
 .grove-root[data-vw="mobile"] .grove-toc {
   position: static;
+  /* Inside the mobile <details> disclosure the rail is already in a bounded box and the
+     page scrolls; a second nested scroller there traps the touch gesture. */
+  max-height: none;
+  overflow-y: visible;
+}
+/* The disclosure's <summary> already says "On this page", so the list's own label is a
+   duplicate there. It always was — but giving it a sticky opaque bar (above) turned a
+   quiet repetition into two stacked headers. The nav keeps its `aria-label`, so nothing
+   is lost for assistive tech. */
+.grove-toc__disclosure .grove-toc__h {
+  display: none;
 }
 .grove-toc__h {
   font-family: var(--mono);
@@ -1084,6 +1114,14 @@ a.gdl-row {
   letter-spacing: .1em;
   color: var(--ink-3);
   margin-bottom: 10px;
+  /* Sticky INSIDE the rail's own scroller: once the list scrolls, the label that says
+     what the list is would otherwise be the first thing to leave. Needs an opaque
+     background or the entries read through it. */
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding-bottom: 6px;
+  z-index: 1;
 }
 .grove-toc a {
   display: block;
@@ -1118,9 +1156,45 @@ a.gdl-row {
   color: var(--ink-2);
   cursor: pointer;
   list-style: none;
+  /* The native marker is suppressed below, so without a replacement this control has NO
+     affordance at all — on a phone the contents list is the whole navigation, and an
+     unmarked rounded box reads as a caption, not a button. Reported from a real iPhone as
+     "I see no toc": the list was there, collapsed, behind a thing that did not look like
+     it opened. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* Comfortable thumb target — the text alone is 12px tall. */
+  min-height: 44px;
 }
 .grove-toc__disclosure summary::-webkit-details-marker {
   display: none;
+}
+/* A caret drawn in CSS rather than an icon import, so the disclosure stays styling-only
+   and no call site has to change. Points down when closed, up when open. */
+.grove-toc__disclosure summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform .18s ease;
+}
+.grove-toc__disclosure[open] summary::after {
+  transform: translateY(1px) rotate(225deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grove-toc__disclosure summary::after {
+    transition: none;
+  }
+}
+.grove-toc__disclosure summary:hover,
+.grove-toc__disclosure[open] summary {
+  color: var(--ink);
 }
 .grove-toc__disclosure[open] summary {
   border-bottom: 1px solid var(--line);
