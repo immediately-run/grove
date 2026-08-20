@@ -16,4 +16,11 @@ resolve.
 The heading above is anchored by the same `remarkHeadingAnchors` pass the fork uses — the
 engine is the same code either way.
 
-Back to [home](/home).
+<Callout kind="note" title="This box is the override.">
+  `Callout` is a manifest component, so a shell may replace it. This one is rendered by
+  `src/ShellCallout.tsx`, not by the engine's stock component — the visible difference is
+  `data-kind` on an `aside.shell-callout`. Swap `components.ts` back to stock and this box
+  changes shape.
+</Callout>
+
+Back to [home](/content/home.mdx).
