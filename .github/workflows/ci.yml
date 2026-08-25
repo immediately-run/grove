@@ -1,0 +1,75 @@
+name: ci
+
+# Build + test on every PR; publish @immediately-run/grove to npm on push to main via
+# trusted publishing (OIDC), mirroring platform-constants / sandbox-protocol / the SDK
+# release job. The engine ships SOURCE (files: src) — the platform transpiles at
+# runtime — so "build" here is the type-check, and the published artifact is the
+# contract surfaces `scripts/check-engine-api.mjs` snapshots.
+#
+# ⚠ OPERATOR PREREQUISITES (one-time):
+#   1. npm trusted publishing configured for @immediately-run/grove on npmjs.com
+#      (repository = immediately-run/grove).
+#   2. Settings → Environments → New environment `production` → Required reviewers.
+#      The first step of the publish job FAILS CLOSED without a recorded approval —
+#      declaring a missing environment auto-creates it UNPROTECTED (the silent-noop
+#      trap), which is exactly what the assertion refuses to trust.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run verify
+
+  publish:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing (OIDC)
+      actions: read # read this run's approval history (the assertion below)
+    steps:
+      - name: Assert this run cleared the `production` approval gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APPROVALS=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/approvals")
+          COUNT=$(printf '%s' "$APPROVALS" | jq '[.[] | select(.state == "approved") | select(any(.environments[]?; .name == "production"))] | length')
+          if [ "${COUNT:-0}" -lt 1 ]; then
+            echo "::error::No human approval recorded for environment 'production' on this run. Configure Settings → Environments → production → Required reviewers. Refusing to publish an irreversible public version unattended (R-TA-1)."
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run verify
+      - name: Publish to npm via trusted publishing (skip if version already published)
+        env:
+          NODE_AUTH_TOKEN: ""
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VER=$(node -p "require('./package.json').version")
+          if npm view "$PKG_NAME@$PKG_VER" version >/dev/null 2>&1; then
+            echo "::notice::$PKG_NAME@$PKG_VER already published — skipping."
+            exit 0
+          fi
+          npm publish --access public
