@@ -1,4 +1,5 @@
 import { isContentEntryPath } from '@immediately-run/mdx-plugins';
+import { FS_PREFIX, normalizeAbsolute, resolveLinkTarget } from '@immediately-run/sdk/linkSpace';
 
 // Path conventions for Grove content.
 //
@@ -140,16 +141,9 @@ export function splitFragment(href: string): [string, string] {
   return i === -1 ? [href, ''] : [href.slice(0, i), href.slice(i)];
 }
 
-/** Collapse `.` and `..` segments in an absolute key. */
-function normalizeKey(abs: string): string {
-  const out: string[] = [];
-  for (const seg of abs.split('/')) {
-    if (!seg || seg === '.') continue;
-    if (seg === '..') out.pop();
-    else out.push(seg);
-  }
-  return '/' + out.join('/');
-}
+/** Collapse `.` and `..` segments in an absolute key — the shared normalizer
+ *  (R3-277b; was a local copy of the same arithmetic). */
+const normalizeKey = normalizeAbsolute;
 
 /**
  * The canonical keys a link href may denote, most-specific first — empty when the href
@@ -191,11 +185,40 @@ export function hrefTargetKey(href: string, fromKey: string): string | null {
   const [rawPath] = splitFragment(href);
   if (!rawPath) return null;
   const path = rawPath.replace(/^\/files/, '');
-  const dir = fromKey.slice(0, fromKey.lastIndexOf('/'));
-  const abs = normalizeKey(path.startsWith('/') ? APP_PREFIX + path : `${dir}/${path}`);
-  // Confinement, not tidiness: an href in foreign content is untrusted, and the result
-  // flows into `fs` reads. Anything that lands outside the corpus denotes nothing.
-  return abs.startsWith(contentDir()) ? abs : null;
+  // R3-277b: resolution is the SHARED resolver (`@immediately-run/sdk/linkSpace`,
+  // R3-273) — the same function the platform's own WikiLink and the docs corpus
+  // checker route through, so the runtime and the gate cannot drift. Relative
+  // targets resolve against the authoring file; `$fs:` targets resolve
+  // mount-absolute (addressing, never reach — R3-273).
+  if (!path.startsWith('/')) {
+    const rel = resolveLinkTarget(path, { currentFile: fromKey, corpusRoot: getContentRoot() });
+    if (rel.state !== 'resolved') return null;
+    // Confinement, not tidiness: an href in foreign content is untrusted, and the
+    // result flows into `fs` reads. In the default space anything that lands outside
+    // the corpus denotes nothing (`$fs:` is exempt by design; the entry checks
+    // downstream decide what renders).
+    return rel.path.startsWith(contentDir()) || path.startsWith(FS_PREFIX) ? rel.path : null;
+  }
+  // Absolute spellings come in two generations, both accepted INBOUND (the R3-272
+  // rule; emission via keyToHref stays canonical): the legacy repo-root spelling
+  // ('/content/handbook/x.mdx' — anchored where the corpus's own repo keeps it,
+  // under 'content/') and the canonical corpus-absolute ('/handbook/x.mdx' —
+  // anchored at the corpus root by the shared resolver). The legacy spelling is
+  // recognized by its prefix and wins when it matches, because that is the only
+  // form a repo-shaped corpus could have meant by it; anything else is
+  // corpus-absolute, closed under traversal ('..' clamps INSIDE the corpus —
+  // R3-273's rule, which supersedes this file's old escape-to-null behavior).
+  const legacyPrefix = contentDir().endsWith('/content/') ? '/content' : null;
+  if (legacyPrefix && (path === legacyPrefix || path.startsWith(`${legacyPrefix}/`))) {
+    const legacyAnchor = contentDir().slice(0, -'content/'.length);
+    const legacy = normalizeAbsolute(legacyAnchor + path);
+    if (legacy.startsWith(contentDir())) return legacy;
+  }
+  const corpusAnchored = resolveLinkTarget(path, { currentFile: fromKey, corpusRoot: getContentRoot() });
+  if (corpusAnchored.state === 'resolved' && corpusAnchored.path.startsWith(contentDir())) {
+    return corpusAnchored.path;
+  }
+  return null;
 }
 
 /**
