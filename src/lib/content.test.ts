@@ -211,8 +211,59 @@ describe('hrefTargetKey — resolution without the entry-file requirement', () =
     expect(hrefTargetKey('#sec-1', HOME)).toBeNull();
     expect(hrefTargetKey('', HOME)).toBeNull();
     // Confinement: the result flows into fs reads, and under dispatch the href is
-    // foreign content.
+    // foreign content. RELATIVE climbs out of the corpus still denote nothing.
     expect(hrefTargetKey('../../src/App.tsx', HOME)).toBeNull();
-    expect(hrefTargetKey('/../package.json', HOME)).toBeNull();
+    // An ABSOLUTE traversal no longer escapes to null, it CLAMPS inside the corpus
+    // (R3-273's closed-space rule, adopted by R3-277b — the corpus space is closed
+    // under traversal; the old escape-to-null reading is superseded).
+    expect(hrefTargetKey('/../../src/App.tsx', HOME)).toBe('/app/content/src/App.tsx');
+    expect(hrefTargetKey('/../package.json', HOME)).toBe('/app/content/package.json'); // clamped INSIDE, not escaped
+  });
+});
+
+// R3-277b — the link-resolution parity harness: grove's runtime resolution
+// (`hrefTargetKey`) must agree with the SHARED fixture (and therefore with the
+// SDK resolver and the docs checker, which assert against the same cases).
+import { LINK_SPACE_FIXTURE } from '@immediately-run/mdx-plugins';
+
+describe('link-space parity (LINK_SPACE_FIXTURE, R3-277b)', () => {
+  // The corpus-rooted cases, run through grove's own resolution with the fork
+  // packaging's root. The mount-absolute corpus of the fixture is '/app/content'
+  // — exactly the fork's — so the corpus-space cases translate verbatim; the
+  // fs-rooted/no-corpus case and the chroot collapse are resolver-level (the
+  // checker + SDK suites own them) and are skipped by corpusRoot here.
+  const FORK_ROOT = '/app/content';
+  const contentCases = LINK_SPACE_FIXTURE.filter(
+    (c) => c.corpusRoot === FORK_ROOT && !c.bundleChrooted && c.currentFile !== undefined,
+  );
+
+  it('the fixture still reaches this harness (non-vacuous)', () => {
+    expect(contentCases.length).toBeGreaterThanOrEqual(7);
+  });
+
+  for (const c of contentCases) {
+    it(`${c.raw} from ${c.currentFile ?? '<unknown>'} — ${c.why}`, () => {
+      const got = hrefTargetKey(c.raw, c.currentFile ?? '/app/content/home.mdx');
+      if (c.expect.state === 'resolved') {
+        // grove confines default-space targets to the corpus; the fixture's one
+        // escapes-corpus case ('../specs/A.mdx') therefore maps to null here —
+        // an existence-denial, not a disagreement (the resolver case above
+        // proved the path arithmetic; entry checks would reject it anyway).
+        const insideCorpus = c.expect.path.startsWith(FORK_ROOT);
+        expect(got).toBe(insideCorpus || c.raw.startsWith('$fs:') ? c.expect.path : null);
+      } else {
+        expect(got).toBe(null);
+      }
+    });
+  }
+
+  it('legacy repo-root absolute spellings are accepted inbound (R3-272 rule)', () => {
+    expect(hrefTargetKey('/content/handbook/onboarding.mdx', '/app/content/home.mdx')).toBe(
+      '/app/content/handbook/onboarding.mdx'
+    );
+    // canonical corpus-absolute still wins
+    expect(hrefTargetKey('/handbook/onboarding.mdx', '/app/content/home.mdx')).toBe(
+      '/app/content/handbook/onboarding.mdx'
+    );
   });
 });

@@ -11,6 +11,7 @@ import {
   useMounts,
 } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
+import { LinkSpaceContext } from '@immediately-run/sdk/linkSpace';
 import {
   contentDir,
   homeKey,
@@ -26,7 +27,7 @@ import type { NavRecord } from './lib/queries';
 import { layoutChainForKey } from './lib/layout';
 import { folderIndexKey } from './lib/directory';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
-import { isDispatched } from './lib/contentRoot';
+import { getContentRoot, isDispatched } from './lib/contentRoot';
 import { GroveShellContext, OutletContext } from './lib/shell';
 import type { GroveShell, NavItem } from './lib/shell';
 import PageView from './components/PageView';
@@ -258,6 +259,9 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
   };
 
   return (
+    // R3-277b: declare the enclosing corpus for the platform's link-space consumers
+    // (the shared resolver's corpus-anchored absolute + `$fs:` handling read this).
+    <LinkSpaceContext.Provider value={{ corpusRoot: getContentRoot() }}>
     <GroveShellContext.Provider value={shell}>
       <div
         className="grove-root"
@@ -283,6 +287,7 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
         <GroveAgent writable={writable} entryKey={entryKey} entryTitle={(meta?.title || 'this entry').replace(/\.$/, '')} />
       </div>
     </GroveShellContext.Provider>
+    </LinkSpaceContext.Provider>
   );
 }
 
