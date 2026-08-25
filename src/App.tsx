@@ -20,6 +20,7 @@
 import { use, useEffect, useRef } from 'react';
 import * as sdk from '@immediately-run/sdk';
 import { sendMessage } from '@immediately-run/sdk/sandboxUtils';
+import { MetadataSource } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useCorpusMetadata } from './hooks/useCorpusMetadata';
@@ -85,14 +86,15 @@ export default function App() {
   }
 
   if (corpus.status === 'ready' && corpus.metadata) {
-    // Swap the SOURCE of the index, not the index: the SDK's metadata hooks read
-    // `filesMetadata` off this context, so re-providing it with the scanned corpus makes
-    // every consumer work unchanged. Everything else in the host's state — navigation,
-    // routing, the outer href — passes through untouched.
+    // Provide the scanned corpus as the metadata SOURCE through the supported
+    // surface (R3-276), not a wholesale TinkerableContext re-provision: the
+    // platform stays free to grow its own state, and the hooks read the nearest
+    // MetadataSource — so every consumer works unchanged, and nothing re-states
+    // host fields it does not own.
     return (
-      <TinkerableContext.Provider value={{ ...host, filesMetadata: corpus.metadata }}>
+      <MetadataSource value={corpus.metadata}>
         <GroveWiki readOnly={boot.readOnly} />
-      </TinkerableContext.Provider>
+      </MetadataSource>
     );
   }
 
