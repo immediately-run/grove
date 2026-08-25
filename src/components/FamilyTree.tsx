@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useContext } from 'react';
+import { useContext } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
+import type { Metadata } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { contentDir, sandboxPathToKey } from '../lib/content';
-import { queryPaths } from '../lib/wiki';
+import { sandboxPathToKey } from '../lib/content';
+import { familyTreeQuery } from '../lib/queries';
+import type { FamilyNodeRecord } from '../lib/queries';
 
 interface Node {
   id: string;
@@ -21,22 +23,9 @@ export default function FamilyTree() {
   const ctx = useContext(TinkerableContext) as any;
   const currentKey = sandboxPathToKey(ctx?.navigationState?.sandboxPath || '/');
 
-  const queryFn = useCallback((fm: Record<string, any>) => {
-    const out: { key: string; label: string; group: string }[] = [];
-    Object.entries(fm).forEach(([p, m]: [string, any]) => {
-      if (!p.startsWith(contentDir())) return;
-      const group = m?.house || m?.team || m?.parent || m?.manager;
-      if (group && (m?.name || m?.title)) {
-        out.push({ key: p, label: (m.name || m.title).replace(/\.$/, ''), group: String(group) });
-      }
-    });
-    return out.map((o) => [o.key, o.label, o.group].join('\t'));
-  }, []);
-  const q = useMetadataQuery(queryFn);
-  const rows = queryPaths(q).map((s: string) => {
-    const [key, label, group] = s.split('\t');
-    return { key, label, group };
-  });
+  // Records, not tab-encoded paths (R3-276a).
+  const q = useMetadataQuery<Metadata, FamilyNodeRecord>(familyTreeQuery);
+  const rows: FamilyNodeRecord[] = Array.isArray(q) ? q : [];
 
   if (!rows.length) {
     return <p className="grove-search__empty">No relationships defined.</p>;
@@ -57,9 +46,9 @@ export default function FamilyTree() {
     hubs.push(hub);
     groups[g].forEach((m: any, mi: number) => {
       const my = 120 + mi * 46;
-      const mn: Node = { id: m.key, label: m.label, group: g, x: cx, y: my };
+      const mn: Node = { id: m.path, label: m.label, group: g, x: cx, y: my };
       members.push(mn);
-      edges.push({ x1: cx, y1: 56, x2: cx, y2: my, cur: m.key === currentKey });
+      edges.push({ x1: cx, y1: 56, x2: cx, y2: my, cur: m.path === currentKey });
     });
   });
   const maxRows = Math.max(...groupNames.map((g) => groups[g].length));

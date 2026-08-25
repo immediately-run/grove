@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
-import { isContentEntry, keyToHref } from '../lib/content';
-import { crumb, queryPaths } from '../lib/wiki';
+import type { Metadata } from '@immediately-run/sdk';
+import { keyToHref } from '../lib/content';
+import { crumb } from '../lib/wiki';
+import { searchQuery } from '../lib/queries';
+import type { SearchRecord } from '../lib/queries';
 import Icon from './Icon';
-
-const SEP = '\t';
 
 interface Hit {
   key: string;
@@ -21,24 +21,19 @@ export default function Search({ onClose }: { onClose: () => void }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const queryFn = useCallback(
-    (fm: Record<string, any>) =>
-      Object.keys(fm)
-        .filter(isContentEntry)
-        .map((p) =>
-          [p, fm[p]?.title || '', fm[p]?.description || '', (fm[p]?.tags || []).filter((t: string) => !t.startsWith('ui/')).join(',')].join(SEP)
-        ),
-    []
-  );
-  const q = useMetadataQuery(queryFn);
-  const rows: string[] = queryPaths(q);
+  // Records, not tab-encoded paths (R3-276a): `tags` is the array itself, so the
+  // join/split round-trip is gone.
+  const q = useMetadataQuery<Metadata, SearchRecord>(searchQuery);
+  const rows: SearchRecord[] = Array.isArray(q) ? q : [];
 
-  const rowsKey = rows.join('|');
+  const rowsKey = rows.map((r) => r.path).join('|');
   const { entries, tags } = useMemo(() => {
-    const es: { key: string; title: string; desc: string; tags: string }[] = rows.map((r) => {
-      const [key, title, desc, tg] = r.split(SEP);
-      return { key, title: (title || key).replace(/\.$/, ''), desc: desc || '', tags: tg || '' };
-    });
+    const es = rows.map(({ path, title, desc, tags: entryTags }) => ({
+      key: path,
+      title: (title || path).replace(/\.$/, ''),
+      desc: desc || '',
+      tags: entryTags.join(','),
+    }));
     const tagSet = new Set<string>();
     es.forEach((e) => e.tags.split(',').filter(Boolean).forEach((t) => tagSet.add(t)));
     return { entries: es, tags: Array.from(tagSet).sort() };

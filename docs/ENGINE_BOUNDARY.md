@@ -203,3 +203,31 @@ straight through**. The two throwing cases are worse than they look: the throw i
 allow-list, and React's own defenses are a second layer rather than the only one.
 `src/lib/safeIntrinsics.test.tsx` pins every one of those cases, including the raw-tag
 behaviour that motivates the wrapper.
+
+## 7. Fork delta, re-measured after the R3-276a port (2026-08-25)
+
+The R3-276a port (record queries + `MetadataSource`, grove #45) landed in both trees in
+the same window. Measured immediately after, engine `src/` vs the docs fork's `src/`:
+
+- **Byte-identical after the port:** `lib/queries.ts` + its tests, `Search.tsx`,
+  `FamilyTree.tsx` — the shared metadata-query surfaces have zero fork divergence.
+- **Fork-only (the furniture, unchanged in kind):** the roadmap components
+  (`RoadmapBoard`, `RoadmapMeta`, `NextAvailable`, `Dependencies`, `ProjectIndex`,
+  `ProjectItems`, `ProjectMeta`, `TopicIndex`, `ItemCard`, `StatusBadge`), `data/roadmap.ts`,
+  `lib/roadmap.ts`, plus the `.rm-*` css block. Every one reads `status:`/`project:`/
+  `prs:`/`depends_on:` — corpus tooling, not engine.
+- **Fork naming specialization:** `CONTENT_DIR` constant vs the engine's
+  `contentDir()` runtime call (the fork is single-packaging and knows its root at build
+  time); visible as ~8-line diffs in `Sidebar.tsx`, `TagCloud.tsx`, `ChildPages.tsx`.
+- **Engine-ahead (NOT ported by R3-276a, pre-existing):** the fork's `App.tsx` is still
+  the pre-R3-169 monolith — it never needed the dispatch gate — and it lacks the newer
+  engine features (`GroveWiki` split, `DirectoryList`/`DirectoryView` folder routing,
+  `SafeLayout`, `TableOfContents`). That is drift the fork OWNS catching up on, tracked
+  separately from this boundary record; the fork renders the docs corpus on the surfaces
+  it has.
+
+The R3-276a fork/dispatch parity drill (headless Chrome on `local.immediately.run`, same
+throwaway corpus rendered both ways) found nav, search, and family-tree **identical**
+between the modes: same labels, same in-corpus hrefs, same family labels
+(`Engineering · Operations · Ada Lovelace · Alan Turing · Dorothy Vaughan`), with 83
+viewer-dev-server requests proving the dispatch render exercised the local engine build.

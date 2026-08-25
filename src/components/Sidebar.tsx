@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { Link, useMetadataQuery } from '@immediately-run/sdk';
+import type { Metadata } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { contentDir, isContentEntry, keyToHref, sandboxPathToKey } from '../lib/content';
-import { queryPaths } from '../lib/wiki';
+import { contentDir, keyToHref, sandboxPathToKey } from '../lib/content';
+import { sidebarQuery } from '../lib/queries';
+import type { SidebarRecord } from '../lib/queries';
 import Icon from './Icon';
-
-const SEP = '\t';
 
 interface TreeNode {
   name: string;
@@ -75,24 +75,17 @@ export default function Sidebar() {
   const ctx = useContext(TinkerableContext) as any;
   const currentKey = sandboxPathToKey(ctx?.navigationState?.sandboxPath || '/');
 
-  const queryFn = useCallback(
-    (fm: Record<string, any>) =>
-      Object.keys(fm)
-        .filter(isContentEntry)
-        .map((p) => [p, fm[p]?.title || '', (fm[p]?.tags || []).join(','), fm[p]?.nav || ''].join(SEP)),
-    []
-  );
-  const q = useMetadataQuery(queryFn);
-  const rows: string[] = queryPaths(q);
+  // Records, not tab-encoded paths (R3-276a).
+  const q = useMetadataQuery<Metadata, SidebarRecord>(sidebarQuery);
+  const rows: SidebarRecord[] = Array.isArray(q) ? q : [];
 
-  const rowsKey = rows.join('|');
+  const rowsKey = rows.map((r) => r.path).join('|');
   const { tree, sections } = useMemo(() => {
     const root: TreeNode = { name: '', children: {} };
     const secs: { key: string; label: string }[] = [];
-    rows.forEach((r) => {
-      const [key, title, tags, nav] = r.split(SEP);
-      insert(root, key, title);
-      if ((tags || '').split(',').includes('ui/sidebar')) secs.push({ key, label: nav || title || key });
+    rows.forEach(({ path, title, tags, nav }) => {
+      insert(root, path, title);
+      if (tags.includes('ui/sidebar')) secs.push({ key: path, label: nav || title || path });
     });
     return { tree: root, sections: secs };
     // eslint-disable-next-line react-hooks/exhaustive-deps
