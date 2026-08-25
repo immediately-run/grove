@@ -13,7 +13,7 @@
     "render": "app"
   },
   "dependencies": {
-    "@immediately-run/grove": "github:immediately-run/grove#main",
+    "@immediately-run/grove": "0.1.0",
     "@immediately-run/sdk": "^0.43.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
