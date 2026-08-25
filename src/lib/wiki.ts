@@ -13,6 +13,13 @@ export function queryPaths(q: unknown): string[] {
   return Array.isArray(q) ? (q as { path: string }[]).map((e) => e.path) : [];
 }
 
+/** Records from a metadata query that returned records: the entries as given, or
+ *  `[]` when the query threw (`{ error }` result). The record-shape twin of
+ *  {@link queryPaths}. */
+export function queryRecords<E extends object>(q: unknown): ({ path: string } & E)[] {
+  return Array.isArray(q) ? (q as ({ path: string } & E)[]) : [];
+}
+
 /** Average adult reading speed; `→ N min read` is rounded up, min 1. */
 export function readingTime(body: string): number {
   const words = body.trim().split(/\s+/).filter(Boolean).length;

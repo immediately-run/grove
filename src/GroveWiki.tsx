@@ -2,6 +2,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import fs from 'fs';
+import type { Metadata } from '@immediately-run/sdk';
 import {
   Include,
   useAllMetadata,
@@ -19,7 +20,9 @@ import {
   keyToInclude,
   sandboxPathToKey,
 } from './lib/content';
-import { queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
+import { queryPaths, queryRecords, readingTime, stripFrontmatter } from './lib/wiki';
+import { navQuery } from './lib/queries';
+import type { NavRecord } from './lib/queries';
 import { layoutChainForKey } from './lib/layout';
 import { folderIndexKey } from './lib/directory';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
@@ -211,20 +214,14 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
     };
   }, [entryKey]);
 
-  const navQuery = useCallback(
-    (fm: Record<string, any>) =>
-      Object.keys(fm)
-        .filter((p) => isContentEntry(p) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
-        .sort((a, b) => (fm[a].order ?? 999) - (fm[b].order ?? 999))
-        .map((p) => [p, fm[p]?.nav || (fm[p]?.title || '').replace(/\.$/, '')].join('\t')),
-    []
-  );
-  const navResult = useMetadataQuery(navQuery);
-  const navRows: string[] = queryPaths(navResult);
-  const navItems: NavItem[] = navRows.map((r) => {
-    const [key, label] = r.split('\t');
-    return { key, href: keyToHref(key), label };
-  });
+  // Records, not tab-encoded paths (R3-276a): the query selects `{ path, label }`
+  // and the hook returns them as-is — no fake-path encoding round-trip.
+  const navResult = useMetadataQuery<Metadata, NavRecord>(navQuery);
+  const navItems: NavItem[] = queryRecords<NavRecord>(navResult).map(({ path, label }) => ({
+    key: path,
+    href: keyToHref(path),
+    label,
+  }));
 
   // Closest-match suggestion for a 404 (shared namespace or name overlap).
   const suggestion = missing
