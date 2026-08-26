@@ -63,25 +63,29 @@ default; a light theme is wired via `data-theme="light"` on `<html>`.
 - For icons beyond the unicode set (`→ ★ ● ☀ ☾`), use
   [Lucide](https://lucide.dev) at 16–24px, `currentColor`. No emoji.
 
-## Finding the SDK API (read this before guessing imports)
+## Finding the platform APIs (read this before guessing imports)
 
-Everything the platform offers comes from `@immediately-run/sdk`. Don't guess
-export names or signatures — look them up. The package ships full API docs,
-fetchable in one request and optimized for both humans and coding agents:
+Don't guess export names or signatures — look them up. Every published platform
+package ships an agent-facing `llms.txt` (a concise map of every export with its
+import path and a one-liner), generated from the same sources the release gates
+check, so it cannot rot:
 
-- **`llms.txt`** — <https://immediately-run.github.io/immediately-run-sdk/llms.txt> —
-  a concise map of every export grouped by module, with its kind, import path,
-  and a one-line description. **Start here.**
-- **`api.json`** — <https://immediately-run.github.io/immediately-run-sdk/api.json> —
-  the complete TypeDoc model (exact signatures, parameters, types) when you need
-  more than the one-liners.
-- **HTML reference** — <https://immediately-run.github.io/immediately-run-sdk/> —
-  human-browsable.
+- **`@immediately-run/sdk`** — <https://immediately-run.github.io/immediately-run-sdk/llms.txt>
+  (also `api.json` — the full TypeDoc model — and an HTML reference at the same
+  origin). The platform client: RPC, capabilities, mounts, fs, editor, LLM,
+  metadata queries, link spaces, the safe renderer re-exports.
+- **`@immediately-run/grove`** — this repo's own `llms.txt` (repo root, and shipped
+  in the package tarball): the composition surface, the component vocabulary with
+  tiers/props/overridability, and the frontmatter keys the engine reads.
+- **`@immediately-run/mdx-plugins`** — the grammar canon: heading-id/slug rules,
+  frontmatter parsing, the entry rule, the link-space resolver + its parity fixture.
+- **`@immediately-run/safe-content`** — the non-executable MDX renderer.
 
-Once installed, `node_modules/@immediately-run/sdk` ships `.d.ts` carrying the
-same JSDoc, so your editor/agent reads the typed API inline with no network. All
-exports are importable from the package root (`@immediately-run/sdk`) or a
-per-module subpath (`@immediately-run/sdk/hooks`).
+Installed packages also ship `.d.ts` with the same JSDoc, so your editor reads the
+typed API inline with no network; `node_modules/@immediately-run/<pkg>/llms.txt` is
+the version-matched map when you want it in one read. The one-page index of which
+layer answers which need is the platform surfaces map in the docs wiki
+(`content/context/platform_surfaces.mdx`).
 
 ## Platform security model (what your app can and can't do)
 

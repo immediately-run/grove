@@ -1,6 +1,6 @@
 {
   "name": "@immediately-run/grove",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "src/main.tsx",
   "immediately.run": {
@@ -18,11 +18,13 @@
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
-    "verify": "npm run check:engine-api:selftest && npm run check:engine-api && npm run check:manifest && npm run check:deps && npm run lint && npm run build && npm run test",
+    "verify": "npm run check:llms && npm run check:engine-api:selftest && npm run check:engine-api && npm run check:manifest && npm run check:deps && npm run lint && npm run build && npm run test",
     "check:manifest": "node scripts/check-manifest.mjs",
     "check:deps": "node scripts/check-app-dependencies.mjs --self-test && node scripts/check-app-dependencies.mjs",
     "check:engine-api": "node scripts/check-engine-api.mjs",
-    "check:engine-api:selftest": "node scripts/check-engine-api.mjs --self-test"
+    "check:engine-api:selftest": "node scripts/check-engine-api.mjs --self-test",
+    "gen:llms": "node scripts/gen-llms.mjs",
+    "check:llms": "node scripts/gen-llms.mjs --check"
   },
   "dependencies": {
     "@immediately-run/mdx-plugins": "0.4.0",
@@ -69,7 +71,8 @@
     "viewer.manifest.json",
     "viewer-manifest.schema.json",
     "README.md",
-    "docs/ENGINE_BOUNDARY.md"
+    "docs/ENGINE_BOUNDARY.md",
+    "llms.txt"
   ],
   "peerDependencies": {
     "@immediately-run/sdk": "^0.43.1",
