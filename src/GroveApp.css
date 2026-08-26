@@ -2755,3 +2755,20 @@ tr[data-kind="dir"] a.gdir__link::after {
   font-size: 11.5px;
   color: var(--ink-3);
 }
+
+/* Corpus component declarations that could not be loaded (R3-174). A visible, dismissible-
+   free notice rather than a console line: the author of the corpus is the person who needs
+   to see it, and they are reading the page, not the devtools. */
+.grove-decl-error {
+  margin: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-left-width: 3px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+.grove-decl-error ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}

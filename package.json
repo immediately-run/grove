@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@immediately-run/mdx-plugins": "0.4.0",
-    "@immediately-run/sdk": "^0.46.0",
+    "@immediately-run/sdk": "^0.52.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
@@ -75,7 +75,7 @@
     "llms.txt"
   ],
   "peerDependencies": {
-    "@immediately-run/sdk": "^0.43.1",
+    "@immediately-run/sdk": "^0.52.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   }

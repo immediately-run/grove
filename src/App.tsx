@@ -22,8 +22,10 @@ import * as sdk from '@immediately-run/sdk';
 import { sendMessage } from '@immediately-run/sdk/sandboxUtils';
 import { MetadataSource } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
+import { MDXProvider } from '@immediately-run/sdk/MDXProvider';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useCorpusMetadata } from './hooks/useCorpusMetadata';
+import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
 import { viewedDocumentForTarget } from './lib/content';
 import GroveWiki from './GroveWiki';
@@ -68,6 +70,16 @@ export default function App() {
   }, [boot.status, outerHref]);
   // Only a dispatched viewer scans; a fork's index is already in the context.
   const corpus = useCorpusMetadata(boot.status === 'ready' ? getContentRoot() : null);
+  // BOTH packagings, deliberately (R3-174). A corpus's own component vocabulary must not
+  // depend on how it was composed — `PLATFORM_LAYERING_SPEC` §1.1's mode-invariance rule —
+  // so a fork reads its marker too; that is one cheap open of a file already in `/app`.
+  // Gated on the boot status for the same reason the scan is: before the delegation
+  // resolves, `getContentRoot()` is still the fork default, and reading THAT marker under
+  // dispatch would register the viewer's own sample-corpus components against someone
+  // else's content.
+  const contentComponents = useContentComponents(
+    boot.status === 'ready' || boot.status === 'fork' ? getContentRoot() : null,
+  );
 
   if (boot.status === 'failed') {
     return (
@@ -77,13 +89,32 @@ export default function App() {
     );
   }
 
-  if (boot.status === 'waiting' || corpus.status === 'scanning') {
+  // The provider must be COMPLETE before content paints (MDX_FROM_MOUNT_SPEC §2's
+  // invariant): rendering into a half-composed map would flash a missing-component error
+  // for `<RoadmapBoard>` until registration landed — the very error content components
+  // exist to remove — and a nested provider patched in afterwards would do the same.
+  // Holding here costs nothing, because the gate already exists for the corpus scan.
+  if (boot.status === 'waiting' || corpus.status === 'scanning' || contentComponents.status === 'loading') {
     return (
       <div className="grove-boot">
         <p className="grove-boot__msg">Opening…</p>
       </div>
     );
   }
+
+  // Corpus-declared components (R3-174) go on as a nested provider, which the SDK's
+  // `useMDXComponents` resolves as `{...stock, ...content}` — so CONTENT WINS a name
+  // clash, and a wiki may override even `<DocsByTag>` with its own (value 4, max
+  // hackability). §2's "single-map merge, never provider nesting" was written against
+  // patching a provider in AFTER a partial render; nesting it INSIDE the gate above is
+  // that same merge, composed before anything paints.
+  const wiki = <GroveWiki readOnly={boot.readOnly} rejectedComponents={contentComponents.rejected} />;
+  const withComponents =
+    contentComponents.status === 'ready' && Object.keys(contentComponents.components).length > 0 ? (
+      <MDXProvider components={contentComponents.components}>{wiki}</MDXProvider>
+    ) : (
+      wiki
+    );
 
   if (corpus.status === 'ready' && corpus.metadata) {
     // Provide the scanned corpus as the metadata SOURCE through the supported
@@ -92,11 +123,9 @@ export default function App() {
     // MetadataSource — so every consumer works unchanged, and nothing re-states
     // host fields it does not own.
     return (
-      <MetadataSource value={corpus.metadata}>
-        <GroveWiki readOnly={boot.readOnly} />
-      </MetadataSource>
+      <MetadataSource value={corpus.metadata}>{withComponents}</MetadataSource>
     );
   }
 
-  return <GroveWiki readOnly={boot.readOnly} />;
+  return withComponents;
 }

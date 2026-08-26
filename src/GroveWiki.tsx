@@ -12,6 +12,7 @@ import {
 } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { LinkSpaceContext } from '@immediately-run/sdk/linkSpace';
+import { CorpusContext, toCorpusPath, fromCorpusPath } from '@immediately-run/sdk/corpus';
 import {
   contentDir,
   homeKey,
@@ -28,6 +29,7 @@ import { layoutChainForKey } from './lib/layout';
 import { folderIndexKey } from './lib/directory';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
 import { getContentRoot, isDispatched } from './lib/contentRoot';
+import type { RejectedComponent } from './lib/corpusComponents';
 import { GroveShellContext, OutletContext } from './lib/shell';
 import type { GroveShell, NavItem } from './lib/shell';
 import PageView from './components/PageView';
@@ -52,6 +54,19 @@ function writePref(k: string, v: string): void {
   } catch {
     /* ignore */
   }
+}
+
+// Corpus-absolute path → the href that navigates to it, for CONTENT (R3-174).
+//
+// Module scope, and that is load-bearing rather than tidiness: this function is handed to
+// content through `CorpusContext`, and the SDK's `useCorpusEntries` memoizes on its
+// identity. A closure rebuilt each render would make that memo never hold, so the hook the
+// SDK documents as "safe in a dependency array" would quietly stop being one — from the
+// PROVIDER's side, where nobody using it would think to look. Nothing here is reactive:
+// `contentDir()` is boot-settled module state and `keyToHref` is a pure function of it.
+function corpusHref(corpusPath: string): string {
+  const absolute = fromCorpusPath(corpusPath, contentDir().replace(/\/+$/, ''));
+  return absolute === null ? corpusPath : keyToHref(absolute);
 }
 
 // Build the nested render for a layout chain (outermost first). Each layer wraps
@@ -87,7 +102,16 @@ function renderLayers(chain: string[], useDefault: boolean, safe: boolean): Reac
  * default export of `App.tsx` is a gate in front of it rather than this component
  * (R3-169: under dispatch the root is a runtime value, not `/app/content/`).
  */
-export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) {
+export default function GroveWiki({
+  readOnly = false,
+  rejectedComponents = [],
+}: {
+  readOnly?: boolean;
+  /** Corpus component declarations that could not be loaded (R3-174). Shown, not
+   *  swallowed: a `<RoadmapBoard/>` that silently never appears is indistinguishable from
+   *  one nobody wrote, and the author has no other channel to learn which it was. */
+  rejectedComponents?: RejectedComponent[];
+}) {
   const ctx = useContext(TinkerableContext) as any;
   const sandboxPath: string = ctx?.navigationState?.sandboxPath || '/';
   const mounts = useMounts() as any[];
@@ -258,10 +282,54 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
     directory,
   };
 
+  // The corpus scope handed to CONTENT (R3-174; MDX_FROM_MOUNT_SPEC §2, §7 1a).
+  //
+  // A component the corpus ships cannot import this engine — it would resolve a second
+  // copy from the registry, with its own `contentRoot` module state, and answer about the
+  // wrong corpus — so everything it needs about the corpus arrives through the SDK, which
+  // both sides genuinely share (one `/node_modules` per frame). Three facts, and each is
+  // one a content component cannot derive for itself:
+  //
+  //  • `root` — so metadata keys can be rebased off the mount prefix. Content must never
+  //    see `/mnt/<hash>/…`: it is host knowledge the viewer reads THROUGH but does not
+  //    publish (the property `DirectoryList.test.tsx` pins), and it is not stable across
+  //    loads, so anything content stored or linked with it would rot.
+  //  • `entry` — the entry being READ, not the file the component sits in. A component in
+  //    a `_layout.mdx` wraps the entry, so `<Include>`'s own module identity would name
+  //    the layout; furniture in the layout chain (a status line, a dependency rail) needs
+  //    the page it is describing.
+  //  • `toHref` — because corpus-path→URL is this VIEWER's policy and the two packagings
+  //    genuinely disagree (`urlAnchor`). Content that computed its own hrefs would be
+  //    correct in exactly one packaging, which is the mode-invariance rule
+  //    (PLATFORM_LAYERING §1.1) broken in the least visible possible way.
+  // `contentRoot` is module state settled at boot, so it is read here — into a local the
+  // memo can list as a dependency — rather than inside the factory. Calling it inside
+  // would close over a value the dependency list does not name, which the React Compiler
+  // correctly refuses to preserve memoization across.
+  // Built fresh each render, like everything else in this component — no hand-memoization
+  // (the rest of the file has none either; `react-hooks/preserve-manual-memoization`
+  // rejects one here because `entryKey` derives from the metadata query's array).
+  //
+  // That is safe because the EXPENSIVE half does not key on this object's identity: the
+  // SDK's `useCorpusEntries` destructures `{root, toHref}` and memoizes on those, and both
+  // are stable — `root` is a string compared by value, `toHref` is the module-scope
+  // `corpusHref` above. A new wrapper re-renders consumers (cheap); it does not re-derive
+  // 800-odd entries. Making `toHref` a closure would silently undo that, which is the
+  // whole reason it is not one.
+  const corpusRoot = contentDir().replace(/\/+$/, '');
+  const corpusEntry = toCorpusPath(entryKey, corpusRoot);
+  const corpusScope = { root: corpusRoot, entry: corpusEntry, toHref: corpusHref };
+
   return (
     // R3-277b: declare the enclosing corpus for the platform's link-space consumers
     // (the shared resolver's corpus-anchored absolute + `$fs:` handling read this).
     <LinkSpaceContext.Provider value={{ corpusRoot: getContentRoot() }}>
+    {/* R3-174: the corpus scope CONTENT reads — sibling to the link space, not a
+        replacement for it. The two answer different questions: `LinkSpaceContext` tells
+        the platform's link resolver where absolute hrefs are anchored; `CorpusContext`
+        tells a component the corpus ships which entries exist, which one is being read,
+        and how to turn a corpus path into a URL. */}
+    <CorpusContext value={corpusScope}>
     <GroveShellContext.Provider value={shell}>
       <div
         className="grove-root"
@@ -271,6 +339,18 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
         data-theme={theme === 'default' && light ? 'light' : undefined}
       >
         <div className="device__scroll">
+          {rejectedComponents.length > 0 ? (
+            <div className="grove-decl-error" role="status">
+              <strong>This corpus declares components that could not be loaded.</strong>
+              <ul>
+                {rejectedComponents.map((r) => (
+                  <li key={r.name}>
+                    <code>{r.name}</code> — {r.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="grove-shell" data-nav={frameNone ? undefined : navMode}>
             {renderLayers(chain, useDefault, safe)}
           </div>
@@ -287,6 +367,7 @@ export default function GroveWiki({ readOnly = false }: { readOnly?: boolean }) 
         <GroveAgent writable={writable} entryKey={entryKey} entryTitle={(meta?.title || 'this entry').replace(/\.$/, '')} />
       </div>
     </GroveShellContext.Provider>
+    </CorpusContext>
     </LinkSpaceContext.Provider>
   );
 }
