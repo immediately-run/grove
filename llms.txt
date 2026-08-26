@@ -1,0 +1,115 @@
+# @immediately-run/grove — the viewer kit for directory-as-content wikis
+
+> The Grove viewer: a kit of React components, layouts and themes for building immediately.run wikis. Composable as a fork, a dispatch target, or a pinned library. (v0.1.0)
+
+Grove is NOT a wiki engine: routing, MDX compilation, the frontmatter index, link
+spaces and heading anchors live in the sandbox + `@immediately-run/sdk`. What this
+package owns is the component vocabulary, the chrome, the layout chain, the themes,
+and the defaults. Three composition modes (PLATFORM_LAYERING_SPEC §1.1):
+
+- **M1 dispatch** — a content repo with `opensWith: {task: "open-wiki"}` resolves here;
+  you write no code, the host mounts the corpus.
+- **M2 fork** — engine + corpus in one repo (the docs wiki shape).
+- **M3 library** — a thin shell imports this package pinned and composes it:
+  see `examples/thin-shell/`, and the override contract below.
+
+## Import surface (package.json exports)
+
+- `@immediately-run/grove` → ./src/lib.ts
+- `@immediately-run/grove/app` → ./src/App.tsx
+- `@immediately-run/grove/manifest` → ./viewer.manifest.json
+- `@immediately-run/grove/components` → ./src/mdxComponents.ts
+- `@immediately-run/grove/styles.css` → ./src/GroveApp.css
+- `@immediately-run/grove/theme.css` → ./src/index.css
+- `@immediately-run/grove/package.json` → ./package.json
+
+## Composition entry (src/lib.ts)
+
+- `GROVE_MDX`
+- `GroveApp`
+- `GroveShell`
+- `GroveShellContext`
+- `GroveWiki`
+- `ManifestComponent`
+- `ManifestOverrideError`
+- `NavItem`
+- `OutletContext`
+- `SAFE_MDX`
+- `VIEWER_MANIFEST`
+- `ViewerManifest`
+- `composeComponents`
+- `contentDir`
+- `getContentRoot`
+- `homeKey`
+- `isContentEntry`
+- `isDispatched`
+- `keyToFsPath`
+- `keyToHref`
+- `keyToInclude`
+- `layoutChainForKey`
+- `manifestNames`
+- `overridableNames`
+- `queryPaths`
+- `readingTime`
+- `sandboxPathToKey`
+- `stripFrontmatter`
+- `useShell`
+
+## Component vocabulary — the override contract (viewer.manifest.json)
+
+This is THE two-way surface: what a corpus may use, and what a library-composing
+shell may override. `composeComponents(base, overrides)` THROWS on a name that is
+not declared here or is declared `overridable: false` — overriding never silently
+no-ops. Tiers: `engine` renders any corpus · `chrome` is site furniture · `corpus`
+is one corpus's conventions (declared by that corpus, not this repo).
+
+- `a` (engine, overridable) — Wiki-link resolver: renders the resolved / broken / self states for an in-corpus href. Props: href: string?, children: node?.
+- `Backlinks` (engine, overridable) — Entries linking to this one.
+- `Callout` (engine, overridable) — An aside block with a kind (note / warning / …). Props: kind: string?, title: string?, children: node?.
+- `ChildPages` (engine, overridable) — The entries nested under this one.
+- `Directory` (engine, overridable) — The entries under one corpus directory. Props: path: string?.
+- `DirectoryList` (engine, overridable) — A folder listing as a table, with metadata columns chosen by `columns` and narrowed to those the rows actually carry. Props: path: string?, title: string?, columns: string?, sort: string?, hidden: boolean?.
+- `DocList` (engine, overridable) — A queried list of entries — the generic index primitive. Props: tag: string?, limit: number?.
+- `DocsByTag` (engine, overridable) — Entries grouped under one tag. Props: tag: string?.
+- `FamilyTree` (engine, overridable) — A relationship graph rendered from frontmatter links. Props: children: node?.
+- `GroveFooter` (chrome, overridable) — The site footer.
+- `GroveNav` (chrome, overridable) — Top/side navigation. Reads the shell context, so an override must too (or render its own).
+- `GroveSidebar` (chrome, overridable) — The corpus tree sidebar.
+- `img` (engine, overridable) — Resolves a mount-relative asset off the filesystem. Props: src: string?, alt: string?.
+- `Infobox` (engine, overridable) — The boxed summary panel a wiki entry carries beside its lede. Props: title: string?, children: node?.
+- `Kbd` (engine, overridable) — A keyboard key. Props: children: node?.
+- `KeyValue` (engine, overridable) — A definition-list row for infobox-style facts. Props: children: node?.
+- `Lede` (engine, overridable) — The opening paragraph, set apart typographically. Props: children: node?.
+- `More` (engine, overridable) — A 'read more' pointer to a related entry. Props: href: string?, children: node?.
+- `Outlet` (engine, LOCKED) — The layout chain's inward slot. NOT overridable — the chain's nesting is engine mechanics, and replacing it detaches every layer from the page it wraps.
+- `PageMeta` (engine, overridable) — The entry's own metadata line (updated, reading time, …).
+- `Quote` (engine, overridable) — A pull quote with an optional citation. Props: cite: string?, children: node?.
+- `RecentlyUpdated` (engine, overridable) — The most recently updated entries. Props: limit: number?.
+- `TableOfContents` (engine, overridable) — The on-this-page heading list, which keeps the active entry in view as the reader scrolls. Props: entryKey: string?, title: string?, className: string?.
+- `TagCloud` (engine, overridable) — Every tag in the corpus, weighted by use. Props: limit: number?.
+- `TagList` (engine, overridable) — The tags of one entry, as links to their indexes. Props: tags: string[]?.
+- `Timeline` (engine, overridable) — A dated sequence of entries or events. Props: children: node?.
+- `Toc` (engine, overridable) — The table of contents derived from the entry's heading anchors. Props: depth: number?.
+
+## Frontmatter keys the engine reads
+
+- `site`
+- `layout`
+- `view`
+- `frame`
+- `render`
+- `nav`
+- `order`
+- `tags`
+
+Unknown keys pass through (carried, unread) — a corpus may keep its own vocabulary.
+
+## What lives one layer down (do not reimplement here)
+
+- Platform client (RPC, capabilities, mounts, fs, editor, LLM): `@immediately-run/sdk`
+  — its llms.txt: https://immediately-run.github.io/immediately-run-sdk/llms.txt
+- Link-space resolver + grammar canon: `@immediately-run/mdx-plugins`
+- Non-executable MDX rendering: `@immediately-run/safe-content`
+
+---
+_Generated from viewer.manifest.json + package.json by `scripts/gen-llms.mjs`; regenerate on vocabulary changes (verify checks freshness)._
