@@ -44,7 +44,7 @@ export function useOpenWikiBoot(): OpenWikiBoot {
     // effect would run AFTER the first content render, which is the whole failure this
     // gate exists to prevent. Idempotent and purely derived, so a StrictMode double
     // render sets the same value twice.
-    setContentRoot(resolution.root, { readOnly: resolution.readOnly });
+    setContentRoot(resolution.root, { readOnly: resolution.readOnly, mountId: resolution.mountId });
   }
 
   // The module IS the latch: once a root is set, the delegation is final for the life of

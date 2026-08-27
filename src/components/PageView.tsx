@@ -3,7 +3,6 @@ import { Include, Link } from '@immediately-run/sdk';
 import { useShell } from '../lib/shell';
 import { keyToHref, keyToRepoRel } from '../lib/content';
 import { crumb } from '../lib/wiki';
-import { requestEdit } from '@immediately-run/sdk';
 import DirectoryView from './DirectoryView';
 import EntryHeader from './EntryHeader';
 import SafeEntryBody from './SafeEntryBody';
@@ -20,7 +19,8 @@ declare const module: any;
 // site chrome (nav / sidebar / footer) — that's the layout's job — so the page
 // stays free of shell concerns.
 export default function PageView() {
-  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, vw, safe, directory } = useShell();
+  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, openEditor, vw, safe, directory } =
+    useShell();
 
   // A folder URL. `checking` renders nothing rather than the 404: the readdir that
   // decides between them is one RPC away, and a 404 that appears and then turns into a
@@ -39,7 +39,7 @@ export default function PageView() {
         </p>
         <div className="grove-state__actions">
           <Link className="btn-ghost" href="/"><Icon name="chevron-right" /> Back to home</Link>
-          {writable ? <button className="btn-primary" onClick={() => requestEdit({ path: keyToRepoRel(entryKey) }).catch(() => undefined)}><Icon name="file-plus" /> Create it</button> : null}
+          {writable ? <button className="btn-primary" onClick={() => openEditor(entryKey)}><Icon name="file-plus" /> Create it</button> : null}
         </div>
       </div>
     );

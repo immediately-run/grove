@@ -33,7 +33,17 @@ export interface GroveShell {
   // Environment
   vw: 'mobile' | 'desktop';
   navMode: 'top' | 'side';
+  /** Whether to render an edit affordance — the corpus MOUNT's answer, re-read live
+   *  (R3-266), never a property of how this instance was packaged. */
   writable: boolean;
+  /** Open a content entry in the platform editor. Which verb that takes differs by
+   *  packaging (`lib/editTarget`); the chrome never has to know which. */
+  openEditor: (entryKey: string) => void;
+  /** True while an editor is being summoned, for a busy label. */
+  editBusy: boolean;
+  /** What a save actually does, for the affordance's title — under dispatch it says that
+   *  proposing a change back to the content repo is not wired yet (R3-266's residual). */
+  editHint: string;
   siteTitle: string;
   /** Interpreter mode (TRUST_MODES §5): render this entry's body through the
    *  non-executable safe renderer (R3-213) instead of the compiled/executable `<Include>`

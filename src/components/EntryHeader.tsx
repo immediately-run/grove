@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react';
-import { requestEdit, useFileMetadata } from '@immediately-run/sdk';
-import { keyToRepoRel } from '../lib/content';
+import { useFileMetadata } from '@immediately-run/sdk';
+import { useShell } from '../lib/shell';
 import { crumb } from '../lib/wiki';
 import Icon from './Icon';
 
@@ -17,17 +16,11 @@ export default function EntryHeader({
   writable: boolean;
   mins: number;
 }) {
+  const { openEditor, editBusy, editHint } = useShell();
   const meta = useFileMetadata(entryKey) as any;
-  const [busy, setBusy] = useState(false);
   if (!meta) return null;
   const tags: string[] = Array.isArray(meta.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
   const cr = crumb(entryKey);
-  const edit = () => {
-    setBusy(true);
-    requestEdit({ path: keyToRepoRel(entryKey) })
-      .catch(() => undefined)
-      .finally(() => setBusy(false));
-  };
   return (
     <header className="grove-entry-header">
       {cr.includes('/') ? <nav className="crumb">{cr}</nav> : null}
@@ -40,9 +33,14 @@ export default function EntryHeader({
           <span key={t} className="grove-tag">#{t}</span>
         ))}
         {writable && (
-          <button className="grove-edit-affordance" data-busy={busy ? '1' : '0'} onClick={edit}>
+          <button
+            className="grove-edit-affordance"
+            data-busy={editBusy ? '1' : '0'}
+            title={editHint}
+            onClick={() => openEditor(entryKey)}
+          >
             <Icon name="pencil" />
-            {busy ? 'Opening editor…' : 'Edit'}
+            {editBusy ? 'Opening editor…' : 'Edit'}
           </button>
         )}
       </div>
