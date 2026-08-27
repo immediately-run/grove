@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { resolveOpenWiki, OPEN_WIKI_TASK, CONTENT_MOUNT_TYPE } from './openWiki';
-import { getContentRoot, setContentRoot, resetContentRoot, isDispatched, APP_CONTENT_ROOT } from './contentRoot';
+import {
+  getContentRoot,
+  getCorpusMountId,
+  setContentRoot,
+  resetContentRoot,
+  isDispatched,
+  APP_CONTENT_ROOT,
+} from './contentRoot';
 import { slugToKey, isContentEntry, homeKey, contentDir, keyToHref, sandboxPathToKey } from './content';
 import { layoutChainForKey } from './layout';
 import type { SandboxMount } from '@immediately-run/sdk/mounts';
@@ -13,14 +20,14 @@ afterEach(resetContentRoot);
 describe('resolveOpenWiki — the delegated corpus', () => {
   it('resolves the dir param mounted at the host-minted chroot', () => {
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/app'), mount('/task/t1/dir')]);
-    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: false, via: 'task' });
+    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: false, via: 'task', mountId: '/task/t1/dir' });
   });
 
   it('reports a read-only delegation without refusing it', () => {
     // Sharing a corpus read-only is legitimate — the reader still reads. Only the WRITE
     // affordances may consult this; refusing the whole open would break the ordinary case.
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/task/t1/dir', { mode: 'ro' })]);
-    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: true, via: 'task' });
+    expect(r).toEqual({ ok: true, root: '/task/t1/dir', readOnly: true, via: 'task', mountId: '/task/t1/dir' });
   });
 
   it('is not a callee when there is no task input — the ordinary fork boot', () => {
@@ -48,7 +55,7 @@ describe('resolveOpenWiki — the delegated corpus', () => {
     // The host owns the `/task/<slot>/<param>` grammar; if it ever renames the segment,
     // suffix-matching alone would cancel a task the user really asked for.
     const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/app'), mount('/mnt/abc123')]);
-    expect(r).toEqual({ ok: true, root: '/mnt/abc123', readOnly: false, via: 'task' });
+    expect(r).toEqual({ ok: true, root: '/mnt/abc123', readOnly: false, via: 'task', mountId: '/mnt/abc123' });
   });
 
   it('does not guess between two foreign mounts', () => {
@@ -72,7 +79,7 @@ describe('repo-load dispatch — a cold URL load, with no task input at all', ()
       mount('/app'),
       mount('/mnt/deadbeef', { type: CONTENT_MOUNT_TYPE, name: 'neumark/book-nine-from-here' }),
     ]);
-    expect(r).toEqual({ ok: true, root: '/mnt/deadbeef', readOnly: false, via: 'repo-load' });
+    expect(r).toEqual({ ok: true, root: '/mnt/deadbeef', readOnly: false, via: 'repo-load', mountId: '/mnt/deadbeef' });
   });
 
   it('carries a read-only delegation through', () => {
@@ -212,5 +219,39 @@ describe('routing — the URL space follows the packaging', () => {
     const key = sandboxPathToKey('/app/content/home.mdx');
     expect(key.startsWith('/task/t1/dir/')).toBe(true);
     expect(key).toBe('/task/t1/dir/app/content/home.mdx');
+  });
+});
+
+// R3-266 — the corpus mount ID, which is what an onward delegation NAMES. Without it a
+// dispatched viewer can locate the corpus and still not hand one of its files to the
+// platform editor, which is the whole of the dispatched write path.
+describe('resolveOpenWiki — the corpus mount id (the onward-delegation handle)', () => {
+  it('prefers the host-published id over the path', () => {
+    const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [
+      mount('/task/t1/dir', { id: 'space:abc' }),
+    ]);
+    expect(r).toMatchObject({ ok: true, mountId: 'space:abc' });
+  });
+
+  it('falls back to the mount PATH, which is exactly what the host publishes for a chroot', () => {
+    // `mintDelegations` names the descriptor `{ path, type: 'task-delegation', id: path }`,
+    // so path and id coincide for a task delegation — the fallback is the same answer, not
+    // a guess, and it keeps working against a host that publishes no id at all.
+    const r = resolveOpenWiki({ task: OPEN_WIKI_TASK, params: {} }, [mount('/task/t1/dir')]);
+    expect(r).toMatchObject({ ok: true, mountId: '/task/t1/dir' });
+  });
+
+  it('carries the id through the repo-load branch too', () => {
+    const r = resolveOpenWiki(null, [
+      mount('/mnt/deadbeef', { type: CONTENT_MOUNT_TYPE, id: 'github:neumark/book@main' }),
+    ]);
+    expect(r).toMatchObject({ ok: true, via: 'repo-load', mountId: 'github:neumark/book@main' });
+  });
+
+  it('reaches the contentRoot module, so the affordance can read it back', () => {
+    setContentRoot('/task/t1/dir', { readOnly: false, mountId: 'space:abc' });
+    expect(getCorpusMountId()).toBe('space:abc');
+    resetContentRoot();
+    expect(getCorpusMountId()).toBeNull();
   });
 });

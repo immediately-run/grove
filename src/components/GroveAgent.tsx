@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
-import { chat, requestEdit, useChatProvider } from '@immediately-run/sdk';
-import { keyToRepoRel } from '../lib/content';
+import { chat, useChatProvider } from '@immediately-run/sdk';
+import { useShell } from '../lib/shell';
 import Icon from './Icon';
 
 interface Msg {
@@ -27,6 +27,7 @@ const CHIPS = [
 // banners rather than faking a host surface.
 export default function GroveAgent({ writable, entryKey, entryTitle }: { writable: boolean; entryKey: string; entryTitle: string }) {
   const provider = useChatProvider();
+  const { openEditor } = useShell();
   const [open, setOpen] = useState(false);
   const [detent, setDetent] = useState<'half' | 'full'>('half');
   const [resting, setResting] = useState('');
@@ -212,7 +213,7 @@ export default function GroveAgent({ writable, entryKey, entryTitle }: { writabl
                 <div className="ga-foot__hand">
                   <span>Grove's own agent · scoped to your grants</span>
                   <a
-                    onClick={() => requestEdit({ path: keyToRepoRel(entryKey) }).catch(() => undefined)}
+                    onClick={() => openEditor(entryKey)}
                     role="button"
                     tabIndex={0}
                   >

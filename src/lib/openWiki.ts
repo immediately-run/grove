@@ -25,7 +25,16 @@ export const DIR_PARAM = 'dir';
 export const CONTENT_MOUNT_TYPE = 'content';
 
 export type OpenWikiResolution =
-  | { ok: true; root: string; readOnly: boolean; via: 'task' | 'repo-load' }
+  | {
+      ok: true;
+      root: string;
+      readOnly: boolean;
+      via: 'task' | 'repo-load';
+      /** The corpus mount's id — what an onward delegation names (R3-266). Falls back to
+       *  the mount PATH, which is exactly what the host publishes as the id for a task
+       *  chroot (`mintDelegations` uses the mount point as the descriptor id). */
+      mountId: string;
+    }
   | { ok: false; reason: 'not-a-callee' | 'wrong-task' | 'no-mount' };
 
 /**
@@ -53,7 +62,13 @@ export function resolveOpenWiki(
   // input and would otherwise fall out as `not-a-callee` and render our own corpus.
   const marked = mounts.find((m) => m.type === CONTENT_MOUNT_TYPE);
   if (marked) {
-    return { ok: true, root: marked.path, readOnly: marked.mode === 'ro', via: 'repo-load' };
+    return {
+      ok: true,
+      root: marked.path,
+      readOnly: marked.mode === 'ro',
+      via: 'repo-load',
+      mountId: marked.id ?? marked.path,
+    };
   }
 
   if (!input) return { ok: false, reason: 'not-a-callee' };
@@ -67,7 +82,7 @@ export function resolveOpenWiki(
   // `mode` is absent on the primary repo mount and rw by default elsewhere. A read-only
   // delegation is a legitimate way to share a corpus — the reader still reads — so it
   // resolves normally and only the WRITE affordances consult this flag.
-  return { ok: true, root: hit.path, readOnly: hit.mode === 'ro', via: 'task' };
+  return { ok: true, root: hit.path, readOnly: hit.mode === 'ro', via: 'task', mountId: hit.id ?? hit.path };
 }
 
 /** The message a failed resolution should show, in the reader's terms rather than the

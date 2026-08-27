@@ -8,7 +8,6 @@ import {
   useAllMetadata,
   useFileMetadata,
   useMetadataQuery,
-  useMounts,
 } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { LinkSpaceContext } from '@immediately-run/sdk/linkSpace';
@@ -28,7 +27,8 @@ import type { NavRecord } from './lib/queries';
 import { layoutChainForKey } from './lib/layout';
 import { folderIndexKey } from './lib/directory';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
-import { getContentRoot, isDispatched } from './lib/contentRoot';
+import { useEditAffordance } from './hooks/useEditAffordance';
+import { getContentRoot } from './lib/contentRoot';
 import type { RejectedComponent } from './lib/corpusComponents';
 import { GroveShellContext, OutletContext } from './lib/shell';
 import type { GroveShell, NavItem } from './lib/shell';
@@ -114,7 +114,6 @@ export default function GroveWiki({
 }) {
   const ctx = useContext(TinkerableContext) as any;
   const sandboxPath: string = ctx?.navigationState?.sandboxPath || '/';
-  const mounts = useMounts() as any[];
 
   const [theme, setTheme] = useState(() => readPref('grove:theme') || 'default');
   const [light, setLight] = useState(() => readPref('grove:appearance') === 'light');
@@ -147,22 +146,16 @@ export default function GroveWiki({
     return () => window.removeEventListener('keydown', on);
   }, []);
 
-  // ⚠ TEMPORARY, and not a design: dispatched content IS writable — R3-266.
+  // R3-266 — dispatched content IS writable, and the MOUNT decides.
   //
-  // The affordance below calls `requestEdit`, which is **self-scoped by contract** ("v1
-  // supports only a repo-relative path in the CURRENT repo … editing a file in one of your
-  // mounts is the `edit-file` task, not this"). Under dispatch the corpus is a mount, so
-  // that call would edit GROVE rather than the corpus on screen. Offering it would be
-  // wrong; withholding it *as a design* is also wrong, and this comment exists so the next
-  // reader does not conclude the second from the first.
-  //
-  // The fix is a verb swap, not a withheld capability: delegate the entry to
-  // `invokeTask('edit-file', { file: capFile({ mountId, relPath }, { mode: 'rw' }) })`,
-  // declare `invokes: edit-file`, and gate on the CORPUS MOUNT's mode rather than on the
-  // packaging. A task callee already holds the minted delegated grant, so nothing new has
-  // to be minted. Tracked in R3-266; `docs/specs/REPO_CONTENT_DISPATCH_SPEC.mdx` §5.
-  const writable =
-    !isDispatched() && !readOnly && (mounts?.some((m) => m.type === 'worktree' && m.mode !== 'ro') ?? false);
+  // This used to read `!isDispatched() && …`, withholding every edit affordance from a
+  // dispatched viewer. The reason was real but the conclusion was not: `requestEdit` is
+  // **self-scoped by contract**, so under dispatch it names a path in GROVE's repo rather
+  // than in the corpus on screen. The fix is a verb swap, not a withheld capability — see
+  // `lib/editTarget` — and the gate is the corpus mount's CURRENT mode, re-read on every
+  // mount change so a live role downgrade hides the affordance instead of producing
+  // `EROFS` on click.
+  const { writable, busy: editBusy, openEditor, editHint } = useEditAffordance(readOnly);
 
   const routeKey = sandboxPathToKey(sandboxPath) || homeKey();
   // The site brand is a wiki-wide constant, so read it from the home entry's
@@ -269,6 +262,9 @@ export default function GroveWiki({
     vw,
     navMode,
     writable,
+    openEditor,
+    editBusy,
+    editHint,
     siteTitle,
     safe,
     navItems,

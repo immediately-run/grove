@@ -1,5 +1,6 @@
-import { Link, requestEdit } from '@immediately-run/sdk';
+import { Link } from '@immediately-run/sdk';
 import { useShell } from '../lib/shell';
+import { getContentRoot } from '../lib/contentRoot';
 import { THEMES } from '../data/themes';
 import Icon from './Icon';
 
@@ -12,6 +13,7 @@ export default function GroveNav() {
     navItems,
     entryKey,
     writable,
+    openEditor,
     theme,
     setTheme,
     light,
@@ -26,7 +28,10 @@ export default function GroveNav() {
     const el = (document.querySelector('.ga-foot input') || document.querySelector('.ga-line input')) as HTMLElement | null;
     el?.focus();
   };
-  const newEntry = () => requestEdit({ path: 'content/untitled.mdx' }).catch(() => undefined);
+  // The new entry belongs to whichever corpus is mounted, so it is named from the
+  // content ROOT rather than the fork's `content/` literal — under dispatch the latter
+  // would create a file in Grove's own repo (R3-266).
+  const newEntry = () => openEditor(`${getContentRoot()}untitled.mdx`);
 
   return (
     <nav className="grove-nav">

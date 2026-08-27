@@ -10,7 +10,16 @@
         "task": "open-wiki",
         "version": "1.0"
       }
-    ]
+    ],
+    "invokes": [
+      {
+        "task": "edit-file",
+        "version": "^1"
+      }
+    ],
+    "requests": {
+      "task:invoke": {}
+    }
   },
   "scripts": {
     "dev": "vite",

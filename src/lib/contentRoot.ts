@@ -24,6 +24,7 @@ export const APP_CONTENT_ROOT = '/app/content/';
 
 let root: string = APP_CONTENT_ROOT;
 let readOnly = false;
+let mountId: string | null = null;
 
 /** Where this instance's corpus lives, with a trailing slash. Read at CALL time. */
 export function getContentRoot(): string {
@@ -35,10 +36,23 @@ export function getContentRoot(): string {
  * with the delegated directory, or not at all (the fork, which keeps the default).
  * Normalizes the trailing slash so every `startsWith`/`slice` in the helpers holds.
  */
-export function setContentRoot(dir: string, opts: { readOnly?: boolean } = {}): void {
+export function setContentRoot(dir: string, opts: { readOnly?: boolean; mountId?: string | null } = {}): void {
   if (!dir) return;
   root = dir.endsWith('/') ? dir : `${dir}/`;
   readOnly = opts.readOnly ?? false;
+  mountId = opts.mountId ?? null;
+}
+
+/**
+ * The mount id of the corpus, or null for a fork (whose corpus is its own repo, not a
+ * mount). R3-266: this is what an onward delegation NAMES — `capFile({ mountId, relPath })`
+ * — when Grove hands a content file to the platform editor. It lives here with the root
+ * for the same reason the read-only flag does: it is the same fact, decided once by the
+ * same delegation, and every consumer that asks "may I offer an edit, and of what?"
+ * already reads the root.
+ */
+export function getCorpusMountId(): string | null {
+  return mountId;
 }
 
 /** Whether the mounted corpus was delegated read-only. Lives here rather than in React
@@ -58,4 +72,5 @@ export function isDispatched(): boolean {
 export function resetContentRoot(): void {
   root = APP_CONTENT_ROOT;
   readOnly = false;
+  mountId = null;
 }
