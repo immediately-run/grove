@@ -1,4 +1,5 @@
-// Pull in the `fs` module types provided by @immediately-run/dev-fs, so app
-// code can `import fs from 'fs'` and type-check against the async-only surface
-// immediately.run exposes. See https://github.com/immediately-run/dev-fs
-/// <reference types="@immediately-run/dev-fs/fs" />
+// The ambient `fs` + `module` types the immediately.run SANDBOX provides to app
+// code — declared by the package that owns the surface: `@immediately-run/sdk`
+// (R3-276b moved them there from `@immediately-run/dev-fs`, whose job is the local
+// `vite dev` disk bridge, not the contract). One line, complete from sdk 0.49.0.
+/// <reference types="@immediately-run/sdk/ambient" />
