@@ -79,6 +79,7 @@ is one corpus's conventions (declared by that corpus, not this repo).
 - `Infobox` (engine, overridable) — The boxed summary panel a wiki entry carries beside its lede. Props: title: string?, children: node?.
 - `Kbd` (engine, overridable) — A keyboard key. Props: children: node?.
 - `KeyValue` (engine, overridable) — A definition-list row for infobox-style facts. Props: children: node?.
+- `LayoutGallery` (engine, overridable) — The layouts gallery: the starters, page variants and collection shapes grouped by their three mechanisms, enumerated from this manifest.
 - `Lede` (engine, overridable) — The opening paragraph, set apart typographically. Props: children: node?.
 - `More` (engine, overridable) — A 'read more' pointer to a related entry. Props: href: string?, children: node?.
 - `Outlet` (engine, LOCKED) — The layout chain's inward slot. NOT overridable — the chain's nesting is engine mechanics, and replacing it detaches every layer from the page it wraps.
@@ -88,6 +89,7 @@ is one corpus's conventions (declared by that corpus, not this repo).
 - `TableOfContents` (engine, overridable) — The on-this-page heading list, which keeps the active entry in view as the reader scrolls. Props: entryKey: string?, title: string?, className: string?.
 - `TagCloud` (engine, overridable) — Every tag in the corpus, weighted by use. Props: limit: number?.
 - `TagList` (engine, overridable) — The tags of one entry, as links to their indexes. Props: tags: string[]?.
+- `ThemeGallery` (engine, overridable) — The themes gallery: one row per shipped theme, enumerated from this manifest — adding a theme adds a row with no edit to the entry.
 - `Timeline` (engine, overridable) — A dated sequence of entries or events. Props: children: node?.
 - `Toc` (engine, overridable) — The table of contents derived from the entry's heading anchors. Props: depth: number?.
 

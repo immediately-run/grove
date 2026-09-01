@@ -36,7 +36,7 @@
         "title": "string?",
         "children": "node?"
       },
-      "summary": "An aside block with a kind (note / warning / \u2026)."
+      "summary": "An aside block with a kind (note / warning / …)."
     },
     "Lede": {
       "tier": "engine",
@@ -77,7 +77,7 @@
         "paginate": "'infinite'?",
         "batch": "number?"
       },
-      "summary": "A queried list of entries \u2014 the generic index primitive. paginate=\"infinite\" windows it with a sentinel and a stated end (R3-314); the attribute must be a literal."
+      "summary": "A queried list of entries — the generic index primitive. paginate=\"infinite\" windows it with a sentinel and a stated end (R3-314); the attribute must be a literal."
     },
     "TagCloud": {
       "tier": "engine",
@@ -179,7 +179,7 @@
       "overridable": true,
       "sanitizing": false,
       "props": {},
-      "summary": "The entry's own metadata line (updated, reading time, \u2026)."
+      "summary": "The entry's own metadata line (updated, reading time, …)."
     },
     "RecentlyUpdated": {
       "tier": "engine",
@@ -229,7 +229,7 @@
       "overridable": false,
       "sanitizing": false,
       "props": {},
-      "summary": "The layout chain's inward slot. NOT overridable \u2014 the chain's nesting is engine mechanics, and replacing it detaches every layer from the page it wraps."
+      "summary": "The layout chain's inward slot. NOT overridable — the chain's nesting is engine mechanics, and replacing it detaches every layer from the page it wraps."
     },
     "GroveNav": {
       "tier": "chrome",
@@ -251,6 +251,20 @@
       "sanitizing": false,
       "props": {},
       "summary": "The site footer."
+    },
+    "ThemeGallery": {
+      "tier": "engine",
+      "overridable": true,
+      "sanitizing": false,
+      "props": {},
+      "summary": "The themes gallery: one row per shipped theme, enumerated from this manifest — adding a theme adds a row with no edit to the entry."
+    },
+    "LayoutGallery": {
+      "tier": "engine",
+      "overridable": true,
+      "sanitizing": false,
+      "props": {},
+      "summary": "The layouts gallery: the starters, page variants and collection shapes grouped by their three mechanisms, enumerated from this manifest."
     }
   },
   "frontmatter": {
@@ -267,6 +281,58 @@
       "cover"
     ],
     "passThrough": true
+  },
+  "themes": {
+    "default": {
+      "label": "immediately.run",
+      "preferred": "dark",
+      "ships": true,
+      "summary": "The brand applied to a reading surface — the baseline every other look is measured against."
+    },
+    "archive": {
+      "label": "Archive",
+      "preferred": "light",
+      "ships": true,
+      "summary": "Encyclopedic reference: dense, quiet, contents-forward. Source Serif 4 reading face."
+    },
+    "journal": {
+      "label": "Journal",
+      "preferred": "light",
+      "ships": true,
+      "summary": "A personal notebook or family record: warm, short measure, soft frame. Lora reading face."
+    },
+    "editorial": {
+      "label": "Editorial",
+      "preferred": "dark",
+      "ships": true,
+      "summary": "Loud on purpose — a zine, a gig listing, a release archive. Loud through weight and colour, not a new face."
+    }
+  },
+  "pageVariants": {
+    "doc": {
+      "key": "layout",
+      "value": "doc",
+      "ships": true,
+      "summary": "The default reference page: contents rail, floated infobox, backlink index."
+    },
+    "post": {
+      "key": "layout",
+      "value": "post",
+      "ships": true,
+      "summary": "One measured column, no rails — the long-form entry."
+    },
+    "full": {
+      "key": "layout",
+      "value": "full",
+      "ships": true,
+      "summary": "The widest measure; drawn on the directory board rather than its own."
+    },
+    "bare": {
+      "key": "frame",
+      "value": "none",
+      "ships": true,
+      "summary": "No chrome at all; the entry supplies its own."
+    }
   },
   "layouts": {
     "shell": {
@@ -291,13 +357,17 @@
   "collections": {
     "feed": {
       "component": "DocList",
-      "props": { "shape": "feed" },
+      "props": {
+        "shape": "feed"
+      },
       "ships": true,
       "summary": "A dated list of entries — title, date, lede."
     },
     "image-excerpt": {
       "component": "DocList",
-      "props": { "shape": "grid" },
+      "props": {
+        "shape": "grid"
+      },
       "ships": true,
       "summary": "Cards with a picture slot and an excerpt. The slot holds the link-graph lattice until `cover:` lands (R3-313); it is not gated on it."
     },
@@ -313,7 +383,10 @@
     },
     "infinite-scroll": {
       "component": "DocList",
-      "props": { "paginate": "infinite", "batch": "20" },
+      "props": {
+        "paginate": "infinite",
+        "batch": "20"
+      },
       "ships": true,
       "summary": "The list that grows as you scroll: a windowed feed with a keyboard-actionable sentinel and a stated end. Behaviour like this can ONLY be an engine component's literal prop — never a starter file."
     }

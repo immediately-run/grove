@@ -205,6 +205,73 @@
   --wash: radial-gradient(75% 55% at 88% -5%, rgba(194, 53, 0, .08), transparent 60%);
 }
 
+/* — the catalogue galleries (R3-311): rows enumerated from the manifest — */
+.gg-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gg-section {
+  margin-top: 18px;
+}
+.gg-section h3 {
+  font-family: var(--disp);
+  font-weight: var(--disp-weight, 700);
+  font-size: 19px;
+  margin: 0 0 2px;
+}
+.gg-note {
+  color: var(--ink-2);
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+.gg-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-shape, 10px);
+  background: var(--panel);
+}
+.gg-swatch {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 38px;
+  border-radius: calc(var(--radius-shape, 10px) * 0.7);
+  border: 1px solid var(--line-2);
+}
+.gg-body {
+  min-width: 0;
+}
+.gg-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font-weight: 600;
+  color: var(--ink);
+}
+.gg-title code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.gg-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.gg-summary {
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-top: 3px;
+}
+
 /* ============ SHELL ============ */
 .grove-root a {
   color: inherit;
