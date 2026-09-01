@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { isContentEntry, keyToHref } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
+import EntryImage from './EntryImage';
 
 // One dated entry on the axis: mono date · node · card.
 function Row({ path }: { path: string }) {
@@ -14,6 +15,7 @@ function Row({ path }: { path: string }) {
       <div className="gtl-date">{m.date}</div>
       <div className="gtl-node" />
       <div className="gtl-card">
+        <EntryImage entryPath={path} src={m.cover} alt="" className="gtl-cover" degrade={null} />
         <div className="gtl-title">{(m.title || path).replace(/\.$/, '')}</div>
         {m.description && <div className="gtl-desc">{m.description}</div>}
         {tags.length ? (
