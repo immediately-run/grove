@@ -21,6 +21,7 @@
 
 import type { Frontmatter } from './frontmatter';
 import { parseFrontmatter } from './frontmatter';
+import { collectHeadings } from '@immediately-run/sdk';
 
 /** The metadata map shape the SDK hooks read (`FilesMetadata`). */
 export type CorpusMetadata = Record<string, Frontmatter>;
@@ -71,7 +72,14 @@ export async function listCorpusFiles(root: string, fs: ScanFs, maxDepth = 12): 
   return out.sort();
 }
 
-/** Read + parse a list of entries into the metadata map, bounded-concurrently. */
+/** Read + parse a list of entries into the metadata map, bounded-concurrently.
+ *
+ * The additive headings index extension (GROVE_AGENT_SPEC §4): a dispatched row
+ * carries its entry's `headings: [{id, text, depth}]`, ids from the same
+ * mdx-plugins canon the render path emits (via the SDK's `collectHeadings` — one
+ * implementation, shared with the tool that reads the field). The author's own
+ * frontmatter `headings` key wins; a row with none of either simply lacks the
+ * field (readers degrade to body reads). */
 async function readAll(paths: string[], fs: ScanFs): Promise<CorpusMetadata> {
   const meta: CorpusMetadata = {};
   let next = 0;
@@ -82,7 +90,14 @@ async function readAll(paths: string[], fs: ScanFs): Promise<CorpusMetadata> {
       const path = paths[i];
       try {
         const raw = await fs.readFile(path, 'utf8');
-        meta[path] = parseFrontmatter(raw).data;
+        const parsed = parseFrontmatter(raw);
+        const row = parsed.data;
+        const headings = collectHeadings(parsed.body);
+        if (headings.length && !Object.prototype.hasOwnProperty.call(row, 'headings')) {
+          meta[path] = { ...row, headings } as Frontmatter & { headings?: unknown };
+        } else {
+          meta[path] = row;
+        }
       } catch {
         // One unreadable entry must not empty the whole corpus. It is simply absent from
         // the index — the same state it would be in if the author had not written it.

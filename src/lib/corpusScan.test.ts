@@ -90,11 +90,14 @@ describe('scanCorpus — the index a dispatched viewer reads', () => {
     expect(meta['/mnt/c/themes.mdx'].owns).toEqual({ concepts: ['the-frame'] });
   });
 
-  it('keeps an entry with NO frontmatter, with empty metadata', async () => {
+  it('keeps an entry with NO frontmatter, with empty metadata (plus the additive headings field)', async () => {
     // A draft or a bare `_layout.mdx` is still part of the corpus; dropping it would make
-    // the file unroutable rather than merely unlabelled.
+    // the file unroutable rather than merely unlabelled. Since the headings index
+    // extension (GROVE_AGENT_SPEC §4) the row carries its heading list too.
     const fs = fakeFs({ '/mnt/c/raw.mdx': '# just a heading\n' });
-    expect(await scanCorpus('/mnt/c', fs)).toEqual({ '/mnt/c/raw.mdx': {} });
+    expect(await scanCorpus('/mnt/c', fs)).toEqual({
+      '/mnt/c/raw.mdx': { headings: [{ id: 'just-a-heading', text: 'just a heading', depth: 1 }] },
+    });
   });
 
   it('loses only the unreadable entry, never the corpus', async () => {
@@ -153,5 +156,36 @@ describe('parseFrontmatter — the grammar the authoring contract documents', ()
   it('does not mistake a horizontal rule mid-document for frontmatter', () => {
     const src = '# Title\n\n---\n\nmore';
     expect(parseFrontmatter(src).data).toEqual({});
+  });
+});
+
+describe('scanCorpus — the additive headings index (GROVE_AGENT_SPEC §4)', () => {
+  it('G-GA-7 — a scan emits headings whose ids match the rendered anchors (the mdx-plugins canon)', async () => {
+    const fs = fakeFs({
+      '/mnt/c/a.mdx': '---\ntitle: A\n---\n\n## 8. Capability model\n\n## Getting started\n\n## Getting started\n',
+    });
+    const meta = await scanCorpus('/mnt/c', fs);
+    expect(meta['/mnt/c/a.mdx']).toMatchObject({
+      title: 'A',
+      headings: [
+        { id: 'sec-8', text: '8. Capability model', depth: 2 },
+        { id: 'getting-started', text: 'Getting started', depth: 2 },
+        { id: 'getting-started-1', text: 'Getting started', depth: 2 },
+      ],
+    });
+  });
+
+  it('the author own `headings` frontmatter key wins over the computed field', async () => {
+    const fs = fakeFs({
+      '/mnt/c/a.mdx': '---\ntitle: A\nheadings: authored\n---\n\n## One\n',
+    });
+    const meta = await scanCorpus('/mnt/c', fs);
+    expect(meta['/mnt/c/a.mdx']).toEqual({ title: 'A', headings: 'authored' });
+  });
+
+  it('a heading-less entry simply lacks the field (the old-index degrade)', async () => {
+    const fs = fakeFs({ '/mnt/c/a.mdx': '---\ntitle: A\n---\n\nprose only\n' });
+    const meta = await scanCorpus('/mnt/c', fs);
+    expect(meta['/mnt/c/a.mdx']).toEqual({ title: 'A' });
   });
 });

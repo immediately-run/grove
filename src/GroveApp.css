@@ -2377,38 +2377,84 @@ a.gdl-row {
 }
 
 /* agent banner states (no-key / forbidden / read-only) */
-.ga-banner {
-  margin: 0;
-  border-radius: 0;
-  border: 0;
+/* The reach card (GROVE_AGENT_SPEC §6) — the session envelope, one row per
+   capability, cause attached to every ✗. */
+.ga-reach {
   border-bottom: 1px solid var(--line);
   background: var(--panel-2);
-  padding: 14px 16px;
+  padding: 10px 16px;
   display: flex;
-  gap: 11px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
 }
-.ga-banner svg {
-  width: 18px;
-  height: 18px;
-  color: var(--accent-3);
+.ga-reach__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.ga-reach__mark {
   flex: 0 0 auto;
-  margin-top: 1px;
+  width: 14px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
 }
-.ga-banner__t {
-  font-weight: 600;
-  font-size: 13.5px;
+.ga-reach__row--ok .ga-reach__mark {
+  color: var(--accent);
+}
+.ga-reach__row--blocked .ga-reach__mark {
+  color: var(--ink-3);
+}
+.ga-reach__row--neutral .ga-reach__mark {
+  color: var(--ink-3);
+}
+.ga-reach__label {
   color: var(--ink);
-  margin-bottom: 3px;
+  font-weight: 500;
 }
-.ga-banner__d {
+.ga-reach__row--blocked .ga-reach__label {
+  color: var(--ink-2);
+  font-weight: 400;
+}
+.ga-reach__row--neutral .ga-reach__label {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.ga-reach__cause {
+  color: var(--ink-2);
+}
+.ga-egress {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.ga-toast {
+  margin: 10px 16px 0;
+  border: 1px solid color-mix(in srgb, var(--accent-3) 45%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--accent-3) 8%, var(--panel));
+  padding: 9px 12px;
   font-size: 12.5px;
   color: var(--ink-2);
-  line-height: 1.5;
 }
-.ga-banner__d a {
-  color: var(--accent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+.ga-activity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  padding: 2px 2px;
+}
+.ga-activity svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
 }
 
 /* ============ EXTENSIBILITY VIEWS ============ */
