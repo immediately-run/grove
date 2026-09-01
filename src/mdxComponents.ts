@@ -6,6 +6,8 @@ import Lede from './components/Lede';
 import Infobox from './components/Infobox';
 import More from './components/More';
 import DocList from './components/DocList';
+import ThemeGallery from './components/ThemeGallery';
+import LayoutGallery from './components/LayoutGallery';
 import TagCloud from './components/TagCloud';
 import TagList from './components/TagList';
 import Directory from './components/Directory';
@@ -61,6 +63,8 @@ export const GROVE_MDX = {
   ChildPages,
   Timeline,
   FamilyTree,
+  ThemeGallery,
+  LayoutGallery,
   // Layout primitives — a `_layout.mdx` arranges the shell out of these around an
   // <Outlet/>, so the site chrome is content (see src/lib/layout.ts).
   Outlet,
