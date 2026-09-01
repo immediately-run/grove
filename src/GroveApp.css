@@ -1368,6 +1368,37 @@ a.gdl-row {
   display: flex;
   flex-direction: column;
 }
+/* —— the windowed feed's sentinel + end (R3-314) ——
+   The sentinel is a BUTTON (keyboard-reachable, keyboard-actionable) styled as
+   the skeleton rows it precedes, so the batch arriving below it reads as the
+   same surface continuing. The skeleton bars occupy real height via .sk-line,
+   which is what keeps the boundary shift-free: the box exists before the rows
+   do, and prefers-reduced-motion already stills the shimmer (§.sk rule). */
+.gdl-sentinel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 18px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.gdl-sentinel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.gdl-end {
+  margin: 0;
+  padding: 18px 4px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
 .gdl-row {
   display: grid;
   grid-template-columns: 1fr auto;

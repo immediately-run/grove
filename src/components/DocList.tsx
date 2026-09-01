@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { isContentEntry, keyToHref, slugToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
@@ -11,6 +11,13 @@ interface Props {
   tag?: string;
   limit?: string | number;
   sort?: 'date' | 'title';
+  /** "infinite" — a windowed feed that grows on scroll (R3-314). A LITERAL
+   *  attribute: the safe renderer copies `paginate="infinite"` verbatim but drops
+   *  `paginate={mode}` silently, and the list then renders whole with nothing
+   *  saying why. */
+  paginate?: string;
+  /** How many entries a windowed batch adds (literal string or number). */
+  batch?: string | number;
 }
 
 function tagsOf(meta: any): string[] {
@@ -60,7 +67,26 @@ function CardTile({ path }: { path: string }) {
 // Import-free engine component: a frontmatter-driven index of entries, in a feed
 // or grid shape. `slugs` pins an explicit ordered set; otherwise it queries the
 // whole content space (optionally filtered by `tag`), excluding view/index pages.
-export default function DocList({ shape = 'feed', title, slugs, tag, limit, sort = 'date' }: Props) {
+//
+// `paginate="infinite"` (R3-314): a windowed feed with an IntersectionObserver
+// sentinel — the repo's other observer (useHeadings, the contents rail) is the
+// pattern, and this one reuses its shape rather than inventing machinery. Three
+// states beyond "rows": a skeleton batch (rows render `.sk` until their metadata
+// resolves, occupying the real box so nothing shifts), a sentinel that is a
+// BUTTON — reachable and actionable by keyboard alone, not only by scrolling —
+// and an explicit end ("that is all N entries") rather than a list that merely
+// stops. No IntersectionObserver in the environment → the full list renders;
+// that degradation is the honest fallback, not an error.
+export default function DocList({
+  shape = 'feed',
+  title,
+  slugs,
+  tag,
+  limit,
+  sort = 'date',
+  paginate,
+  batch,
+}: Props) {
   const queryFn = useCallback(
     (fm: Record<string, any>) => {
       const keys = Object.keys(fm).filter((p) => {
@@ -87,6 +113,32 @@ export default function DocList({ shape = 'feed', title, slugs, tag, limit, sort
   const n = limit ? Number(limit) : undefined;
   if (n && paths.length > n) paths = paths.slice(0, n);
 
+  // ── the windowed feed (R3-314) ─────────────────────────────────────────────
+  const windowed = paginate === 'infinite' && typeof IntersectionObserver !== 'undefined';
+  const batchSize = Math.max(1, Number(batch) || 20);
+  const [visible, setVisible] = useState(batchSize);
+  const sentinelRef = useRef<HTMLButtonElement | null>(null);
+  const more = windowed && visible < paths.length;
+  const shown = windowed ? paths.slice(0, visible) : paths;
+
+  useEffect(() => {
+    if (!more) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    // Load a little BEFORE the sentinel is fully reached, so a slow scroll never
+    // sees the end of the list — same observer shape as useHeadings' scroll-spy.
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setVisible((v) => v + batchSize);
+      },
+      { rootMargin: '0px 0px 240px 0px', threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [more, batchSize]);
+
+  const loadMore = () => setVisible((v) => v + batchSize);
+
   return (
     <div className="grove-doclist-wrap">
       {title ? (
@@ -99,9 +151,23 @@ export default function DocList({ shape = 'feed', title, slugs, tag, limit, sort
         <p className="grove-search__empty">No entries yet.</p>
       ) : (
         <div className="grove-doclist" data-shape={shape}>
-          {paths.map((p: string) =>
+          {shown.map((p: string) =>
             shape === 'grid' ? <CardTile key={p} path={p} /> : <Row key={p} path={p} />
           )}
+          {more ? (
+            <button
+              ref={sentinelRef}
+              className="gdl-sentinel"
+              onClick={loadMore}
+              aria-label={`Load the next ${Math.min(batchSize, paths.length - shown.length)} entries`}
+            >
+              <span className="sk sk-line" style={{ width: '42%' }} />
+              <span className="sk sk-line" style={{ width: '68%' }} />
+            </button>
+          ) : null}
+          {windowed && !more && paths.length > batchSize ? (
+            <p className="gdl-end" role="status">That is all {paths.length} entries.</p>
+          ) : null}
         </div>
       )}
     </div>
