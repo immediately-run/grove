@@ -69,7 +69,7 @@ is one corpus's conventions (declared by that corpus, not this repo).
 - `ChildPages` (engine, overridable) — The entries nested under this one.
 - `Directory` (engine, overridable) — The entries under one corpus directory. Props: path: string?.
 - `DirectoryList` (engine, overridable) — A folder listing as a table, with metadata columns chosen by `columns` and narrowed to those the rows actually carry. Props: path: string?, title: string?, columns: string?, sort: string?, hidden: boolean?.
-- `DocList` (engine, overridable) — A queried list of entries — the generic index primitive. Props: tag: string?, limit: number?.
+- `DocList` (engine, overridable) — A queried list of entries — the generic index primitive. paginate="infinite" windows it with a sentinel and a stated end (R3-314); the attribute must be a literal. Props: tag: string?, limit: number?, paginate: 'infinite'?, batch: number?.
 - `DocsByTag` (engine, overridable) — Entries grouped under one tag. Props: tag: string?.
 - `FamilyTree` (engine, overridable) — A relationship graph rendered from frontmatter links. Props: children: node?.
 - `GroveFooter` (chrome, overridable) — The site footer.

@@ -73,9 +73,11 @@
       "sanitizing": false,
       "props": {
         "tag": "string?",
-        "limit": "number?"
+        "limit": "number?",
+        "paginate": "'infinite'?",
+        "batch": "number?"
       },
-      "summary": "A queried list of entries \u2014 the generic index primitive."
+      "summary": "A queried list of entries \u2014 the generic index primitive. paginate=\"infinite\" windows it with a sentinel and a stated end (R3-314); the attribute must be a literal."
     },
     "TagCloud": {
       "tier": "engine",
@@ -311,9 +313,9 @@
     },
     "infinite-scroll": {
       "component": "DocList",
-      "props": { "paginate": "infinite" },
-      "ships": false,
-      "summary": "The list that grows as you scroll. Ships with R3-314; declared now because behaviour like this can ONLY be an engine component's literal prop — never a starter file."
+      "props": { "paginate": "infinite", "batch": "20" },
+      "ships": true,
+      "summary": "The list that grows as you scroll: a windowed feed with a keyboard-actionable sentinel and a stated end. Behaviour like this can ONLY be an engine component's literal prop — never a starter file."
     }
   }
 }
