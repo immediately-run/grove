@@ -84,19 +84,20 @@ export default function GroveNav() {
                     </button>
                   ))}
                 </div>
-                {theme === 'default' ? (
-                  <div className="gtm__appearance">
-                    <div className="gtm__sub">Appearance</div>
-                    <div className="gtm__seg">
-                      <button data-on={!light ? '1' : '0'} onClick={() => setLight(false)}>
-                        <Icon name="moon" /> Dark
-                      </button>
-                      <button data-on={light ? '1' : '0'} onClick={() => setLight(true)}>
-                        <Icon name="sun" /> Light
-                      </button>
-                    </div>
+                {/* R3-308: the appearance control is offered for EVERY theme — each
+                    catalogue entry ships both polarities, so gating it on
+                    `default` would be single-polarity by construction again. */}
+                <div className="gtm__appearance">
+                  <div className="gtm__sub">Appearance</div>
+                  <div className="gtm__seg">
+                    <button data-on={!light ? '1' : '0'} onClick={() => setLight(false)}>
+                      <Icon name="moon" /> Dark
+                    </button>
+                    <button data-on={light ? '1' : '0'} onClick={() => setLight(true)}>
+                      <Icon name="sun" /> Light
+                    </button>
                   </div>
-                ) : null}
+                </div>
               </div>
             </>
           ) : null}

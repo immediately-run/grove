@@ -7,6 +7,7 @@ import {
   Include,
   useAllMetadata,
   useFileMetadata,
+  useHostTheme,
   useMetadataQuery,
 } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
@@ -26,6 +27,8 @@ import { navQuery } from './lib/queries';
 import type { NavRecord } from './lib/queries';
 import { layoutChainForKey } from './lib/layout';
 import { folderIndexKey } from './lib/directory';
+import { resolvePalette, resolvePolarity, type Polarity } from './lib/themeSelection';
+import { preferredPolarity } from './data/themes';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
 import { useEditAffordance } from './hooks/useEditAffordance';
 import { getContentRoot } from './lib/contentRoot';
@@ -115,8 +118,43 @@ export default function GroveWiki({
   const ctx = useContext(TinkerableContext) as any;
   const sandboxPath: string = ctx?.navigationState?.sandboxPath || '/';
 
-  const [theme, setTheme] = useState(() => readPref('grove:theme') || 'default');
-  const [light, setLight] = useState(() => readPref('grove:appearance') === 'light');
+  // ── Theme selection (R3-308, 02-theme-contract §4) ─────────────────────────
+  //
+  // Two INDEPENDENT axes with three sources, resolved through ONE module
+  // (lib/themeSelection) so no surface re-derives the precedence:
+  //
+  //   palette  = reader override, else the author's `theme:` on the home entry, else default
+  //   polarity = reader override, else the host's theme, else the palette's preferred
+  //
+  // The stored prefs are OVERRIDES, nullable by nature: absent until the reader
+  // acts, which is what gives the author's declaration its turn. They are written
+  // by the user actions (chooseTheme/choosePolarity), NEVER by an effect on mount
+  // — the old effects promoted the initial value to a reader choice on first
+  // visit, which is exactly why a `theme:` declaration could never have won.
+  // (Visitors from before this change carry a mount-written pref; it stands —
+  // they are Grove readers, and a reader outranks an author.)
+  const [readerTheme, setReaderTheme] = useState<string | null>(() => readPref('grove:theme'));
+  const [readerAppearance, setReaderAppearance] = useState<Polarity | null>(() => {
+    const p = readPref('grove:appearance');
+    return p === 'light' || p === 'dark' ? p : null;
+  });
+  const chooseTheme = (id: string) => {
+    setReaderTheme(id);
+    writePref('grove:theme', id);
+  };
+  const choosePolarity = (wantLight: boolean) => {
+    const p: Polarity = wantLight ? 'light' : 'dark';
+    setReaderAppearance(p);
+    writePref('grove:appearance', p);
+  };
+  // The host drives POLARITY ONLY (`theme:read` is the one theme capability the
+  // open-wiki binding holds) — and only when there IS a host. `useHostTheme`'s
+  // channel reports an `initial: 'dark'` before any host speaks, so an unframed
+  // standalone `vite dev` render would otherwise carry a phantom host opinion
+  // and flip light-preferred themes. Framed === a host exists to have one.
+  const framed = typeof window !== 'undefined' && window.parent !== window;
+  const hostTheme = useHostTheme();
+  const hostPolarity: Polarity | null = framed ? hostTheme : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -131,8 +169,6 @@ export default function GroveWiki({
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  useEffect(() => writePref('grove:theme', theme), [theme]);
-  useEffect(() => writePref('grove:appearance', light ? 'light' : 'dark'), [light]);
 
   // ⌘K / Ctrl-K opens search.
   useEffect(() => {
@@ -162,6 +198,21 @@ export default function GroveWiki({
   // `site` frontmatter — not the current entry's (which only home would carry),
   // else the brand flips to the 'Grove' fallback on every sub-page.
   const homeMeta = useFileMetadata(homeKey()) as any;
+  // R3-308: the author's palette declaration — `theme:` on the home entry, the
+  // wiki-wide sibling of `site:`. Like `site`, it is read from HOME and not the
+  // current entry, so a sub-page never flips the wiki's look back to `default`.
+  const authorTheme: string | null =
+    typeof homeMeta?.theme === 'string' && homeMeta.theme ? homeMeta.theme : null;
+  // The two axes, resolved through the one module that owns the precedence. `theme`
+  // and `light` below are the RESOLVED values every surface renders from — the raw
+  // reader overrides live only in state and in the menu handlers.
+  const theme = resolvePalette({ reader: readerTheme, author: authorTheme });
+  const polarity: Polarity = resolvePolarity({
+    reader: readerAppearance,
+    host: hostPolarity,
+    preferred: preferredPolarity(theme),
+  });
+  const light = polarity === 'light';
   // Existence / 404: the whole index tells us if a followed link is dead. Layout
   // files are structure, not entries, so they're excluded here (and everywhere).
   const allKeysQuery = useCallback((fm: Record<string, any>) => Object.keys(fm).filter(isContentEntry), []);
@@ -250,9 +301,9 @@ export default function GroveWiki({
 
   const shell: GroveShell = {
     theme,
-    setTheme,
+    setTheme: chooseTheme,
     light,
-    setLight,
+    setLight: choosePolarity,
     menuOpen,
     setMenuOpen,
     searchOpen,
@@ -332,7 +383,7 @@ export default function GroveWiki({
         data-vw={vw}
         data-nav={navMode}
         data-grove-theme={theme === 'default' ? undefined : theme}
-        data-theme={theme === 'default' && light ? 'light' : undefined}
+        data-theme={polarity}
       >
         <div className="device__scroll">
           {rejectedComponents.length > 0 ? (
