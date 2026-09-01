@@ -3,8 +3,15 @@
    Tokens mirror the immediately.run design system — pull colors, fonts, radii,
    and shadows from here rather than hard-coding values. */
 
-/* Web fonts MUST be the first line of the file. */
-@import url('https://fonts.googleapis.com/css2?family=Gabarito:wght@400;500;600;700;800;900&family=Public+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+/* R3-315 — the faces arrive as DECLARED assets the engine mints from in-repo
+   bytes (ThemeAssets → data/themeFonts.ts); the Google Fonts @import that stood
+   here is gone: it broke offline in every stance and was blocked under compiled
+   dispatch of a low-trust corpus. Nothing in this file names a network location.
+
+   The cascade layers (plan 05 §5): engine rules (the minted @font-face set) live
+   in grove.engine; existing rules stay unlayered, which wins over every layer,
+   so this line adds the discipline without re-laminating the file. */
+@layer grove.reset, grove.engine, grove.theme, grove.content;
 
 /* ---------------------------------------------------------------- DARK (default) */
 :root {

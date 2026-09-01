@@ -21,8 +21,10 @@ local `vite dev` — the most common silent failure.
 4. **One component per file, default-exported**, named for what it renders.
 5. **CSS lives in `.css` files imported from TypeScript** — not in giant
    `<style>` blocks or inline `style={{}}` for the bulk of styling.
-6. **Fonts via CSS `@import`** as the first line of the CSS file, not `<link>`
-   tags in `index.html`.
+6. **Fonts as declared assets** (`data/themeFonts.ts` → `ThemeAssets`): the
+   engine reads the bytes from `assets/fonts/` and mints `blob:` `@font-face`
+   rules. No remote `@import` — it breaks offline in every stance and is blocked
+   under compiled dispatch (R3-315). Not `<link>` tags in `index.html` either.
 7. **Import local assets** (`import logo from './assets/logo.png'`); don't
    reference server paths that won't exist in the sandbox.
 8. **No Node / build-time-only APIs** in the rendered tree — it runs in a browser

@@ -28,6 +28,8 @@ import { useCorpusMetadata } from './hooks/useCorpusMetadata';
 import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
 import { viewedDocumentForTarget } from './lib/content';
+import ThemeAssets from './components/ThemeAssets';
+import { DEFAULT_THEME_ASSETS } from './data/themeFonts';
 import GroveWiki from './GroveWiki';
 
 // R3-268 — the viewed-document rule, registered ONCE at module load: every
@@ -116,6 +118,17 @@ export default function App() {
       wiki
     );
 
+  // R3-315 — the engine's declared assets (the default face set) mint to blob:
+  // URLs at boot and emit their @font-face rules in the engine cascade layer.
+  // Mounts OUTSIDE the corpus gate deliberately: faces are engine state, not a
+  // function of the scanned index, and a slow scan must not delay them.
+  const withAssets = (
+    <>
+      <ThemeAssets declarations={DEFAULT_THEME_ASSETS} />
+      {withComponents}
+    </>
+  );
+
   if (corpus.status === 'ready' && corpus.metadata) {
     // Provide the scanned corpus as the metadata SOURCE through the supported
     // surface (R3-276), not a wholesale TinkerableContext re-provision: the
@@ -123,9 +136,9 @@ export default function App() {
     // MetadataSource — so every consumer works unchanged, and nothing re-states
     // host fields it does not own.
     return (
-      <MetadataSource value={corpus.metadata}>{withComponents}</MetadataSource>
+      <MetadataSource value={corpus.metadata}>{withAssets}</MetadataSource>
     );
   }
 
-  return withComponents;
+  return withAssets;
 }
