@@ -41,6 +41,8 @@ import DefaultLayout from './components/DefaultLayout';
 import Search from './components/Search';
 import Drawer from './components/Drawer';
 import GroveAgent from './components/GroveAgent';
+import ThemeAssets from './components/ThemeAssets';
+import { themeAssetsFor } from './data/themeFonts';
 
 declare const module: any;
 
@@ -390,6 +392,10 @@ export default function GroveWiki({
         data-grove-theme={theme === 'default' ? undefined : theme}
         data-theme={polarity}
       >
+        {/* R3-310: the ACTIVE theme's declared faces — the engine mints blob:
+            @font-face rules (R3-315's mechanism); switching themes revokes the
+            outgoing set and re-mints. */}
+        <ThemeAssets declarations={themeAssetsFor(theme)} />
         <div className="device__scroll">
           {rejectedComponents.length > 0 ? (
             <div className="grove-decl-error" role="status">
