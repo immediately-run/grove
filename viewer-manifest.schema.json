@@ -57,6 +57,43 @@
         "corpusTooling": { "type": "array", "items": { "type": "string" }, "description": "Keys a corpus's own tooling reads. The engine ignores them." },
         "passThrough": { "type": "boolean", "description": "Whether unknown keys are allowed (they are carried, unread). False makes the vocabulary closed." }
       }
+    },
+    "layouts": {
+      "type": "object",
+      "description": "The layout-starters catalogue (R3-309, bucket A): `_layout.mdx` starters under `content/_layouts/` a contributor or agent copies from. Keyed by starter id (= filename); `layoutRole` is the declared kind the entry and the file must agree on — the field existed in the sample layouts for a year with nothing reading it, and the catalogue is what gives it a job.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["layoutRole", "arranges", "ships", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "layoutRole": {
+            "enum": ["root", "section"],
+            "description": "`root` is an outermost shell (selects the nav arrangement); `section` nests under a root and wraps one folder."
+          },
+          "arranges": { "type": "string", "description": "The chrome the starter arranges around `<Outlet/>`." },
+          "ships": { "type": "boolean", "description": "Whether the starter file exists today (kept false for a catalogue entry whose file lands with a later item)." },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "collections": {
+      "type": "object",
+      "description": "The collection-shapes catalogue (R3-309, bucket C): what a LIST of entries looks like. Behaviour lives here, not in a starter — an `_layout.mdx` cannot hold state, so infinite scroll is an engine component's literal prop, never a file you copy.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["ships", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "component": { "type": "string", "description": "The engine component the shape rides on (absent for shapes that are not component calls at all — a directory URL is one)." },
+          "props": {
+            "type": "object",
+            "description": "The literal attributes a corpus writes to select the shape. Expression props are dropped silently by the interpreter — every documented call must stay literal.",
+            "additionalProperties": { "type": "string" }
+          },
+          "ships": { "type": "boolean", "description": "Whether the shape renders today; a not-yet-shipping entry documents what lands with which item." },
+          "summary": { "type": "string" }
+        }
+      }
     }
   }
 }

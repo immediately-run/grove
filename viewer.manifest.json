@@ -264,5 +264,55 @@
       "tags"
     ],
     "passThrough": true
+  },
+  "layouts": {
+    "shell": {
+      "layoutRole": "root",
+      "arranges": "nav · sidebar · content · footer",
+      "ships": true,
+      "summary": "The site shell as copyable content. `nav: side` by default; flip the frontmatter to `nav: top` and drop the `<GroveSidebar/>` line for the top-nav arrangement."
+    },
+    "section": {
+      "layoutRole": "section",
+      "arranges": "shared hero + <Outlet/> + siblings rail",
+      "ships": true,
+      "summary": "A folder frame: one shared header above every entry in a subtree, `<ChildPages/>` below. Nest it under a root shell."
+    },
+    "hero": {
+      "layoutRole": "root",
+      "arranges": "a full-bleed image band over top navigation, then a short grid",
+      "ships": true,
+      "summary": "A landing root: `nav: top`, a hero band, then `<DocList shape=\"grid\" limit=\"4\"/>`. The picture slot renders the link-graph lattice until `cover:` lands."
+    }
+  },
+  "collections": {
+    "feed": {
+      "component": "DocList",
+      "props": { "shape": "feed" },
+      "ships": true,
+      "summary": "A dated list of entries — title, date, lede."
+    },
+    "image-excerpt": {
+      "component": "DocList",
+      "props": { "shape": "grid" },
+      "ships": true,
+      "summary": "Cards with a picture slot and an excerpt. The slot holds the link-graph lattice until `cover:` lands (R3-313); it is not gated on it."
+    },
+    "timeline": {
+      "component": "Timeline",
+      "props": {},
+      "ships": true,
+      "summary": "Entries on a dated spine; already matches the reference archetype."
+    },
+    "directory": {
+      "ships": true,
+      "summary": "A folder URL with no `index.mdx` of its own — the generated listing. Not a component call: the mechanism is the URL itself."
+    },
+    "infinite-scroll": {
+      "component": "DocList",
+      "props": { "paginate": "infinite" },
+      "ships": false,
+      "summary": "The list that grows as you scroll. Ships with R3-314; declared now because behaviour like this can ONLY be an engine component's literal prop — never a starter file."
+    }
   }
 }

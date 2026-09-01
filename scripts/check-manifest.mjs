@@ -14,7 +14,7 @@
 // LITERAL's keys, not a regex over the whole file. That is the distinction R3-277c asks
 // for: reformatting `mdxComponents.ts` must not change the outcome.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -140,6 +140,79 @@ for (const [subpath, target] of Object.entries(pkg.exports ?? {})) {
   }
 }
 
+// ── R3-309 — the layout-catalogue gates ─────────────────────────────────────
+//
+// The manifest's `layouts` entries and the files under content/_layouts/ must agree
+// in BOTH directions (the same two-way rule the components section enforces), and a
+// shipping starter's OWN frontmatter must carry the `layoutRole` its entry declares.
+// That is the job the field was given: it sat unread in the sample layouts for a
+// year, and "an inert field in a file people copy is a field people will copy".
+
+const LAYOUTS_DIR = join(root, 'content', '_layouts');
+const starterIds =
+  existsSync(LAYOUTS_DIR)
+    ? readdirSync(LAYOUTS_DIR, { withFileTypes: true })
+        .filter((e) => e.isFile() && /\.mdx?$/.test(e.name))
+        .map((e) => e.name.replace(/\.mdx?$/, ''))
+    : [];
+
+/** The frontmatter block of a starter, as key → value (scalars only — that is all a
+ *  starter declares). */
+function frontmatterOf(file) {
+  const src = readFileSync(join(LAYOUTS_DIR, file), 'utf8');
+  const m = src.match(/^---\n([\s\S]*?)\n---/);
+  const fm = {};
+  if (m) for (const line of m[1].split('\n')) {
+    const kv = line.match(/^(\w+):\s*(.+)$/);
+    if (kv) fm[kv[1]] = kv[2].trim().replace(/^['"]|['"]$/g, '');
+  }
+  return fm;
+}
+
+const declaredLayouts = manifest.layouts ?? {};
+for (const [id, entry] of Object.entries(declaredLayouts)) {
+  if (entry.ships && !starterIds.includes(id)) {
+    errors.push(`  layouts.${id} — declared ships:true but content/_layouts/${id}.mdx does not exist.`);
+  }
+  if (entry.ships) {
+    const fm = frontmatterOf(`${id}.mdx`);
+    if (fm.layoutRole !== entry.layoutRole) {
+      errors.push(
+        `  layouts.${id} — manifest says layoutRole:${entry.layoutRole}, the starter's frontmatter says ` +
+          `${JSON.stringify(fm.layoutRole)}. The two must agree.`,
+      );
+    }
+    if (fm.nav && fm.nav !== 'top' && fm.nav !== 'side') {
+      errors.push(`  layouts.${id} — nav:${fm.nav} is neither 'top' nor 'side'; resolveNavMode would silently fall back.`);
+    }
+  }
+}
+for (const id of starterIds) {
+  if (!declaredLayouts[id]) {
+    errors.push(
+      `  content/_layouts/${id}.mdx — a starter on disk with NO manifest entry. It renders (when ` +
+        `copied) but nothing declares it: a corpus checker cannot find it and an agent cannot discover it.`,
+    );
+  }
+}
+
+// Collection shapes ride on engine components; a declared component that is not in the
+// vocabulary is the same lie as an undeclared one in the components section.
+const collections = manifest.collections ?? {};
+for (const [id, entry] of Object.entries(collections)) {
+  if (entry.component && !exported.has(entry.component)) {
+    errors.push(
+      `  collections.${id} — rides on "${entry.component}", which is not registered in GROVE_MDX. ` +
+        `A corpus writing the documented call renders nothing.`,
+    );
+  }
+  for (const [prop, value] of Object.entries(entry.props ?? {})) {
+    if (/^\{.*\}$/.test(value)) {
+      errors.push(`  collections.${id} — props.${prop} is an EXPRESSION (${value}). The interpreter drops it silently.`);
+    }
+  }
+}
+
 if (errors.length) {
   console.error(`FAIL manifest ↔ reality (${errors.length}):\n${errors.join('\n')}`);
   process.exit(1);
@@ -147,5 +220,6 @@ if (errors.length) {
 console.log(
   `OK ${manifest.viewer.name}: ${declared.size} components declared, ` +
     `${[...declared].filter((n) => manifest.components[n].overridable).length} overridable, ` +
-    `${Object.keys(pkg.exports ?? {}).length} export subpaths resolve.`,
+    `${Object.keys(pkg.exports ?? {}).length} export subpaths resolve, ` +
+    `${starterIds.length} layout starter(s), ${Object.keys(collections).length} collection shape(s).`,
 );

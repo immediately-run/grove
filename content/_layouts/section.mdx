@@ -1,0 +1,26 @@
+---
+layoutRole: section
+description: A section frame starter — copy into a folder as _layout.mdx and every entry in that subtree renders at Outlet below a shared header, with the folder's other entries (ChildPages) below it. Nest it under your root shell; an entry opts out with frame: none in its own frontmatter. Structural tags carry an attribute and blank-line separation — that is the interpreter's vocabulary.
+---
+
+<section className="grove-section">
+  <header className="grove-section__hero">
+
+  #### Section
+
+  ## The section title.
+
+  One shared header for every entry in this folder — not one of them includes it.
+
+  </header>
+
+  <Outlet />
+</section>
+
+<nav className="grove-section__more">
+
+#### More in this section
+
+<ChildPages />
+
+</nav>
