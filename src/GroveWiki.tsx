@@ -42,7 +42,9 @@ import Search from './components/Search';
 import Drawer from './components/Drawer';
 import GroveAgent from './components/GroveAgent';
 import ThemeAssets from './components/ThemeAssets';
+import ContentTheme, { type ContentStylesheet } from './components/ContentTheme';
 import { themeAssetsFor } from './data/themeFonts';
+import { parseFrontmatter } from './lib/frontmatter';
 
 declare const module: any;
 
@@ -264,6 +266,45 @@ export default function GroveWiki({
   // frontmatter map (folder convention + `frame` override), so it reads the whole
   // metadata store and re-derives when the content set or the entry changes.
   const allMeta = useAllMetadata() as Record<string, Record<string, unknown>>;
+
+  // ── Content-carried themes (R3-316) ────────────────────────────────────────
+  // `ui/stylesheet` entries discovered from the SAME index every other surface
+  // reads (mode-invariant: fork, dispatch and library all fill it); bodies are
+  // raw CSS behind frontmatter, gated by the grammar inside ContentTheme and
+  // admitted only into the lowest cascade layer. A rejected sheet degrades to a
+  // status line naming the line — never a silent drop, never a crash.
+  const [contentSheets, setContentSheets] = useState<ContentStylesheet[]>([]);
+  const [rejectedSheet, setRejectedSheet] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const found: ContentStylesheet[] = [];
+    const paths = Object.keys(allMeta).filter((p) => {
+      const tags = allMeta[p]?.tags;
+      return Array.isArray(tags) && tags.includes('ui/stylesheet');
+    });
+    (async () => {
+      for (const p of paths) {
+        try {
+          const raw = await (await import('./lib/safeSources')).safeSources.read(p);
+          const parsed = parseFrontmatter(raw);
+          found.push({
+            path: p,
+            css: parsed.body,
+            declarations: {
+              ...(Array.isArray(parsed.data.fonts) ? { fonts: parsed.data.fonts as never } : {}),
+              ...(parsed.data.assets && typeof parsed.data.assets === 'object' ? { assets: parsed.data.assets as never } : {}),
+            },
+          });
+        } catch {
+          /* an unreadable stylesheet contributes nothing — same as an absent one */
+        }
+      }
+      if (alive) setContentSheets(found);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [allMeta]);
   const chain: string[] = layoutChainForKey(entryKey, allMeta);
   const frameNone = meta?.frame === 'none' || meta?.frame === false;
 
@@ -396,7 +437,14 @@ export default function GroveWiki({
             @font-face rules (R3-315's mechanism); switching themes revokes the
             outgoing set and re-mints. */}
         <ThemeAssets declarations={themeAssetsFor(theme)} />
+        <ContentTheme sheets={contentSheets} onRejected={(path, v) => setRejectedSheet(`${path}:${v.line} — ${v.reason}`)} />
         <div className="device__scroll">
+          {rejectedSheet ? (
+            <div className="grove-decl-error" role="status">
+              <strong>A stylesheet entry was rejected by the theme grammar.</strong>
+              <div>{rejectedSheet}</div>
+            </div>
+          ) : null}
           {rejectedComponents.length > 0 ? (
             <div className="grove-decl-error" role="status">
               <strong>This corpus declares components that could not be loaded.</strong>
