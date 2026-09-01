@@ -254,6 +254,7 @@
   "frontmatter": {
     "engine": [
       "site",
+      "theme",
       "layout",
       "view",
       "frame",

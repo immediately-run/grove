@@ -94,6 +94,7 @@ is one corpus's conventions (declared by that corpus, not this repo).
 ## Frontmatter keys the engine reads
 
 - `site`
+- `theme`
 - `layout`
 - `view`
 - `frame`

@@ -67,6 +67,11 @@
 }
 
 /* —— alternate themes: identical DOM, CSS-only re-skin —— */
+/* R3-308: every theme ships BOTH polarities. The bare [data-grove-theme] block is
+   the theme's PREFERRED polarity (the one it opens in absent other opinions); the
+   paired block with an explicit [data-theme] is the other one. GroveWiki always
+   emits data-theme, so a wiki follows the reader or the host into either polarity
+   of ANY theme — alternates are no longer single-polarity by construction. */
 .grove-root[data-grove-theme="pixies"] {
   --bg: #0c0410;
   --panel: #1a0a1e;
@@ -88,6 +93,27 @@
   --radius-shape: 8px;
   --wash: radial-gradient(70% 55% at 85% -5%, rgba(255, 45, 142, .2), transparent 60%), radial-gradient(55% 45% at 4% 2%, rgba(157, 41, 255, .16), transparent 60%);
 }
+.grove-root[data-grove-theme="pixies"][data-theme="light"] {
+  --bg: #fdf6fb;
+  --panel: #ffffff;
+  --panel-2: #f9edf7;
+  --line: rgba(123, 47, 247, .18);
+  --line-2: rgba(123, 47, 247, .32);
+  --ink: #2c1030;
+  --ink-2: #6d3f76;
+  --ink-3: #7d5f84;
+  --accent: #d10f74;
+  --accent-2: #6b21c9;
+  --accent-3: #8a5a00;
+  --grad: linear-gradient(96deg, #ffe14d 0%, #ff2d8e 50%, #9d29ff 100%);
+  --glow: 0 0 0 1px rgba(209, 15, 116, .35), 0 8px 22px rgba(209, 15, 116, .18);
+  --accent-pink: #d10f74;
+  --accent-violet: #6b21c9;
+  --disp-weight: 900;
+  --prose-measure: 66ch;
+  --radius-shape: 8px;
+  --wash: radial-gradient(70% 55% at 85% -5%, rgba(209, 15, 116, .08), transparent 60%), radial-gradient(55% 45% at 4% 2%, rgba(107, 33, 201, .06), transparent 60%);
+}
 .grove-root[data-grove-theme="family"] {
   --bg: #faf6f1;
   --panel: #fffdfa;
@@ -95,7 +121,7 @@
   --line: rgba(120, 90, 60, .16);
   --line-2: rgba(120, 90, 60, .28);
   --ink: #3b342c;
-  --ink-2: #7c7062;
+  --ink-2: #6b5f51;
   --ink-3: #a89c8c;
   --accent: #c8744f;
   --accent-2: #9a8f5e;
@@ -108,6 +134,27 @@
   --prose-measure: 64ch;
   --radius-shape: 20px;
   --wash: radial-gradient(60% 50% at 82% -2%, rgba(224, 154, 106, .14), transparent 60%);
+}
+.grove-root[data-grove-theme="family"][data-theme="dark"] {
+  --bg: #241d16;
+  --panel: #2d251c;
+  --panel-2: #372c21;
+  --line: rgba(224, 154, 106, .16);
+  --line-2: rgba(224, 154, 106, .3);
+  --ink: #f2e9de;
+  --ink-2: #c9b8a5;
+  --ink-3: #a2937f;
+  --accent: #e09a6a;
+  --accent-2: #c8a06a;
+  --accent-3: #d9b98a;
+  --grad: linear-gradient(96deg, #f3cf9a 0%, #e09a6a 50%, #c8744f 100%);
+  --glow: 0 0 0 1px rgba(224, 154, 106, .4), 0 10px 26px rgba(224, 154, 106, .2);
+  --accent-pink: #e09a6a;
+  --accent-violet: #c8a06a;
+  --disp-weight: 700;
+  --prose-measure: 64ch;
+  --radius-shape: 20px;
+  --wash: radial-gradient(60% 50% at 82% -2%, rgba(224, 154, 106, .1), transparent 60%);
 }
 .grove-root[data-grove-theme="lotr"] {
   --bg: #ece2cc;
@@ -129,6 +176,27 @@
   --prose-measure: 72ch;
   --radius-shape: 4px;
   --wash: radial-gradient(70% 60% at 50% -5%, rgba(122, 90, 42, .1), transparent 65%);
+}
+.grove-root[data-grove-theme="lotr"][data-theme="dark"] {
+  --bg: #1d1810;
+  --panel: #262014;
+  --panel-2: #302818;
+  --line: rgba(184, 154, 86, .18);
+  --line-2: rgba(184, 154, 86, .32);
+  --ink: #ede2c8;
+  --ink-2: #c4b48e;
+  --ink-3: #9a8a6c;
+  --accent: #c9a45c;
+  --accent-2: #8aa468;
+  --accent-3: #b08a48;
+  --grad: linear-gradient(96deg, #b89a56 0%, #8a6a36 50%, #4a5a38 100%);
+  --glow: 0 0 0 1px rgba(201, 164, 92, .4), 0 8px 20px rgba(201, 164, 92, .22);
+  --accent-pink: #c9a45c;
+  --accent-violet: #8aa468;
+  --disp-weight: 700;
+  --prose-measure: 72ch;
+  --radius-shape: 4px;
+  --wash: radial-gradient(70% 60% at 50% -5%, rgba(201, 164, 92, .08), transparent 65%);
 }
 
 /* ============ SHELL ============ */
