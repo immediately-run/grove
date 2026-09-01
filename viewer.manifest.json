@@ -261,7 +261,8 @@
       "render",
       "nav",
       "order",
-      "tags"
+      "tags",
+      "cover"
     ],
     "passThrough": true
   },

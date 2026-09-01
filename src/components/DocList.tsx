@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { isContentEntry, keyToHref, slugToKey } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
+import EntryImage from './EntryImage';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -37,13 +38,18 @@ function Row({ path }: { path: string }) {
   );
 }
 
-// One entry as a grid card — link-graph placeholder pic + a footer of meta.
+// One entry as a grid card — the entry's `cover:` when it declares one (resolved
+// against the OWNING entry, R3-313 — a card must show its own picture, not the
+// rendered entry's), the link-graph lattice when it does not or the asset is
+// unreadable. Degrade, never break.
 function CardTile({ path }: { path: string }) {
   const meta = useFileMetadata(path) as any;
   if (!meta) return <div className="gdl-card"><div className="gdl-card__pic" /></div>;
   return (
     <Link href={keyToHref(path)} className="gdl-card">
-      <div className="gdl-card__pic" />
+      <div className="gdl-card__pic">
+        <EntryImage entryPath={path} src={meta.cover} alt="" className="gdl-card__cover" degrade={<span className="gdl-card__lattice" />} />
+      </div>
       <div className="gdl-card__foot">
         <div className="gdl-card__t">{(meta.title || path).replace(/\.$/, '')}</div>
         {meta.description && <div className="gdl-card__d">{meta.description}</div>}

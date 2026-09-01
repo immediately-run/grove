@@ -102,6 +102,7 @@ is one corpus's conventions (declared by that corpus, not this repo).
 - `nav`
 - `order`
 - `tags`
+- `cover`
 
 Unknown keys pass through (carried, unread) — a corpus may keep its own vocabulary.
 

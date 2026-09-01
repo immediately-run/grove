@@ -1449,6 +1449,25 @@ a.gdl-row {
   inset: 0;
   background: radial-gradient(70% 70% at 75% 15%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
 }
+/* R3-313 — the entry's `cover:` fills the lattice box when present; the lattice
+   stays as the degrade (the box's own background shows through when the image is
+   absent, so nothing shifts layout). */
+.gdl-card__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gtl-cover {
+  width: 100%;
+  max-height: 96px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+  display: block;
+}
 .gdl-card__foot {
   padding: 14px 15px;
   border-top: 1px solid var(--line);
