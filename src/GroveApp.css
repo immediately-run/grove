@@ -6,6 +6,30 @@
   overflow-x: hidden;
 }
 
+/* R3-316 — the escape hatch, pinned where content cannot reach: for !important
+   declarations EARLIER layers win, so grove.reset (the first layer, ordered in
+   index.css) beats grove.content no matter what a ui/stylesheet tries. A reader
+   can always reach a shipped theme without clearing storage — the one guarantee
+   the content layer must not be able to revoke. Proven by test (the hiding
+   vectors are enumerated), not by reading this comment. */
+@layer grove.reset {
+  .grove-root .grove-theme-control,
+  .grove-root .grove-theme-menu {
+    display: revert !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    clip-path: none !important;
+    transform: none !important;
+    position: revert !important;
+    z-index: auto !important;
+    width: revert !important;
+    height: revert !important;
+    overflow: revert !important;
+    filter: none !important;
+  }
+}
+
 /* ============ GROVE THEME TOKENS (the contract) ============ */
 .grove-root {
   --bg: #0a0b11;

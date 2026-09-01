@@ -62,7 +62,7 @@ export default function GroveNav() {
           <Icon name="message" />
         </button>
         <div className="grove-nav__more">
-          <button className="icbtn" title="Theme" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+          <button className="icbtn grove-theme-control" title="Theme" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
             ☀
           </button>
           {menuOpen ? (
