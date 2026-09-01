@@ -45,8 +45,8 @@ describe('resolvePolarity — reader, else host, else the palette’s own prefer
 describe('the catalogue carries a preferred polarity for every theme (R3-308)', () => {
   it('every theme declares one, and unknown ids fall back to dark', () => {
     for (const t of THEMES) expect(['light', 'dark']).toContain(t.preferred);
-    expect(preferredPolarity('pixies')).toBe('dark');
-    expect(preferredPolarity('family')).toBe('light');
+    expect(preferredPolarity('editorial')).toBe('dark');
+    expect(preferredPolarity('archive')).toBe('light');
     expect(preferredPolarity('never-heard-of')).toBe('dark');
   });
 });

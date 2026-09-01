@@ -36,6 +36,7 @@
   --wash: radial-gradient(60% 50% at 82% -2%, rgba(178, 133, 242, .12), transparent 60%), radial-gradient(48% 38% at 6% 4%, rgba(244, 154, 212, .06), transparent 60%);
   --disp-weight: 800;
   --prose-measure: 70ch;
+  --prose-leading: 1.6;
   --radius-shape: var(--r-lg);
   background: var(--bg);
   color: var(--ink);
@@ -66,137 +67,142 @@
   --accent-violet: #9a45e6;
 }
 
-/* —— alternate themes: identical DOM, CSS-only re-skin —— */
-/* R3-308: every theme ships BOTH polarities. The bare [data-grove-theme] block is
-   the theme's PREFERRED polarity (the one it opens in absent other opinions); the
-   paired block with an explicit [data-theme] is the other one. GroveWiki always
-   emits data-theme, so a wiki follows the reader or the host into either polarity
-   of ANY theme — alternates are no longer single-polarity by construction. */
-.grove-root[data-grove-theme="pixies"] {
-  --bg: #0c0410;
-  --panel: #1a0a1e;
-  --panel-2: #260f2c;
-  --line: rgba(255, 120, 200, .16);
-  --line-2: rgba(255, 120, 200, .3);
-  --ink: #fce9f6;
-  --ink-2: #d79bc9;
-  --ink-3: #9c6a8e;
-  --accent: #ff2d8e;
-  --accent-2: #7b2ff7;
-  --accent-3: #ffd23f;
-  --grad: linear-gradient(96deg, #ffe14d 0%, #ff2d8e 50%, #9d29ff 100%);
-  --glow: 0 0 0 1px rgba(255, 45, 142, .6), 0 0 30px rgba(255, 45, 142, .4);
-  --accent-pink: #ff2d8e;
-  --accent-violet: #9d29ff;
-  --disp-weight: 900;
-  --prose-measure: 66ch;
-  --radius-shape: 8px;
-  --wash: radial-gradient(70% 55% at 85% -5%, rgba(255, 45, 142, .2), transparent 60%), radial-gradient(55% 45% at 4% 2%, rgba(157, 41, 255, .16), transparent 60%);
+/* —— catalogue themes (R3-310): identical DOM, CSS-only re-skin, token-only —
+   every block declares custom properties and NOTHING else (02-theme-contract §1;
+   scripts/check-theme-token-only.mjs gates it). Per R3-308 the bare
+   [data-grove-theme] block is the theme's PREFERRED polarity and the paired
+   [data-theme] block is the other; GroveWiki always emits data-theme.
+
+   `--sans` is the body-face ROLE: archive puts a serif in it (the contract's
+   documented decision — the faces themselves arrive as declared assets, never a
+   url()). */
+
+/* — archive: encyclopedic reference — dense, quiet, contents-forward — */
+.grove-root[data-grove-theme="archive"] {
+  --bg: #f7f5f1;
+  --panel: #fffefb;
+  --panel-2: #efede7;
+  --line: rgba(52, 60, 65, .16);
+  --line-2: rgba(52, 60, 65, .3);
+  --ink: #23282c;
+  --ink-2: #515a60;
+  --ink-3: #6d777d;
+  --accent: #7a5c20;
+  --accent-2: #3f5a63;
+  --accent-3: #8a6a2c;
+  --grad: linear-gradient(96deg, #b89a56 0%, #7a5c20 55%, #3f5a63 100%);
+  --glow: 0 0 0 1px rgba(122, 92, 32, .4), 0 8px 20px rgba(122, 92, 32, .16);
+  --accent-pink: #7a5c20;
+  --accent-violet: #3f5a63;
+  --sans: "Source Serif 4", Georgia, serif;
+  --disp-weight: 600;
+  --prose-measure: 76ch;
+  --prose-leading: 1.55;
+  --radius-shape: 2px;
+  --wash: radial-gradient(70% 60% at 50% -5%, rgba(122, 92, 32, .07), transparent 65%);
 }
-.grove-root[data-grove-theme="pixies"][data-theme="light"] {
-  --bg: #fdf6fb;
-  --panel: #ffffff;
-  --panel-2: #f9edf7;
-  --line: rgba(123, 47, 247, .18);
-  --line-2: rgba(123, 47, 247, .32);
-  --ink: #2c1030;
-  --ink-2: #6d3f76;
-  --ink-3: #7d5f84;
-  --accent: #d10f74;
-  --accent-2: #6b21c9;
-  --accent-3: #8a5a00;
-  --grad: linear-gradient(96deg, #ffe14d 0%, #ff2d8e 50%, #9d29ff 100%);
-  --glow: 0 0 0 1px rgba(209, 15, 116, .35), 0 8px 22px rgba(209, 15, 116, .18);
-  --accent-pink: #d10f74;
-  --accent-violet: #6b21c9;
-  --disp-weight: 900;
-  --prose-measure: 66ch;
-  --radius-shape: 8px;
-  --wash: radial-gradient(70% 55% at 85% -5%, rgba(209, 15, 116, .08), transparent 60%), radial-gradient(55% 45% at 4% 2%, rgba(107, 33, 201, .06), transparent 60%);
+.grove-root[data-grove-theme="archive"][data-theme="dark"] {
+  --bg: #131517;
+  --panel: #1a1d20;
+  --panel-2: #21252a;
+  --line: rgba(196, 205, 210, .15);
+  --line-2: rgba(196, 205, 210, .26);
+  --ink: #e6e9e7;
+  --ink-2: #aeb6b6;
+  --ink-3: #8b9494;
+  --accent: #c9a35c;
+  --accent-2: #7fa7b3;
+  --accent-3: #b08b45;
+  --grad: linear-gradient(96deg, #c9a35c 0%, #8a6a2c 55%, #7fa7b3 100%);
+  --glow: 0 0 0 1px rgba(201, 163, 92, .45), 0 8px 22px rgba(201, 163, 92, .14);
+  --accent-pink: #c9a35c;
+  --accent-violet: #7fa7b3;
+  --wash: radial-gradient(70% 60% at 50% -5%, rgba(201, 163, 92, .07), transparent 65%);
 }
-.grove-root[data-grove-theme="family"] {
-  --bg: #faf6f1;
-  --panel: #fffdfa;
-  --panel-2: #f4ece2;
+
+/* — journal: a personal notebook — warm, short measure, soft frame — */
+.grove-root[data-grove-theme="journal"] {
+  --bg: #faf5ec;
+  --panel: #fffdf8;
+  --panel-2: #f3ebdd;
   --line: rgba(120, 90, 60, .16);
   --line-2: rgba(120, 90, 60, .28);
-  --ink: #3b342c;
-  --ink-2: #6b5f51;
-  --ink-3: #a89c8c;
-  --accent: #c8744f;
-  --accent-2: #9a8f5e;
-  --accent-3: #d9a06a;
-  --grad: linear-gradient(96deg, #f3cf9a 0%, #e09a6a 50%, #c8744f 100%);
-  --glow: 0 0 0 1px rgba(200, 116, 79, .4), 0 10px 26px rgba(200, 116, 79, .2);
-  --accent-pink: #c8744f;
-  --accent-violet: #9a8f5e;
+  --ink: #3a322a;
+  --ink-2: #6f6355;
+  --ink-3: #93866f;
+  --accent: #a25a3c;
+  --accent-2: #7d6b3f;
+  --accent-3: #c08552;
+  --grad: linear-gradient(96deg, #e8c9a0 0%, #c08552 50%, #a25a3c 100%);
+  --glow: 0 0 0 1px rgba(162, 90, 60, .38), 0 10px 26px rgba(162, 90, 60, .16);
+  --accent-pink: #a25a3c;
+  --accent-violet: #7d6b3f;
+  --sans: "Lora", Georgia, serif;
   --disp-weight: 700;
-  --prose-measure: 64ch;
-  --radius-shape: 20px;
-  --wash: radial-gradient(60% 50% at 82% -2%, rgba(224, 154, 106, .14), transparent 60%);
+  --prose-measure: 60ch;
+  --prose-leading: 1.72;
+  --radius-shape: 18px;
+  --wash: radial-gradient(60% 50% at 82% -2%, rgba(192, 133, 82, .13), transparent 60%);
 }
-.grove-root[data-grove-theme="family"][data-theme="dark"] {
-  --bg: #241d16;
-  --panel: #2d251c;
-  --panel-2: #372c21;
-  --line: rgba(224, 154, 106, .16);
-  --line-2: rgba(224, 154, 106, .3);
-  --ink: #f2e9de;
-  --ink-2: #c9b8a5;
-  --ink-3: #a2937f;
-  --accent: #e09a6a;
-  --accent-2: #c8a06a;
-  --accent-3: #d9b98a;
-  --grad: linear-gradient(96deg, #f3cf9a 0%, #e09a6a 50%, #c8744f 100%);
-  --glow: 0 0 0 1px rgba(224, 154, 106, .4), 0 10px 26px rgba(224, 154, 106, .2);
-  --accent-pink: #e09a6a;
-  --accent-violet: #c8a06a;
-  --disp-weight: 700;
-  --prose-measure: 64ch;
-  --radius-shape: 20px;
-  --wash: radial-gradient(60% 50% at 82% -2%, rgba(224, 154, 106, .1), transparent 60%);
+.grove-root[data-grove-theme="journal"][data-theme="dark"] {
+  --bg: #191410;
+  --panel: #201a15;
+  --panel-2: #2a221b;
+  --line: rgba(226, 200, 170, .14);
+  --line-2: rgba(226, 200, 170, .25);
+  --ink: #ede4d6;
+  --ink-2: #bdaa94;
+  --ink-3: #97876f;
+  --accent: #d2956b;
+  --accent-2: #a8935c;
+  --accent-3: #c08552;
+  --grad: linear-gradient(96deg, #d9b285 0%, #d2956b 50%, #a8935c 100%);
+  --glow: 0 0 0 1px rgba(210, 149, 107, .4), 0 10px 26px rgba(210, 149, 107, .13);
+  --accent-pink: #d2956b;
+  --accent-violet: #a8935c;
+  --wash: radial-gradient(60% 50% at 82% -2%, rgba(210, 149, 107, .1), transparent 60%);
 }
-.grove-root[data-grove-theme="lotr"] {
-  --bg: #ece2cc;
-  --panel: #f4ebd6;
-  --panel-2: #e4d8ba;
-  --line: rgba(90, 70, 40, .22);
-  --line-2: rgba(90, 70, 40, .36);
-  --ink: #322712;
-  --ink-2: #6a5c40;
-  --ink-3: #998a68;
-  --accent: #7a5a2a;
-  --accent-2: #4a5a38;
-  --accent-3: #9a7a3a;
-  --grad: linear-gradient(96deg, #b89a56 0%, #8a6a36 50%, #4a5a38 100%);
-  --glow: 0 0 0 1px rgba(122, 90, 42, .4), 0 8px 20px rgba(122, 90, 42, .22);
-  --accent-pink: #7a5a2a;
-  --accent-violet: #4a5a38;
-  --disp-weight: 700;
-  --prose-measure: 72ch;
-  --radius-shape: 4px;
-  --wash: radial-gradient(70% 60% at 50% -5%, rgba(122, 90, 42, .1), transparent 65%);
+
+/* — editorial: loud on purpose — a zine, a gig listing, a release archive — */
+.grove-root[data-grove-theme="editorial"] {
+  --bg: #0d0d0f;
+  --panel: #141417;
+  --panel-2: #1b1b20;
+  --line: rgba(255, 214, 79, .18);
+  --line-2: rgba(255, 214, 79, .34);
+  --ink: #f4f1e6;
+  --ink-2: #c9c4b2;
+  --ink-3: #948f7d;
+  --accent: #ffd64f;
+  --accent-2: #ff4d2e;
+  --accent-3: #37d4a8;
+  --grad: linear-gradient(96deg, #ffd64f 0%, #ff4d2e 55%, #37d4a8 100%);
+  --glow: 0 0 0 1px rgba(255, 214, 79, .7), 0 0 34px rgba(255, 77, 46, .35);
+  --accent-pink: #ff4d2e;
+  --accent-violet: #37d4a8;
+  --disp-weight: 900;
+  --prose-measure: 68ch;
+  --prose-leading: 1.58;
+  --radius-shape: 0px;
+  --wash: radial-gradient(75% 55% at 88% -5%, rgba(255, 77, 46, .16), transparent 60%), radial-gradient(50% 40% at 2% 0%, rgba(55, 212, 168, .12), transparent 55%);
 }
-.grove-root[data-grove-theme="lotr"][data-theme="dark"] {
-  --bg: #1d1810;
-  --panel: #262014;
-  --panel-2: #302818;
-  --line: rgba(184, 154, 86, .18);
-  --line-2: rgba(184, 154, 86, .32);
-  --ink: #ede2c8;
-  --ink-2: #c4b48e;
-  --ink-3: #9a8a6c;
-  --accent: #c9a45c;
-  --accent-2: #8aa468;
-  --accent-3: #b08a48;
-  --grad: linear-gradient(96deg, #b89a56 0%, #8a6a36 50%, #4a5a38 100%);
-  --glow: 0 0 0 1px rgba(201, 164, 92, .4), 0 8px 20px rgba(201, 164, 92, .22);
-  --accent-pink: #c9a45c;
-  --accent-violet: #8aa468;
-  --disp-weight: 700;
-  --prose-measure: 72ch;
-  --radius-shape: 4px;
-  --wash: radial-gradient(70% 60% at 50% -5%, rgba(201, 164, 92, .08), transparent 65%);
+.grove-root[data-grove-theme="editorial"][data-theme="light"] {
+  --bg: #fbfaf6;
+  --panel: #ffffff;
+  --panel-2: #f1efe6;
+  --line: rgba(20, 20, 25, .2);
+  --line-2: rgba(20, 20, 25, .38);
+  --ink: #17171b;
+  --ink-2: #4c4c55;
+  --ink-3: #71717b;
+  --accent: #c23500;
+  --accent-2: #0f7a5f;
+  --accent-3: #8a6d00;
+  --grad: linear-gradient(96deg, #8a6d00 0%, #c23500 55%, #0f7a5f 100%);
+  --glow: 0 0 0 1px rgba(194, 53, 0, .55), 0 10px 24px rgba(194, 53, 0, .18);
+  --accent-pink: #c23500;
+  --accent-violet: #0f7a5f;
+  --wash: radial-gradient(75% 55% at 88% -5%, rgba(194, 53, 0, .08), transparent 60%);
 }
 
 /* ============ SHELL ============ */
@@ -681,7 +687,9 @@
 /* prose */
 .grove-prose {
   max-width: var(--prose-measure);
-  font: var(--body, 400 16px/1.5 var(--sans));
+  /* R3-310: the leading is a THEME token (the contract's gap-3 addition) — a dense
+     reference look and a roomy notebook differ here without selector changes. */
+  font: 400 16px/var(--prose-leading, 1.6) var(--sans);
   color: var(--ink);
   font-size: 16.5px;
   line-height: 1.62;
