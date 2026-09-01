@@ -2622,6 +2622,48 @@ a.gdl-row {
   margin: 0;
   max-width: 100%;
 }
+/* —— the hero root starter's landing band (R3-309 bucket A) ——
+   Full-bleed over TOP navigation: the band sits under .grove-nav (the base,
+   top arrangement of .grove-shell) and spans the viewport, with the prose
+   centred on the measure. No image element — the picture slot is the
+   link-graph lattice / gradient until `cover:` lands (R3-313), so the band
+   composes from tokens only, exactly like every other starter surface. */
+.grove-hero {
+  grid-column: 1 / -1;
+  min-height: clamp(300px, 52vh, 480px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 48px clamp(20px, 6vw, 96px) 56px;
+  background-image: var(--grad), var(--wash);
+  background-blend-mode: soft-light;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid var(--line-2);
+}
+.grove-hero__eyebrow {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.grove-hero h1 {
+  margin: 0;
+  max-width: 18ch;
+  font-family: var(--disp);
+  font-weight: var(--disp-weight);
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.05;
+}
+.grove-hero__lede {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--ink-2);
+  font-size: 17px;
+}
 .grove-section__hero {
   margin-bottom: 30px;
   padding-bottom: 22px;

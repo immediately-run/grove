@@ -20,6 +20,35 @@ function layoutKeyForDir(dir: string): string {
   return dir + '_layout.mdx';
 }
 
+/**
+ * R3-309 — which nav arrangement the ROOT layout asks for. The root `_layout.mdx`'s
+ * frontmatter may carry `nav: top | nav: side`; anything else (absent, misspelled,
+ * another shape) falls back to `'side'`, the arrangement Grove has always shipped —
+ * an undeclared value must never render an unstyled page. The top arrangement is the
+ * base `.grove-shell` CSS; `side` is the variant, so both polarities of this choice
+ * have rules on the other side of the attribute.
+ */
+export function resolveNavMode(
+  rootLayoutMeta: Record<string, unknown> | undefined,
+): 'top' | 'side' {
+  return rootLayoutMeta?.nav === 'top' ? 'top' : 'side';
+}
+
+/**
+ * R3-309 — which page variant (bucket B) an entry selects. `layout: doc | post |
+ * full` in the entry's frontmatter; anything else — absent, misspelled, a future
+ * value the CSS does not implement — falls back to `'doc'`, the reference look,
+ * rather than rendering an unstyled page. The declared set is exactly what
+ * `GroveApp.css` carries `[data-layout]` rules for; the consistency test pins the
+ * two together.
+ */
+export function resolvePageLayout(
+  entryMeta: Record<string, unknown> | undefined,
+): 'doc' | 'post' | 'full' {
+  const v = entryMeta?.layout;
+  return v === 'post' || v === 'full' ? v : 'doc';
+}
+
 /** Does an entry/layout opt out of an inherited layout chain? `frame: none`
  *  (or `frame: false`) means "render me bare / stop inheritance above here". */
 function optsOut(meta: Record<string, unknown> | undefined): boolean {

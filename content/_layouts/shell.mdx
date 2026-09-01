@@ -1,0 +1,14 @@
+---
+layoutRole: root
+nav: side
+description: The site shell starter — copy to your content root as _layout.mdx; it wraps every entry at Outlet. nav: side above selects nav-over-sidebar (the shipped look); flip to nav: top and delete the GroveSidebar line for the top-nav arrangement. Delete every _layout.mdx and the engine renders the same shell — a starter is a convenience, never a requirement.
+---
+
+<GroveNav />
+<GroveSidebar />
+
+<main className="grove-content">
+  <Outlet />
+</main>
+
+<GroveFooter />

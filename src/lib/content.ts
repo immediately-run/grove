@@ -55,6 +55,13 @@ export function isContentEntry(key: string): boolean {
   // counts as an entry in one and not the other is a page that exists but cannot be
   // found — or an index row pointing at a layout wrapper.
   if (!key.startsWith(contentDir())) return false;
+  // R3-309 — underscore-prefixed DIRECTORIES are copy-source, not pages. The canon's
+  // entry rule excludes only the exact `_layout.mdx` filename; `content/_layouts/` (the
+  // layout starters) would otherwise be routable, searchable, indexed pages rendered
+  // mid-catalogue. This is GROVE's rooting-layer policy on top of the canon, not a
+  // second entry rule: the docs corpus has no `_`-directories, so the canon never
+  // needed the rule and grove's starters do.
+  if (/(?:^|\/)_[^/]+\//.test(key.slice(contentDir().length))) return false;
   return isContentEntryPath(key);
 }
 

@@ -25,7 +25,7 @@ import {
 import { queryPaths, queryRecords, readingTime, stripFrontmatter } from './lib/wiki';
 import { navQuery } from './lib/queries';
 import type { NavRecord } from './lib/queries';
-import { layoutChainForKey } from './lib/layout';
+import { layoutChainForKey, resolveNavMode, resolvePageLayout } from './lib/layout';
 import { folderIndexKey } from './lib/directory';
 import { resolvePalette, resolvePolarity, type Polarity } from './lib/themeSelection';
 import { preferredPolarity } from './data/themes';
@@ -235,8 +235,7 @@ export default function GroveWiki({
   const includePath = keyToInclude(entryKey);
   const meta = useFileMetadata(entryKey) as any;
 
-  const layout: string = meta?.layout || 'doc';
-  const navMode: 'top' | 'side' = 'side';
+  const layout = resolvePageLayout(meta);
   const siteTitle: string = meta?.site || homeMeta?.site || 'Grove';
   // Interpreter mode (TRUST_MODES §5 / R3-213): render this entry's body through the
   // non-executable safe renderer instead of the compiled `<Include>` path.
@@ -265,6 +264,12 @@ export default function GroveWiki({
   const allMeta = useAllMetadata() as Record<string, Record<string, unknown>>;
   const chain: string[] = layoutChainForKey(entryKey, allMeta);
   const frameNone = meta?.frame === 'none' || meta?.frame === false;
+
+  // R3-309 — the nav arrangement is the ROOT layout's to choose (`nav: top` in the
+  // outermost _layout.mdx's frontmatter; the default shell and the starters read the
+  // same value through the shell). Undeclared or unknown → 'side', the arrangement
+  // Grove has always shipped — never an unstyled page.
+  const navMode = resolveNavMode(chain.length ? (allMeta[chain[0]!] as Record<string, unknown>) : undefined);
   const useDefault = chain.length === 0 && !frameNone;
 
   // Reading time: read the entry body once per entry.
