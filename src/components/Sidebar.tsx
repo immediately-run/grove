@@ -5,7 +5,7 @@ import type { Metadata } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { contentDir, keyToHref, sandboxPathToKey } from '../lib/content';
 import { sidebarQuery } from '../lib/queries';
-import { plainProse } from '@immediately-run/mdx-plugins';
+import { plainLabel } from '../lib/queries';
 import InlineProse from './InlineProse';
 import type { SidebarRecord } from '../lib/queries';
 import Icon from './Icon';
@@ -87,8 +87,7 @@ export default function Sidebar() {
     const secs: { key: string; label: string }[] = [];
     rows.forEach(({ path, title, tags, nav }) => {
       insert(root, path, title);
-      if (tags.includes('ui/sidebar'))
-        secs.push({ key: path, label: plainProse(nav || title || path).replace(/\.$/, '') });
+      if (tags.includes('ui/sidebar')) secs.push({ key: path, label: plainLabel(nav || title || path) });
     });
     return { tree: root, sections: secs };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,7 +107,7 @@ export default function Sidebar() {
       </div>
       {sections.map((s) => (
         <div className="gs-block" key={s.key}>
-          <div className="gs-block__h">{s.label.replace(/\.$/, '')}</div>
+          <div className="gs-block__h">{s.label}</div>
           <div className="gs-section__body">
             <Link href={keyToHref(s.key)} className="grove-wikilink" data-state="ok">
               Open

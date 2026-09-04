@@ -25,9 +25,38 @@ export function navQuery(fm: Record<string, any>): NavRecord[] {
   return Object.keys(fm)
     .filter((p) => isContentEntry(p) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
     .sort((a, b) => (fm[a].order ?? 999) - (fm[b].order ?? 999))
-    // A label is an attribute/prompt string, not styled prose — the plain form
-    // (R3-531): markers dropped, content kept, then the period trimmed.
-    .map((p) => ({ path: p, label: plainProse(fm[p]?.nav || fm[p]?.title || '').replace(/\.$/, '') }));
+    .map((p) => ({ path: p, label: plainLabel(fm[p]?.nav || fm[p]?.title || '') }));
+}
+
+/** A field bound for an attribute, a label, a prompt or an index — the plain
+ *  form (R3-531): markers dropped, content kept, then the period trimmed. */
+export function plainLabel(s: string): string {
+  return plainProse(s).replace(/\.$/, '');
+}
+
+/** One searchable entry: the RAW title (the palette renders it as inline prose)
+ *  beside the plain form the matcher reads. */
+export type SearchEntry = {
+  key: string;
+  title: string;
+  plain: string;
+  desc: string;
+};
+
+/** The ⌘K index over search records — pure, so the plain/raw split is testable. */
+export function toSearchEntries(rows: { path: string; title: string; desc: string }[]): SearchEntry[] {
+  return rows.map(({ path, title, desc }) => ({
+    key: path,
+    title: title || path,
+    plain: plainLabel(title || path),
+    desc: plainProse(desc || ''),
+  }));
+}
+
+/** Match an entry against a lowercased query on its PLAIN forms — matching the
+ *  raw markdown would miss queries typed over what the reader actually sees. */
+export function matchesQuery(e: SearchEntry, ql: string): boolean {
+  return e.plain.toLowerCase().includes(ql) || e.desc.toLowerCase().includes(ql) || e.key.toLowerCase().includes(ql);
 }
 
 /** One search index row. `tags` excludes the `ui/*` furniture namespace. */
