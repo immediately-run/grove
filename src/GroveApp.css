@@ -1522,6 +1522,32 @@ a.gdl-row {
   letter-spacing: -.01em;
   color: var(--ink);
 }
+
+/* R3-531 — code spans inside frontmatter prose fields (titles, rows, cards,
+   search hits, entry header). No bare `code` rule reaches these surfaces, so
+   one grouped rule carries the prose-code treatment; the font-size is em-
+   relative so the host's size (an 18px row title, a 52px h1) sets the scale
+   and no line height breaks. */
+.grove-entry-header h1 code,
+.gdl-row__t code,
+.gdl-row__d code,
+.gdl-card__t code,
+.gdl-card__d code,
+.gtl-title code,
+.gtl-desc code,
+.grove-bl__t code,
+.grove-search__row .t code,
+.rm-card__t code,
+.rm-project__t code,
+.rm-project__d code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  color: var(--accent-3);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 1px 6px;
+}
 .gdl-row__d {
   font-size: 14px;
   color: var(--ink-2);

@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { isContentEntry, keyToHref } from '../lib/content';
+import InlineProse from './InlineProse';
 import { queryPaths } from '../lib/wiki';
 import EntryImage from './EntryImage';
 
@@ -16,8 +17,8 @@ function Row({ path }: { path: string }) {
       <div className="gtl-node" />
       <div className="gtl-card">
         <EntryImage entryPath={path} src={m.cover} alt="" className="gtl-cover" degrade={null} />
-        <div className="gtl-title">{(m.title || path).replace(/\.$/, '')}</div>
-        {m.description && <div className="gtl-desc">{m.description}</div>}
+        <div className="gtl-title"><InlineProse text={m.title || path} trimPeriod /></div>
+        {m.description && <div className="gtl-desc"><InlineProse text={m.description} /></div>}
         {tags.length ? (
           <div className="gtl-tags">
             {tags.slice(0, 3).map((t) => (

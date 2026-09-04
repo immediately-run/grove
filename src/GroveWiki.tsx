@@ -23,6 +23,7 @@ import {
   sandboxPathToKey,
 } from './lib/content';
 import { queryPaths, queryRecords, readingTime, stripFrontmatter } from './lib/wiki';
+import { plainProse } from '@immediately-run/mdx-plugins';
 import { navQuery } from './lib/queries';
 import type { NavRecord } from './lib/queries';
 import { layoutChainForKey, resolveNavMode, resolvePageLayout } from './lib/layout';
@@ -470,7 +471,7 @@ export default function GroveWiki({
             onClose={() => setDrawerOpen(false)}
           />
         ) : null}
-        <GroveAgent writable={writable} entryKey={entryKey} entryTitle={(meta?.title || 'this entry').replace(/\.$/, '')} />
+        <GroveAgent writable={writable} entryKey={entryKey} entryTitle={plainProse(meta?.title || 'this entry').replace(/\.$/, '')} />
       </div>
     </GroveShellContext.Provider>
     </CorpusContext>

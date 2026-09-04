@@ -11,6 +11,7 @@
 // Every record field is derived data; `path`/`meta` are applied by the hook.
 
 import { isContentEntry } from './content';
+import { plainProse } from '@immediately-run/mdx-plugins';
 
 /** A nav item derived from `ui/nav` frontmatter. */
 export type NavRecord = {
@@ -24,7 +25,9 @@ export function navQuery(fm: Record<string, any>): NavRecord[] {
   return Object.keys(fm)
     .filter((p) => isContentEntry(p) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
     .sort((a, b) => (fm[a].order ?? 999) - (fm[b].order ?? 999))
-    .map((p) => ({ path: p, label: fm[p]?.nav || (fm[p]?.title || '').replace(/\.$/, '') }));
+    // A label is an attribute/prompt string, not styled prose — the plain form
+    // (R3-531): markers dropped, content kept, then the period trimmed.
+    .map((p) => ({ path: p, label: plainProse(fm[p]?.nav || fm[p]?.title || '').replace(/\.$/, '') }));
 }
 
 /** One search index row. `tags` excludes the `ui/*` furniture namespace. */

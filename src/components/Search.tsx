@@ -3,6 +3,8 @@ import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import type { Metadata } from '@immediately-run/sdk';
 import { keyToHref } from '../lib/content';
 import { crumb } from '../lib/wiki';
+import { plainProse } from '@immediately-run/mdx-plugins';
+import InlineProse from './InlineProse';
 import { searchQuery } from '../lib/queries';
 import type { SearchRecord } from '../lib/queries';
 import Icon from './Icon';
@@ -28,12 +30,16 @@ export default function Search({ onClose }: { onClose: () => void }) {
 
   const rowsKey = rows.map((r) => r.path).join('|');
   const { entries, tags } = useMemo(() => {
-    const es = rows.map(({ path, title, desc, tags: entryTags }) => ({
-      key: path,
-      title: (title || path).replace(/\.$/, ''),
-      desc: desc || '',
-      tags: entryTags.join(','),
-    }));
+    const es = rows.map(({ path, title, desc, tags: entryTags }) => {
+      const t = title || path;
+      return {
+        key: path,
+        title: t, // raw — the hit row renders it through <InlineProse>
+        plain: plainProse(t).replace(/\.$/, ''), // the index the matcher reads
+        desc: plainProse(desc || ''),
+        tags: entryTags.join(','),
+      };
+    });
     const tagSet = new Set<string>();
     es.forEach((e) => e.tags.split(',').filter(Boolean).forEach((t) => tagSet.add(t)));
     return { entries: es, tags: Array.from(tagSet).sort() };
@@ -43,7 +49,7 @@ export default function Search({ onClose }: { onClose: () => void }) {
   const ql = query.trim().toLowerCase();
   const matchedEntries: Hit[] = (ql
     ? entries.filter(
-        (e) => e.title.toLowerCase().includes(ql) || e.desc.toLowerCase().includes(ql) || e.key.toLowerCase().includes(ql)
+        (e) => e.plain.toLowerCase().includes(ql) || e.desc.toLowerCase().includes(ql) || e.key.toLowerCase().includes(ql)
       )
     : entries.slice(0, 6)
   ).map((e) => ({ key: e.key, title: e.title, ns: crumb(e.key) }));
@@ -102,7 +108,9 @@ export default function Search({ onClose }: { onClose: () => void }) {
                   onClick={onClose}
                 >
                   <Icon name="file" />
-                  <span className="t">{h.title}</span>
+                  <span className="t">
+                    <InlineProse text={h.title} trimPeriod />
+                  </span>
                   <span className="c">/{h.ns}</span>
                 </Link>
               ))}

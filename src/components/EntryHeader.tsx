@@ -3,6 +3,7 @@ import { useFileMetadata } from '@immediately-run/sdk';
 import { useShell } from '../lib/shell';
 import { crumb } from '../lib/wiki';
 import Icon from './Icon';
+import InlineProse from './InlineProse';
 
 // The entry's header block: breadcrumb, title (optional gradient), meta row
 // (date · reading time · tags) and the unobtrusive edit affordance. Rendered by
@@ -24,7 +25,10 @@ export default function EntryHeader({
   return (
     <header className="grove-entry-header">
       {cr.includes('/') ? <nav className="crumb">{cr}</nav> : null}
-      <h1 className={meta.grad ? 'grad' : ''}>{meta.title || cr}</h1>
+      <h1 className={meta.grad ? 'grad' : ''}>
+        {/* R3-531 — the title is frontmatter prose: code spans render as code. */}
+        <InlineProse text={meta.title || cr} />
+      </h1>
       <div className="grove-meta">
         {meta.date && <span>{meta.date}</span>}
         {mins ? <span>→ {mins} min read</span> : null}

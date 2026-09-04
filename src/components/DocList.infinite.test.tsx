@@ -20,9 +20,13 @@ const N = 142;
 const METADATA: Record<string, Record<string, unknown>> = {};
 for (let i = 1; i <= N; i++) {
   const day = String((i % 28) + 1).padStart(2, '0');
+  // Entry 1 carries a frontmatter code span in title AND description (R3-531):
+  // the field is markdown, and the row must render it as such.
+  const title = i === 1 ? 'Entry 1 — `cache.yml` edition.' : `Entry ${i}.`;
+  const description = i === 1 ? 'The 1st fixture entry, with a `code` span.' : `The ${i}th fixture entry.`;
   METADATA[`/app/content/log/entry-${String(i).padStart(3, '0')}.mdx`] = {
-    title: `Entry ${i}.`,
-    description: `The ${i}th fixture entry.`,
+    title,
+    description,
     date: `2026-01-${day}`,
   };
 }
@@ -149,6 +153,14 @@ describe('the windowed feed (R3-314)', () => {
     expect(rowsOf(host)).toHaveLength(N);
     expect(host.querySelector('.gdl-sentinel')).toBeNull();
     expect(host.querySelector('.gdl-end')).toBeNull(); // nothing was windowed
+  });
+
+  it('a frontmatter code span renders as <code>, never as a literal backtick (R3-531)', async () => {
+    // sort:'title' puts entry 1 — the code-span carrier — in the first batch.
+    const { host } = await mount({ sort: 'title' });
+    expect(host.querySelector('.gdl-row__t code')?.textContent).toBe('cache.yml');
+    expect(host.querySelector('.gdl-row__d code')?.textContent).toBe('code');
+    expect(host.textContent).not.toContain('`');
   });
 
   it('limit still caps the query — a pinned list is never windowed past its pin', async () => {
