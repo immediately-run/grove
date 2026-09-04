@@ -5,6 +5,7 @@ import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { isContentEntry, keyToFsPath, keyToHref, sandboxPathToKey } from '../lib/content';
 import { backlinkSnippet, bodyLinksTo, crumb, queryPaths } from '../lib/wiki';
+import InlineProse from './InlineProse';
 
 interface Hit {
   key: string;
@@ -14,11 +15,10 @@ interface Hit {
 // One linking entry: title + namespace crumb + the snippet around the link.
 function Row({ hit }: { hit: Hit }) {
   const meta = useFileMetadata(hit.key) as any;
-  const title = (meta?.title || crumb(hit.key)).replace(/\.$/, '');
   return (
     <Link href={keyToHref(hit.key)} className="grove-bl">
       <div className="grove-bl__t">
-        {title}
+        <InlineProse text={meta?.title || crumb(hit.key)} trimPeriod />
         <span className="crumb">/{crumb(hit.key)}</span>
       </div>
       <div className="grove-bl__snip" dangerouslySetInnerHTML={{ __html: hit.snippet }} />

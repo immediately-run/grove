@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { familyTreeQuery, navQuery, searchQuery, sidebarQuery } from './queries';
+import {
+  familyTreeQuery,
+  matchesQuery,
+  navQuery,
+  searchQuery,
+  sidebarQuery,
+  toSearchEntries,
+} from './queries';
 
 // The metadata queries select records (R3-276a). These tests pin the selections
 // themselves; the components are thin wiring around them. The store shape is the
@@ -26,8 +33,33 @@ describe('navQuery', () => {
     expect(navQuery({ '/app/content/a.mdx': { title: 'A.', tags: ['ui/nav'] } })[0].label).toBe('A');
   });
 
+  it('a label is the PLAIN form — frontmatter markers dropped, content kept (R3-531)', () => {
+    const rows = navQuery({ '/app/content/a.mdx': { title: 'Run `x` now.', tags: ['ui/nav'] } });
+    expect(rows[0]!.label).toBe('Run x now');
+    // An explicit `nav` is author intent and passes through the plain form too —
+    // a stray marker there gets the same treatment one level down.
+    expect(navQuery({ '/app/content/b.mdx': { title: 'T', nav: 'The **big** door', tags: ['ui/nav'] } })[0].label).toBe('The big door');
+  });
+
   it('never tab-encodes (the R3-276a regression: fake paths are gone)', () => {
     for (const r of navQuery(fm)) expect(JSON.stringify(r)).not.toContain('\t');
+  });
+});
+
+describe('the ⌘K index and matcher (R3-531)', () => {
+  it('toSearchEntries keeps the RAW title for rendering beside the plain form for matching', () => {
+    const [e] = toSearchEntries([{ path: '/app/content/a.mdx', title: 'A `cache.yml` entry.', desc: 'About **keys**.' }]);
+    expect(e.title).toBe('A `cache.yml` entry.');
+    expect(e.plain).toBe('A cache.yml entry');
+    expect(e.desc).toBe('About keys.');
+  });
+
+  it('matchesQuery reads the plain forms — a query typed over what the reader sees hits', () => {
+    const [e] = toSearchEntries([{ path: '/app/content/a.mdx', title: 'A `cache.yml` entry.', desc: '' }]);
+    expect(matchesQuery(e, 'cache.yml')).toBe(true);
+    expect(matchesQuery(e, '`cache`')).toBe(false); // the raw markers are not searchable text
+    expect(matchesQuery(e, 'entry')).toBe(true);
+    expect(matchesQuery(e, 'zzz')).toBe(false);
   });
 });
 

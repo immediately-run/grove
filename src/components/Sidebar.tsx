@@ -5,6 +5,8 @@ import type { Metadata } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { contentDir, keyToHref, sandboxPathToKey } from '../lib/content';
 import { sidebarQuery } from '../lib/queries';
+import { plainLabel } from '../lib/queries';
+import InlineProse from './InlineProse';
 import type { SidebarRecord } from '../lib/queries';
 import Icon from './Icon';
 
@@ -46,7 +48,7 @@ function Branch({ node, currentKey, depth }: { node: TreeNode; currentKey: strin
     return (
       <Link href={keyToHref(node.key!)} className="gs-tree__row" data-cur={node.key === currentKey ? '1' : '0'}>
         <Icon name="file" />
-        {(node.title || node.name).replace(/\.$/, '')}
+        <InlineProse text={node.title || node.name} trimPeriod />
       </Link>
     );
   }
@@ -85,7 +87,7 @@ export default function Sidebar() {
     const secs: { key: string; label: string }[] = [];
     rows.forEach(({ path, title, tags, nav }) => {
       insert(root, path, title);
-      if (tags.includes('ui/sidebar')) secs.push({ key: path, label: nav || title || path });
+      if (tags.includes('ui/sidebar')) secs.push({ key: path, label: plainLabel(nav || title || path) });
     });
     return { tree: root, sections: secs };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,7 +107,7 @@ export default function Sidebar() {
       </div>
       {sections.map((s) => (
         <div className="gs-block" key={s.key}>
-          <div className="gs-block__h">{s.label.replace(/\.$/, '')}</div>
+          <div className="gs-block__h">{s.label}</div>
           <div className="gs-section__body">
             <Link href={keyToHref(s.key)} className="grove-wikilink" data-state="ok">
               Open

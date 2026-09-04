@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useFileMetadata, useMetadataQuery } from '@immediately-run/sdk';
 import { isContentEntry, keyToHref, slugToKey } from '../lib/content';
+import InlineProse from './InlineProse';
 import { queryPaths } from '../lib/wiki';
 import EntryImage from './EntryImage';
 
@@ -32,8 +33,8 @@ function Row({ path }: { path: string }) {
   return (
     <Link href={keyToHref(path)} className="gdl-row">
       <div>
-        <div className="gdl-row__t">{(meta.title || path).replace(/\.$/, '')}</div>
-        {meta.description && <div className="gdl-row__d">{meta.description}</div>}
+        <div className="gdl-row__t"><InlineProse text={meta.title || path} trimPeriod /></div>
+        {meta.description && <div className="gdl-row__d"><InlineProse text={meta.description} /></div>}
         <div className="gdl-row__tags">
           {tagsOf(meta).slice(0, 3).map((t) => (
             <span key={t} className="grove-tag">#{t}</span>
@@ -58,8 +59,8 @@ function CardTile({ path }: { path: string }) {
         <EntryImage entryPath={path} src={meta.cover} alt="" className="gdl-card__cover" degrade={<span className="gdl-card__lattice" />} />
       </div>
       <div className="gdl-card__foot">
-        <div className="gdl-card__t">{(meta.title || path).replace(/\.$/, '')}</div>
-        {meta.description && <div className="gdl-card__d">{meta.description}</div>}
+        <div className="gdl-card__t"><InlineProse text={meta.title || path} trimPeriod /></div>
+        {meta.description && <div className="gdl-card__d"><InlineProse text={meta.description} /></div>}
         <div className="gdl-card__tags">
           {tagsOf(meta).slice(0, 3).map((t) => (
             <span key={t} className="grove-tag">#{t}</span>

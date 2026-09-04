@@ -39,7 +39,7 @@
     "check:llms": "node scripts/gen-llms.mjs --check"
   },
   "dependencies": {
-    "@immediately-run/mdx-plugins": "0.4.0",
+    "@immediately-run/mdx-plugins": "0.6.0",
     "@immediately-run/sdk": "^0.58.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
@@ -61,7 +61,7 @@
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.9",
     "vitest": "^4.1.9",
-    "@immediately-run/mdx-plugins": "0.4.0"
+    "@immediately-run/mdx-plugins": "0.6.0"
   },
   "description": "The Grove viewer: a kit of React components, layouts and themes for building immediately.run wikis. Composable as a fork, a dispatch target, or a pinned library.",
   "license": "Apache-2.0",
