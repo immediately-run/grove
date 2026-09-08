@@ -30,6 +30,7 @@ import { folderIndexKey } from './lib/directory';
 import { resolvePalette, resolvePolarity, type Polarity } from './lib/themeSelection';
 import { preferredPolarity } from './data/themes';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
+import { useScrollReset } from './hooks/useScrollReset';
 import { useEditAffordance } from './hooks/useEditAffordance';
 import { getContentRoot } from './lib/contentRoot';
 import type { RejectedComponent } from './lib/corpusComponents';
@@ -121,6 +122,7 @@ export default function GroveWiki({
 }) {
   const ctx = useContext(TinkerableContext) as any;
   const sandboxPath: string = ctx?.navigationState?.sandboxPath || '/';
+  const hash: string = ctx?.navigationState?.hash ?? '';
 
   // ── Theme selection (R3-308, 02-theme-contract §4) ─────────────────────────
   //
@@ -315,6 +317,10 @@ export default function GroveWiki({
   const navMode = resolveNavMode(chain.length ? (allMeta[chain[0]!] as Record<string, unknown>) : undefined);
   const useDefault = chain.length === 0 && !frameNone;
 
+  // Every navigation starts at the top of the entry, except one aimed at a section. The
+  // ref goes on `.device__scroll` below — the only thing on the page that scrolls.
+  const scrollRef = useScrollReset(entryKey, hash);
+
   // Reading time: read the entry body once per entry.
   useEffect(() => {
     let active = true;
@@ -438,7 +444,7 @@ export default function GroveWiki({
             outgoing set and re-mints. */}
         <ThemeAssets declarations={themeAssetsFor(theme)} />
         <ContentTheme sheets={contentSheets} onRejected={(path, v) => setRejectedSheet(`${path}:${v.line} — ${v.reason}`)} />
-        <div className="device__scroll">
+        <div className="device__scroll" ref={scrollRef}>
           {rejectedSheet ? (
             <div className="grove-decl-error" role="status">
               <strong>A stylesheet entry was rejected by the theme grammar.</strong>

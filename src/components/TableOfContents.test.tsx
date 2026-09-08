@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { createRoot } from 'react-dom/client';
+import type { ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import TableOfContents from './TableOfContents';
 
 // jsdom performs no layout, so every geometry property this component reads is 0. The
@@ -54,6 +55,25 @@ function layout(nav: HTMLElement, opts: { viewHeight?: number; scrollHeight?: nu
 
 const IDS = Array.from({ length: 40 }, (_, i) => `sec-${i + 1}`);
 
+// Every root this file mounts, so `afterEach` can tear them down. Clearing `document.body`
+// is not unmounting: `useHeadings` arms 120/300/600ms re-scan timers and only clears them
+// on unmount, so an abandoned root leaves a timer that fires after the file's jsdom
+// environment is gone — an unhandled `document is not defined` attributed to whichever
+// file happened to be running.
+const roots: Root[] = [];
+
+/** Mount `node` into a fresh host and remember the root for teardown. */
+async function renderInto(node: ReactNode): Promise<HTMLElement> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  roots.push(root);
+  await act(async () => {
+    root.render(node);
+  });
+  return host;
+}
+
 let scrollTo: ReturnType<typeof vi.fn>;
 let scrollIntoView: ReturnType<typeof vi.fn>;
 
@@ -66,17 +86,16 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = scrollIntoView as never;
 });
 afterEach(() => {
+  act(() => {
+    roots.splice(0).forEach((r) => r.unmount());
+  });
   document.body.innerHTML = '';
   vi.restoreAllMocks();
 });
 
 async function mount(): Promise<HTMLElement> {
   plantProse(IDS);
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  await act(async () => {
-    createRoot(host).render(<TableOfContents entryKey="/app/content/x.mdx" />);
-  });
+  const host = await renderInto(<TableOfContents entryKey="/app/content/x.mdx" />);
   return layout(host.querySelector('nav')!);
 }
 
@@ -112,11 +131,7 @@ describe('<TableOfContents/>', () => {
 
   it('does nothing when the whole list fits', async () => {
     plantProse(IDS);
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    await act(async () => {
-      createRoot(host).render(<TableOfContents entryKey="/app/content/x.mdx" />);
-    });
+    const host = await renderInto(<TableOfContents entryKey="/app/content/x.mdx" />);
     layout(host.querySelector('nav')!, { viewHeight: 1000, scrollHeight: 1000 });
     await spyTo('sec-30');
     expect(scrollTo).not.toHaveBeenCalled();
@@ -141,11 +156,7 @@ describe('<TableOfContents/>', () => {
   });
 
   it('renders nothing for an entry with no sub-headings', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    await act(async () => {
-      createRoot(host).render(<TableOfContents entryKey="/app/content/empty.mdx" />);
-    });
+    const host = await renderInto(<TableOfContents entryKey="/app/content/empty.mdx" />);
     expect(host.querySelector('nav')).toBeNull();
   });
 
