@@ -403,6 +403,9 @@
   color: var(--ink);
   border-color: var(--accent-2);
 }
+.icbtn:disabled {
+  opacity: .6;
+}
 .icbtn svg {
   width: 17px;
   height: 17px;
@@ -577,6 +580,13 @@
   color: var(--ink-2);
   transition: .12s;
   cursor: pointer;
+}
+button.gs-tree__row {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
 }
 .gs-tree__row:hover {
   background: var(--panel-2);
@@ -1755,6 +1765,9 @@ a.gdl-row {
 .btn-primary:hover {
   box-shadow: var(--glow);
 }
+.btn-primary:disabled {
+  opacity: .6;
+}
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -1863,6 +1876,14 @@ a.gdl-row {
   padding: 9px 11px;
   border-radius: var(--r-md);
   cursor: pointer;
+}
+button.grove-search__row {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 .grove-search__row:hover,
 .grove-search__row[data-sel="1"] {
@@ -2538,16 +2559,24 @@ a.gdl-row {
   font-size: 11.5px;
   color: var(--ink-3);
 }
-.ga-foot__hand a {
+.ga-foot__hand a,
+.ga-foot__hand button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
 }
-.ga-foot__hand a:hover {
+.ga-foot__hand a:hover,
+.ga-foot__hand button:hover {
   color: var(--accent);
 }
-.ga-foot__hand a svg {
+.ga-foot__hand a svg,
+.ga-foot__hand button svg {
   width: 12px;
   height: 12px;
 }

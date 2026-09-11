@@ -19,7 +19,7 @@ declare const module: any;
 // site chrome (nav / sidebar / footer) — that's the layout's job — so the page
 // stays free of shell concerns.
 export default function PageView() {
-  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, openEditor, vw, safe, directory } =
+  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, openEditor, editBusy, editHint, vw, safe, directory } =
     useShell();
 
   // A folder URL. `checking` renders nothing rather than the 404: the readdir that
@@ -39,7 +39,17 @@ export default function PageView() {
         </p>
         <div className="grove-state__actions">
           <Link className="btn-ghost" href="/"><Icon name="chevron-right" /> Back to home</Link>
-          {writable ? <button className="btn-primary" onClick={() => openEditor(entryKey)}><Icon name="file-plus" /> Create it</button> : null}
+          {writable ? (
+            <button
+              className="btn-primary"
+              data-busy={editBusy ? '1' : '0'}
+              title={editHint}
+              disabled={editBusy}
+              onClick={() => openEditor(entryKey)}
+            >
+              <Icon name="file-plus" /> {editBusy ? 'Opening editor…' : 'Create it'}
+            </button>
+          ) : null}
         </div>
       </div>
     );

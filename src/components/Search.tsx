@@ -109,15 +109,19 @@ export default function Search({ onClose }: { onClose: () => void }) {
               ))}
               {matchedTags.length ? <div className="grove-search__grp">Tags</div> : null}
               {matchedTags.map((t, i) => (
-                <div
+                <button
                   key={t}
+                  type="button"
                   className="grove-search__row"
                   data-sel={sel === matchedEntries.length + i ? '1' : '0'}
-                  onClick={onClose}
+                  onClick={() => {
+                    setQuery(t);
+                    setSel(0);
+                  }}
                 >
                   <Icon name="list" />
                   <span className="t">#{t}</span>
-                </div>
+                </button>
               ))}
             </>
           )}

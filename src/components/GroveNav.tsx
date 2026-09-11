@@ -14,6 +14,8 @@ export default function GroveNav() {
     entryKey,
     writable,
     openEditor,
+    editBusy,
+    editHint,
     theme,
     setTheme,
     light,
@@ -54,7 +56,14 @@ export default function GroveNav() {
           <Icon name="search" />
         </button>
         {writable && (
-          <button className="icbtn" aria-label="New entry" onClick={newEntry}>
+          <button
+            className="icbtn"
+            aria-label={editBusy ? 'Opening editor…' : 'New entry'}
+            title={editHint}
+            data-busy={editBusy ? '1' : '0'}
+            disabled={editBusy}
+            onClick={newEntry}
+          >
             <Icon name="plus" />
           </button>
         )}
