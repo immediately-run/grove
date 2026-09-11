@@ -79,7 +79,7 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
       );
     }
     return (
-      <span className="grove-wikilink" data-state="broken" title={`No entry at ${href}`}>
+      <span className="grove-wikilink" data-state="broken" title={`No entry at ${href}`} aria-label={`No entry at ${href}`}>
         <Icon name="unlink" />
         {children}
       </span>
@@ -97,7 +97,7 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
   const exists = !loaded || keys.includes(targetKey); // optimistic until loaded
   if (!exists) {
     return (
-      <span className="grove-wikilink" data-state="broken" title={`No entry at ${href}`}>
+      <span className="grove-wikilink" data-state="broken" title={`No entry at ${href}`} aria-label={`No entry at ${href}`}>
         <Icon name="unlink" />
         {children}
       </span>

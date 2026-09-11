@@ -28,7 +28,6 @@ const PATHS: Record<string, string> = {
   message: 'M21 11.5a8.5 8.5 0 01-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1121 11.5z',
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
-  stop: 'M6 6h12v12H6z',
 };
 
 interface IconProps extends SVGProps<SVGSVGElement> {

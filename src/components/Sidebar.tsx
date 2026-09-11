@@ -55,11 +55,17 @@ function Branch({ node, currentKey, depth }: { node: TreeNode; currentKey: strin
 
   return (
     <div>
-      <div className="gs-tree__row gs-folder" data-open={open ? '1' : '0'} onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className="gs-tree__row gs-folder"
+        data-open={open ? '1' : '0'}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
         <Icon name="chevron-down" className="chev" />
         {node.name}
         <span className="ct">{childKeys.length}</span>
-      </div>
+      </button>
       {open ? (
         <div className="gs-tree__children">
           {childKeys.map((k) => (

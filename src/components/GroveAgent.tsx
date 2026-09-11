@@ -302,16 +302,16 @@ export default function GroveAgent({
                     disabled={streaming || !canAsk}
                     onChange={(e) => setDraft(e.target.value)}
                   />
-                  <button className="go" type="submit" disabled={streaming || !canAsk || !draft.trim()} aria-label="Send">
-                    <Icon name={streaming ? 'stop' : 'send'} />
+                  <button className="go" type="submit" disabled={streaming || !canAsk || !draft.trim()} aria-label={streaming ? 'Answering…' : 'Send'} title={streaming ? 'Answering…' : 'Send'}>
+                    <Icon name="send" />
                   </button>
                 </form>
                 <div className="ga-foot__hand">
                   <span>{EGRESS_DISCLOSURE}</span>
-                  <a onClick={() => openEditor(entryKey)} role="button" tabIndex={0}>
+                  <button type="button" onClick={() => openEditor(entryKey)}>
                     <Icon name="external" />
-                    Open in the workbench
-                  </a>
+                    Open in the editor
+                  </button>
                 </div>
               </div>
             </div>
