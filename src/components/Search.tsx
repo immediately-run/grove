@@ -61,7 +61,8 @@ export default function Search({ onClose }: { onClose: () => void }) {
   }, []);
 
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') return onClose();
+    // Escape is owned by the overlay hook (document capture); only the list
+    // navigation lives here.
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSel((s) => Math.min(s + 1, Math.max(0, total - 1)));

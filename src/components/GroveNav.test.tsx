@@ -185,3 +185,45 @@ describe('the theme menu Tab contract (R3-608 round 2)', () => {
     expect(host.querySelector('.grove-theme-menu')).toBeNull(); // closed, not stranded
   });
 });
+
+describe('the theme menu Tab contract (R3-608 round 3)', () => {
+  it('Tab-close leaves focus where the browser moved it — never yanked back to the trigger', async () => {
+    let renderWith: (menuOpen: boolean) => Promise<void> = async () => undefined;
+    const shell = { menuOpen: false, theme: 'default', light: false, setMenuOpen: vi.fn() } as Parameters<typeof fullShell>[0];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    renderWith = (menuOpen: boolean) =>
+      act(async () => {
+        root.render(
+          <TinkerableContext.Provider value={NAV as never}>
+            <GroveShellContext.Provider value={fullShell({ ...shell, menuOpen })}>
+              <GroveNav />
+            </GroveShellContext.Provider>
+          </TinkerableContext.Provider>,
+        );
+      });
+    shell.setMenuOpen = vi.fn(((v: boolean) => {
+      if (v === false) void renderWith(false);
+    }) as GroveShell['setMenuOpen']);
+    await renderWith(true);
+    // The page's next tab stop AFTER the menu (the real contract's landing
+    // spot for a Tab-leave).
+    const after = document.createElement('button');
+    after.textContent = 'next stop';
+    host.appendChild(after);
+    const first = host.querySelector('[role="menuitemradio"]') as HTMLElement;
+    first.focus();
+    // Focus the next stop the way the browser's default Tab move would land.
+    await act(async () => {
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+      after.focus(); // the default move this key authorizes
+    });
+    expect(shell.setMenuOpen).toHaveBeenCalledWith(false);
+    expect(host.querySelector('.grove-theme-menu')).toBeNull();
+    // The move stands: focus is NOT pulled back to the theme trigger.
+    const themeButton = host.querySelector('.grove-theme-control') as HTMLButtonElement;
+    expect(document.activeElement).toBe(after);
+    expect(document.activeElement).not.toBe(themeButton);
+  });
+});

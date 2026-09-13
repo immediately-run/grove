@@ -51,6 +51,10 @@ export function useOverlayFocusDismiss(
       close: () => onCloseRef.current(),
     };
     stack.push(entry);
+    // Set when a MENU surface closes because Tab left it: the browser's own
+    // focus move must stand (APG Menu Button), so the cleanup below must NOT
+    // yank focus back to the trigger.
+    let closedViaTab = false;
     const root = rootRef.current;
     const focusables = root ? [...root.querySelectorAll<HTMLElement>(FOCUSABLE)] : [];
     // Focus IN: the first control; a panel with no focusable content takes
@@ -68,8 +72,13 @@ export function useOverlayFocusDismiss(
       }
       if (!trapTab && e.key === 'Tab') {
         // APG Menu: Tab is LEAVE — the focus move proceeds (no preventDefault)
-        // and the menu closes behind it, never stranded over a scrim.
-        if (isTop) onCloseRef.current();
+        // and the menu closes behind it, never stranded over a scrim. The
+        // flag keeps the cleanup from pulling focus back to the trigger: the
+        // move the browser just made is the contract.
+        if (isTop) {
+          closedViaTab = true;
+          onCloseRef.current();
+        }
         return;
       }
       if (!trapTab || e.key !== 'Tab' || !root) return;
@@ -98,8 +107,10 @@ export function useOverlayFocusDismiss(
       document.removeEventListener('keydown', onKeyDown, true);
       const i = stack.indexOf(entry);
       if (i >= 0) stack.splice(i, 1);
-      // Focus RETURNS to the trigger (R-IX-1). Guarded: it may be gone.
-      if (trigger && document.contains(trigger)) trigger.focus();
+      // Focus RETURNS to the trigger (R-IX-1) — unless the menu closed BECAUSE
+      // Tab left it: that move is the contract and stands. Guarded: the
+      // trigger may be gone.
+      if (!closedViaTab && trigger && document.contains(trigger)) trigger.focus();
     };
   }, [open, trapTab]);
 
