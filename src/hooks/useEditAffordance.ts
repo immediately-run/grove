@@ -21,7 +21,13 @@ export interface EditAffordance {
   writable: boolean;
   /** True while an editor is being summoned (for a busy label). */
   busy: boolean;
-  /** Open `entryKey` in the platform editor. Never throws; a refusal is a no-op. */
+  /** True when the host REFUSED the last edit request — callers render it as
+   *  text where the affordance was offered (3.3.1 / 4.1.3, R3-608). A
+   *  `cancelled` rejection (the reader closed the editor) never sets this. */
+  refused: boolean;
+  /** Clear the refusal notice (the next attempt starts from a clean slate). */
+  clearRefused: () => void;
+  /** Open `entryKey` in the platform editor. Never throws; a refusal is reported. */
   openEditor: (entryKey: string) => void;
   /**
    * What a save actually does, so the affordance can say so.
@@ -41,6 +47,7 @@ export interface EditAffordance {
 export function useEditAffordance(readOnly: boolean): EditAffordance {
   const mounts = useMounts();
   const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState(false);
 
   // Read the corpus identity through the mount list's identity, so the memo re-runs when
   // the host re-announces a mount. The root itself is latched at boot (see `contentRoot`);
@@ -53,16 +60,24 @@ export function useEditAffordance(readOnly: boolean): EditAffordance {
 
   const writable = !readOnly && corpusWritable(mounts, corpus);
 
+  // A refusal surfaces where the affordance was offered (3.3.1, R3-608);
+  // `cancelled` — the reader closing the editor — stays silent by contract.
+  const refusedUnlessCancelled = (e: unknown): undefined => {
+    if ((e as { code?: string } | null)?.code !== 'cancelled') setRefused(true);
+    return undefined;
+  };
+
   const openEditor = useCallback(
     (entryKey: string) => {
       const target = editTarget(entryKey, corpus);
       if (!target) return;
       setBusy(true);
+      setRefused(false);
       const done = () => setBusy(false);
       if (target.via === 'self') {
         // The fork: the present→edit transition on our own source. Self-scoped by
         // contract, which is exactly right when the corpus IS our repo.
-        requestEdit({ path: target.path }).catch(() => undefined).finally(done);
+        requestEdit({ path: target.path }).catch(refusedUnlessCancelled).finally(done);
         return;
       }
       // Dispatch: attenuate the corpus delegation down to this one file and hand it to
@@ -72,7 +87,7 @@ export function useEditAffordance(readOnly: boolean): EditAffordance {
       invokeTask('edit-file', {
         file: capFile({ mountId: target.mountId, relPath: target.relPath }, { mode: 'rw' }),
       })
-        .catch(() => undefined) // `cancelled` is how a reader closes the editor
+        .catch(refusedUnlessCancelled) // `cancelled` is how a reader closes the editor
         .finally(done);
     },
     [corpus],
@@ -82,5 +97,5 @@ export function useEditAffordance(readOnly: boolean): EditAffordance {
     ? 'Edits save to the mounted content. Proposing a change back to its repository is not wired yet.'
     : 'Edit this entry';
 
-  return { writable, busy, openEditor, editHint };
+  return { writable, busy, refused, clearRefused: () => setRefused(false), openEditor, editHint };
 }

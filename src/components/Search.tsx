@@ -3,6 +3,7 @@ import { Link, useMetadataQuery } from '@immediately-run/sdk';
 import type { Metadata } from '@immediately-run/sdk';
 import { keyToHref } from '../lib/content';
 import { crumb } from '../lib/wiki';
+import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import InlineProse from './InlineProse';
 import { matchesQuery, searchQuery, toSearchEntries } from '../lib/queries';
 import type { SearchRecord } from '../lib/queries';
@@ -14,13 +15,19 @@ interface Hit {
   ns: string;
 }
 
+let searchListSeq = 0;
+
 // `.grove-search` — the ⌘K command palette: client-side fuzzy filter over the
-// in-memory index, grouped into entries + tags, keyboard-navigable.
+// in-memory index, grouped into entries + tags, keyboard-navigable. The input
+// carries combobox semantics (aria-activedescendant tracks the highlight the
+// filter maintains) and the box the dialog contract via the shared overlay
+// hook (focus in, trap, Escape, focus return — R3-608).
 export default function Search({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
-  const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useOverlayFocusDismiss(true, onClose);
+  const listId = useMemo(() => `grove-search-list-${++searchListSeq}`, []);
 
   // Records, not tab-encoded paths (R3-276a): `tags` is the array itself, so the
   // join/split round-trip is gone.
@@ -63,17 +70,25 @@ export default function Search({ onClose }: { onClose: () => void }) {
       setSel((s) => Math.max(0, s - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      (boxRef.current?.querySelector('.grove-search__row[data-sel="1"]') as HTMLElement | null)?.click();
+      (dialogRef.current?.querySelector('.grove-search__row[data-sel="1"]') as HTMLElement | null)?.click();
     }
   };
 
+  const activeId = total > 0 ? `${listId}-opt-${sel}` : undefined;
+
   return (
     <div className="grove-search" onClick={onClose}>
-      <div className="grove-search__box" ref={boxRef} onClick={(e) => e.stopPropagation()}>
+      <div className="grove-search__box" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         <div className="grove-search__in">
           <Icon name="search" />
           <input
             ref={inputRef}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={listId}
+            aria-activedescendant={activeId}
+            aria-autocomplete="list"
+            aria-label="Search entries and tags"
             value={query}
             placeholder="Search entries and tags…"
             onChange={(e) => {
@@ -84,7 +99,7 @@ export default function Search({ onClose }: { onClose: () => void }) {
           />
           <kbd>esc</kbd>
         </div>
-        <div className="grove-search__res">
+        <div className="grove-search__res" role="listbox" id={listId} aria-label="Results">
           {total === 0 ? (
             <div className="grove-search__empty">
               No entry matches <code>{query}</code>.
@@ -98,6 +113,9 @@ export default function Search({ onClose }: { onClose: () => void }) {
                   href={keyToHref(h.key)}
                   className="grove-search__row"
                   data-sel={sel === i ? '1' : '0'}
+                  id={`${listId}-opt-${i}`}
+                  role="option"
+                  aria-selected={sel === i}
                   onClick={onClose}
                 >
                   <Icon name="file" />
@@ -114,6 +132,9 @@ export default function Search({ onClose }: { onClose: () => void }) {
                   type="button"
                   className="grove-search__row"
                   data-sel={sel === matchedEntries.length + i ? '1' : '0'}
+                  id={`${listId}-opt-${matchedEntries.length + i}`}
+                  role="option"
+                  aria-selected={sel === matchedEntries.length + i}
                   onClick={() => {
                     setQuery(t);
                     setSel(0);

@@ -11,6 +11,7 @@ import {
 } from '@immediately-run/sdk';
 import { useShell } from '../lib/shell';
 import { useHeadings, useActiveHeading } from '../hooks/useHeadings';
+import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { getContentRoot } from '../lib/contentRoot';
 import { createReadEntryTool, createGroveMetadataTool, groveAgentTools, toolExecutor } from '../lib/agentTools';
 import { buildSystemPrompt } from '../lib/agentPrompt';
@@ -44,7 +45,7 @@ export default function GroveAgent({
   const index = useAllMetadata();
   const headings = useHeadings(entryKey);
   const activeHeading = useActiveHeading(headings);
-  const { openEditor } = useShell();
+  const { openEditor, editRefused } = useShell();
   const [open, setOpen] = useState(false);
   const [detent, setDetent] = useState<'half' | 'full'>('half');
   const [resting, setResting] = useState('');
@@ -54,6 +55,12 @@ export default function GroveAgent({
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLInputElement>(null);
+  // One AbortController per run (R3-608): the composer's stop control aborts the
+  // in-flight run through the SDK signal the loop already honours.
+  const abortRef = useRef<AbortController | null>(null);
+  // The panel carries the dialog contract (R3-608): focus in, Tab trapped,
+  // Escape, focus return — the shared hook, stack-aware.
+  const dialogRef = useOverlayFocusDismiss(open, () => setOpen(false));
 
   // The envelope, computed (R-GA-1). `llm:chat` appears in the grant-filtered
   // catalog iff this app holds the consent — an ungranted fork reads a DISTINCT
@@ -133,6 +140,8 @@ export default function GroveAgent({
         else next.push({ kind: 'assistant', text });
         return next;
       });
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const final = await runAgent({
         client: createChatModelClient(),
@@ -142,6 +151,7 @@ export default function GroveAgent({
         prompt: q,
         history: transcriptRef.current,
         maxTurns: 8,
+        signal: controller.signal,
         events: {
           onAssistantDelta: (t) => {
             acc += t;
@@ -163,6 +173,12 @@ export default function GroveAgent({
       transcriptRef.current = final.slice();
       setRows(rendered);
     } catch (e) {
+      // A stop is not an error (R3-608): the aborted run settles with a named
+      // "Stopped" row, and the transcript keeps what streamed so far.
+      if (controller.signal.aborted) {
+        setRows((prev) => [...prev, { kind: 'activity', text: 'Stopped' }]);
+        return;
+      }
       const code = (e as { code?: string })?.code || (e as Error).message;
       setErrorToast(
         code === 'auth-required'
@@ -176,6 +192,7 @@ export default function GroveAgent({
       );
     } finally {
       setStreaming(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
   }
 
@@ -210,7 +227,7 @@ export default function GroveAgent({
       {open && (
         <>
           <div className="ga-scrim" onClick={() => setOpen(false)} />
-          <div className="ga-panel" data-detent={detent}>
+          <div className="ga-panel" data-detent={detent} ref={dialogRef} tabIndex={-1}>
             <div className="ga-panel-inner">
               <div className="ga-head">
                 <span className="grip" onClick={() => setDetent((d) => (d === 'half' ? 'full' : 'half'))} />
@@ -302,12 +319,28 @@ export default function GroveAgent({
                     disabled={streaming || !canAsk}
                     onChange={(e) => setDraft(e.target.value)}
                   />
+                  {streaming ? (
+                    <button
+                      className="stop"
+                      type="button"
+                      aria-label="Stop"
+                      title="Stop"
+                      onClick={() => abortRef.current?.abort()}
+                    >
+                      <Icon name="x" />
+                    </button>
+                  ) : null}
                   <button className="go" type="submit" disabled={streaming || !canAsk || !draft.trim()} aria-label={streaming ? 'Answering…' : 'Send'} title={streaming ? 'Answering…' : 'Send'}>
                     <Icon name="send" />
                   </button>
                 </form>
                 <div className="ga-foot__hand">
                   <span>{EGRESS_DISCLOSURE}</span>
+                  {editRefused && (
+                    <span className="ga-edit-refused" role="status">
+                      Could not open the editor — the host refused
+                    </span>
+                  )}
                   <button type="button" onClick={() => openEditor(entryKey)}>
                     <Icon name="external" />
                     Open in the editor

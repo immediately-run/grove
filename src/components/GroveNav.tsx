@@ -1,6 +1,7 @@
 import { Link } from '@immediately-run/sdk';
 import { useShell } from '../lib/shell';
 import { getContentRoot } from '../lib/contentRoot';
+import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { THEMES } from '../data/themes';
 import Icon from './Icon';
 
@@ -15,6 +16,7 @@ export default function GroveNav() {
     writable,
     openEditor,
     editBusy,
+    editRefused,
     editHint,
     theme,
     setTheme,
@@ -34,6 +36,24 @@ export default function GroveNav() {
   // content ROOT rather than the fork's `content/` literal — under dispatch the latter
   // would create a file in Grove's own repo (R3-266).
   const newEntry = () => openEditor(`${getContentRoot()}untitled.mdx`);
+
+  // The theme menu's contract (R3-608): the shared overlay hook with Tab-trap
+  // OFF (menus do not trap Tab), plus the menu keydown map — arrows walk the
+  // menuitems, Escape closes (the hook), focus returns to the theme button.
+  const menuRef = useOverlayFocusDismiss(menuOpen, () => setMenuOpen(false), { trapTab: false });
+  const onMenuKeyDown = (e: React.KeyboardEvent) => {
+    const items = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])];
+    if (!items.length) return;
+    const idx = items.indexOf(document.activeElement as HTMLElement);
+    const move = (i: number) => {
+      e.preventDefault();
+      items[(i + items.length) % items.length].focus();
+    };
+    if (e.key === 'ArrowDown') move(idx + 1);
+    else if (e.key === 'ArrowUp') move(idx - 1);
+    else if (e.key === 'Home') move(0);
+    else if (e.key === 'End') move(items.length - 1);
+  };
 
   return (
     <nav className="grove-nav">
@@ -56,28 +76,35 @@ export default function GroveNav() {
           <Icon name="search" />
         </button>
         {writable && (
-          <button
-            className="icbtn"
-            aria-label={editBusy ? 'Opening editor…' : 'New entry'}
-            title={editHint}
-            data-busy={editBusy ? '1' : '0'}
-            disabled={editBusy}
-            onClick={newEntry}
-          >
-            <Icon name="plus" />
-          </button>
+          <>
+            <button
+              className="icbtn"
+              aria-label={editBusy ? 'Opening editor…' : 'New entry'}
+              title={editHint}
+              data-busy={editBusy ? '1' : '0'}
+              disabled={editBusy}
+              onClick={newEntry}
+            >
+              <Icon name="plus" />
+            </button>
+            {editRefused && (
+              <span className="grove-edit-refused" role="status">
+                Could not open the editor — the host refused
+              </span>
+            )}
+          </>
         )}
         <button className="icbtn" aria-label="Ask Grove" onClick={askGrove}>
           <Icon name="message" />
         </button>
         <div className="grove-nav__more">
-          <button className="icbtn grove-theme-control" title="Theme" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+          <button className="icbtn grove-theme-control" title="Theme" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen((o) => !o)}>
             ☀
           </button>
           {menuOpen ? (
             <>
               <div className="gtm__scrim" onClick={() => setMenuOpen(false)} />
-              <div className="grove-theme-menu" role="menu">
+              <div className="grove-theme-menu" role="menu" aria-label="Theme" ref={menuRef} tabIndex={-1} onKeyDown={onMenuKeyDown}>
                 <div className="gtm__h">Theme</div>
                 <div className="gtm__list">
                   {THEMES.map((t) => (
@@ -85,6 +112,9 @@ export default function GroveNav() {
                       key={t.id}
                       className="gtm__row"
                       data-cur={theme === t.id ? '1' : '0'}
+                      role="menuitemradio"
+                      aria-checked={theme === t.id}
+                      tabIndex={-1}
                       onClick={() => setTheme(t.id)}
                     >
                       <span className="gtm__sw" style={{ background: t.swatch }} />
@@ -99,10 +129,10 @@ export default function GroveNav() {
                 <div className="gtm__appearance">
                   <div className="gtm__sub">Appearance</div>
                   <div className="gtm__seg">
-                    <button data-on={!light ? '1' : '0'} onClick={() => setLight(false)}>
+                    <button data-on={!light ? '1' : '0'} role="menuitemradio" aria-checked={!light} tabIndex={-1} onClick={() => setLight(false)}>
                       <Icon name="moon" /> Dark
                     </button>
-                    <button data-on={light ? '1' : '0'} onClick={() => setLight(true)}>
+                    <button data-on={light ? '1' : '0'} role="menuitemradio" aria-checked={light} tabIndex={-1} onClick={() => setLight(true)}>
                       <Icon name="sun" /> Light
                     </button>
                   </div>

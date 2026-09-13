@@ -41,6 +41,9 @@ export interface GroveShell {
   openEditor: (entryKey: string) => void;
   /** True while an editor is being summoned, for a busy label. */
   editBusy: boolean;
+  /** True when the host REFUSED the last edit request — render it where the
+   *  affordance was offered (3.3.1, R3-608); a cancelled request never sets it. */
+  editRefused: boolean;
   /** What a save actually does, for the affordance's title — under dispatch it says that
    *  proposing a change back to the content repo is not wired yet (R3-266's residual). */
   editHint: string;

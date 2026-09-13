@@ -197,7 +197,7 @@ export default function GroveWiki({
   // `lib/editTarget` — and the gate is the corpus mount's CURRENT mode, re-read on every
   // mount change so a live role downgrade hides the affordance instead of producing
   // `EROFS` on click.
-  const { writable, busy: editBusy, openEditor, editHint } = useEditAffordance(readOnly);
+  const { writable, busy: editBusy, refused: editRefused, openEditor, editHint } = useEditAffordance(readOnly);
 
   const routeKey = sandboxPathToKey(sandboxPath) || homeKey();
   // The site brand is a wiki-wide constant, so read it from the home entry's
@@ -369,6 +369,7 @@ export default function GroveWiki({
     writable,
     openEditor,
     editBusy,
+    editRefused,
     editHint,
     siteTitle,
     safe,
