@@ -9,7 +9,7 @@ import {
   renderAgentContext,
   type AgentMessage,
 } from '@immediately-run/sdk';
-import { useShell } from '../lib/shell';
+import { useShell, EDIT_REFUSED_NOTICE } from '../lib/shell';
 import { useHeadings, useActiveHeading } from '../hooks/useHeadings';
 import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { getContentRoot } from '../lib/contentRoot';
@@ -169,6 +169,14 @@ export default function GroveAgent({
         },
       });
       const rendered = transcriptToRows(final);
+      // The real loop RESOLVES an aborted run with the partial transcript (a
+      // clean stop, never a thrown error) — so the abort check lives here too,
+      // not only in the catch: a stopped run keeps what streamed and appends a
+      // named Stopped row (R3-608).
+      if (controller.signal.aborted) {
+        setRows((prev) => [...prev, { kind: 'activity', text: 'Stopped' }]);
+        return;
+      }
       if (!rendered.some((r) => r.kind === 'assistant')) throw new Error('empty');
       transcriptRef.current = final.slice();
       setRows(rendered);
@@ -227,7 +235,15 @@ export default function GroveAgent({
       {open && (
         <>
           <div className="ga-scrim" onClick={() => setOpen(false)} />
-          <div className="ga-panel" data-detent={detent} ref={dialogRef} tabIndex={-1}>
+          <div
+            className="ga-panel"
+            data-detent={detent}
+            ref={dialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Ask Grove"
+          >
             <div className="ga-panel-inner">
               <div className="ga-head">
                 <span className="grip" onClick={() => setDetent((d) => (d === 'half' ? 'full' : 'half'))} />
@@ -338,7 +354,7 @@ export default function GroveAgent({
                   <span>{EGRESS_DISCLOSURE}</span>
                   {editRefused && (
                     <span className="ga-edit-refused" role="status">
-                      Could not open the editor — the host refused
+                      {EDIT_REFUSED_NOTICE}
                     </span>
                   )}
                   <button type="button" onClick={() => openEditor(entryKey)}>

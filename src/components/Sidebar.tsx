@@ -107,7 +107,13 @@ function Branch({
         role="treeitem"
         aria-level={depth + 1}
         aria-expanded={open}
-        tabIndex={rowId === stopRowId ? 0 : -1}
+        /* Roving stop, with the collapsed-ancestor fallback (R3-608 review):
+         * the folder holds the stop when it IS the stop's row, or when it is
+         * collapsed yet CONTAINS the current entry — collapsing the branch the
+         * reader is on must never unmount the tree's only tab stop. Exactly
+         * one row qualifies either way: the collapsed folder is the nearest
+         * rendered ancestor of the (unrendered) current row. */
+        tabIndex={rowId === stopRowId || (!open && containsCurrent) ? 0 : -1}
         onClick={() => setOpen((o) => !o)}
       >
         <Icon name="chevron-down" className="chev" />

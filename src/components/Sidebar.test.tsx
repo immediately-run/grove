@@ -99,4 +99,37 @@ describe('Sidebar tree navigation (R3-608)', () => {
     expect(tree).toBeTruthy();
     expect(container.querySelectorAll('[role="treeitem"]').length).toBe(rows(container).length);
   });
+
+  it('collapsing the branch that holds the current entry never strands the tab stop', async () => {
+    // Current entry = the api leaf deep in wiki/guide: its branch renders open.
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <TinkerableContext.Provider value={{ ...NAV, navigationState: { ...NAV.navigationState, sandboxPath: '/app/content/wiki/guide/api.mdx' } } as never}>
+          <Sidebar />
+        </TinkerableContext.Provider>,
+      );
+    });
+    // The current row IS the roving stop.
+    expect(container.querySelectorAll('.gs-tree [tabindex="0"]').length).toBe(1);
+    expect((container.querySelector('.gs-tree [tabindex="0"]') as HTMLElement).getAttribute('data-cur')).toBe('1');
+    // Collapse the guide folder (it contains the current entry): its button
+    // becomes the stop — the nearest rendered ancestor — and the tree keeps
+    // exactly one tabbable row.
+    const guide = rows(container).find((r) => r.getAttribute('aria-expanded') === 'true' && r.textContent?.includes('guide'));
+    expect(guide).toBeTruthy();
+    guide!.focus();
+    await act(async () => {
+      guide!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+    });
+    expect(guide!.getAttribute('aria-expanded')).toBe('false');
+    const stops = container.querySelectorAll('.gs-tree [tabindex="0"]');
+    expect(stops.length).toBe(1);
+    expect(stops[0]).toBe(guide);
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });

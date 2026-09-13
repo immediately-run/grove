@@ -68,6 +68,10 @@ export interface GroveShell {
   directory: DirectoryListing;
 }
 
+/** The refusal sentence, ONE home (R6, R3-608): every surface that offers an edit
+ *  renders this where the affordance was offered. */
+export const EDIT_REFUSED_NOTICE = 'Could not open the editor — the host refused';
+
 export const GroveShellContext = createContext<GroveShell | null>(null);
 
 /** Read the shell context. Throws if used outside App's provider — which only

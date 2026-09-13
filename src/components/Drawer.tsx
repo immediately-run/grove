@@ -25,7 +25,15 @@ export default function Drawer({
   const dialogRef = useOverlayFocusDismiss(true, onClose);
   return (
     <div className="grove-drawer" onClick={onClose}>
-      <div className="grove-drawer__panel" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="grove-drawer__panel"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site menu"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="grove-drawer__h">
           <span className="mk" />
           <span className="t">{siteTitle}</span>

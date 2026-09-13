@@ -25,8 +25,6 @@ export interface EditAffordance {
    *  text where the affordance was offered (3.3.1 / 4.1.3, R3-608). A
    *  `cancelled` rejection (the reader closed the editor) never sets this. */
   refused: boolean;
-  /** Clear the refusal notice (the next attempt starts from a clean slate). */
-  clearRefused: () => void;
   /** Open `entryKey` in the platform editor. Never throws; a refusal is reported. */
   openEditor: (entryKey: string) => void;
   /**
@@ -97,5 +95,5 @@ export function useEditAffordance(readOnly: boolean): EditAffordance {
     ? 'Edits save to the mounted content. Proposing a change back to its repository is not wired yet.'
     : 'Edit this entry';
 
-  return { writable, busy, refused, clearRefused: () => setRefused(false), openEditor, editHint };
+  return { writable, busy, refused, openEditor, editHint };
 }

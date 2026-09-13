@@ -1,5 +1,5 @@
 import { Link } from '@immediately-run/sdk';
-import { useShell } from '../lib/shell';
+import { useShell, EDIT_REFUSED_NOTICE } from '../lib/shell';
 import { getContentRoot } from '../lib/contentRoot';
 import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { THEMES } from '../data/themes';
@@ -47,7 +47,11 @@ export default function GroveNav() {
     const idx = items.indexOf(document.activeElement as HTMLElement);
     const move = (i: number) => {
       e.preventDefault();
-      items[(i + items.length) % items.length].focus();
+      const next = items[(i + items.length) % items.length];
+      next.focus();
+      // APG menu radios: arrows MOVE focus AND activate — the radio the arrow
+      // lands on is selected, so the keyboard alone can change the theme.
+      if (next.getAttribute('role') === 'menuitemradio' && next.getAttribute('aria-checked') !== 'true') next.click();
     };
     if (e.key === 'ArrowDown') move(idx + 1);
     else if (e.key === 'ArrowUp') move(idx - 1);
@@ -89,7 +93,7 @@ export default function GroveNav() {
             </button>
             {editRefused && (
               <span className="grove-edit-refused" role="status">
-                Could not open the editor — the host refused
+                {EDIT_REFUSED_NOTICE}
               </span>
             )}
           </>

@@ -78,7 +78,15 @@ export default function Search({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="grove-search" onClick={onClose}>
-      <div className="grove-search__box" ref={dialogRef} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="grove-search__box"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search entries and tags"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="grove-search__in">
           <Icon name="search" />
           <input

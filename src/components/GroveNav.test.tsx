@@ -21,10 +21,8 @@ const NAV = {
   navigationState: { sandboxPath: '/app/x' },
 };
 
-const mount = async (shell: Partial<GroveShell>) => {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  const full: GroveShell = {
+const fullShell = (shell: Partial<GroveShell>): GroveShell =>
+  ({
     theme: 'default',
     setTheme: vi.fn(),
     light: false,
@@ -52,7 +50,12 @@ const mount = async (shell: Partial<GroveShell>) => {
     missing: false,
     directory: { status: 'idle' },
     ...shell,
-  } as unknown as GroveShell;
+  }) as unknown as GroveShell;
+
+const mount = async (shell: Partial<GroveShell>) => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const full: GroveShell = fullShell(shell);
   await act(async () => {
     createRoot(host).render(
       <TinkerableContext.Provider value={NAV as never}>
@@ -85,5 +88,69 @@ describe('the theme menu (R3-308 — two independent axes)', () => {
   it('lists every catalogue theme — the menu is how a reader reaches them', async () => {
     const host = await mount({ menuOpen: true });
     expect(host.querySelectorAll('.gtm__row').length).toBeGreaterThan(1);
+  });
+});
+
+describe('the theme menu contract (R3-608)', () => {
+  const openMenu = async (over: Partial<GroveShell>) => {
+    const host = await mount({ menuOpen: true, theme: 'default', light: false, ...over });
+    return host;
+  };
+
+  it('Escape returns focus to the theme button (and closes, via the shell state it drives)', async () => {
+    // The shell's setMenuOpen drives the re-render like the real one would:
+    // focus-return rides the hook's cleanup when the menu actually closes.
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const shell = { menuOpen: false, theme: 'default', light: false, setMenuOpen: vi.fn() } as Parameters<typeof fullShell>[0];
+    await act(async () => {
+      root.render(
+        <TinkerableContext.Provider value={NAV as never}>
+          <GroveShellContext.Provider value={fullShell(shell)}>
+            <GroveNav />
+          </GroveShellContext.Provider>
+        </TinkerableContext.Provider>,
+      );
+    });
+    const themeButton = host.querySelector('.grove-theme-control') as HTMLButtonElement;
+    themeButton.focus();
+    const renderWith = (menuOpen: boolean) =>
+      act(async () => {
+        root.render(
+          <TinkerableContext.Provider value={NAV as never}>
+            <GroveShellContext.Provider value={fullShell({ ...shell, menuOpen })}>
+              <GroveNav />
+            </GroveShellContext.Provider>
+          </TinkerableContext.Provider>,
+        );
+      });
+    shell.setMenuOpen = vi.fn(((v: boolean) => {
+      if (v === false) void renderWith(false);
+    }) as GroveShell['setMenuOpen']);
+    await renderWith(true);
+    // focus-in: the menu's first control holds focus.
+    const first = host.querySelector('[role="menuitemradio"]') as HTMLElement;
+    expect(document.activeElement).toBe(first);
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(shell.setMenuOpen).toHaveBeenCalledWith(false);
+    expect(host.querySelector('.grove-theme-menu')).toBeNull(); // the menu closed
+    expect(document.activeElement).toBe(themeButton);
+  });
+
+  it('arrows move among the menuitems and SELECT the radio they land on', async () => {
+    const setTheme = vi.fn();
+    const host = await openMenu({ setTheme });
+    const items = [...host.querySelectorAll('[role^="menuitem"]')] as HTMLElement[];
+    expect(items.length).toBeGreaterThanOrEqual(3); // themes + dark/light
+    items[0].focus();
+    await act(async () => {
+      items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(items[1]);
+    // The landed radio is selected when it was not already checked.
+    expect(setTheme).toHaveBeenCalledTimes(items[1].getAttribute('aria-checked') === 'true' ? 0 : 1);
   });
 });

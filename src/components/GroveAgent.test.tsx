@@ -189,11 +189,16 @@ describe('R3-608 — the composer stops the run; a refusal surfaces, a cancel do
   } as const;
 
   it('stop aborts the in-flight run — signal aborted, streaming cleared, a Stopped row, no error', async () => {
+    // The REAL loop contract on abort: the promise RESOLVES with the partial
+    // transcript (a clean stop, never a thrown error) — the mock mirrors it.
     runAgentMock.mockImplementationOnce(
       (opts: { signal?: AbortSignal }) =>
-        new Promise((_res, reject) => {
+        new Promise((resolve) => {
           opts.signal?.addEventListener('abort', () =>
-            reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+            resolve([
+              { role: 'user', content: 'what is here?' },
+              { role: 'assistant', content: 'partial answer' },
+            ]),
           );
         }),
     );
