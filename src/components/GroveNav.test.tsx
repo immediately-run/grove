@@ -154,3 +154,34 @@ describe('the theme menu contract (R3-608)', () => {
     expect(setTheme).toHaveBeenCalledTimes(items[1].getAttribute('aria-checked') === 'true' ? 0 : 1);
   });
 });
+
+describe('the theme menu Tab contract (R3-608 round 2)', () => {
+  it('Tab LEAVES the menu and closes it — never stranded over the scrim', async () => {
+    let renderWith: (menuOpen: boolean) => Promise<void> = async () => undefined;
+    const shell = { menuOpen: false, theme: 'default', light: false, setMenuOpen: vi.fn() } as Parameters<typeof fullShell>[0];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    renderWith = (menuOpen: boolean) =>
+      act(async () => {
+        root.render(
+          <TinkerableContext.Provider value={NAV as never}>
+            <GroveShellContext.Provider value={fullShell({ ...shell, menuOpen })}>
+              <GroveNav />
+            </GroveShellContext.Provider>
+          </TinkerableContext.Provider>,
+        );
+      });
+    shell.setMenuOpen = vi.fn(((v: boolean) => {
+      if (v === false) void renderWith(false);
+    }) as GroveShell['setMenuOpen']);
+    await renderWith(true);
+    expect(host.querySelector('.grove-theme-menu')).toBeTruthy();
+    const first = host.querySelector('[role="menuitemradio"]') as HTMLElement;
+    await act(async () => {
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    });
+    expect(shell.setMenuOpen).toHaveBeenCalledWith(false);
+    expect(host.querySelector('.grove-theme-menu')).toBeNull(); // closed, not stranded
+  });
+});

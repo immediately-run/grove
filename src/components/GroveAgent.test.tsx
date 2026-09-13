@@ -300,3 +300,31 @@ describe('R3-608 — the composer stops the run; a refusal surfaces, a cancel do
     });
   });
 });
+
+describe('R3-608 round 2 — the panel returns focus to its (unmounted) trigger', () => {
+  it('Escape-close lands focus back on the resting input, not <body>', async () => {
+    const { container } = await renderAgent({ writable: false });
+    await push({ type: 'llm-provider', provider: null });
+    await push({ type: 'api-catalog', methods: [] });
+    // Open through the resting input (the real trigger path).
+    const resting = container.querySelector('.ga-line input') as HTMLInputElement;
+    await act(async () => {
+      resting.focus();
+    });
+    expect(container.querySelector('.ga-panel')).toBeTruthy();
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(container.querySelector('.ga-panel')).toBeNull();
+    // The focus return rides a requestAnimationFrame — flush the frame.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 16));
+    });
+    // The resting line remounted and its SUBMIT control took focus — a real
+    // stop that cannot reopen the panel, never <body>.
+    const remounted = container.querySelector('.ga-line .go') as HTMLButtonElement;
+    expect(remounted).toBeTruthy();
+    expect(document.activeElement).toBe(remounted);
+    expect(container.querySelector('.ga-panel')).toBeNull(); // focus did not reopen
+  });
+});

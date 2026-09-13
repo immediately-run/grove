@@ -2583,6 +2583,14 @@ button.grove-search__row {
   padding: 3px 9px;
   white-space: nowrap;
 }
+/* In the sticky nav the sentence must reflow, not push the cluster wide
+   (1.4.10): it ellipsizes against the viewport's width and carries the full
+   text in its title. */
+.grove-nav .grove-edit-refused {
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ga-foot__hand {
   display: flex;
   align-items: center;

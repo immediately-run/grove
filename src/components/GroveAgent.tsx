@@ -93,6 +93,18 @@ export default function GroveAgent({
   useEffect(() => {
     if (open) requestAnimationFrame(() => footRef.current?.focus());
   }, [open]);
+  // The panel's only trigger (the resting input) UNMOUNTS when it opens, and
+  // its onFocus IS the open action — returning focus to it would reopen the
+  // panel. So the close path returns focus to the resting line's SUBMIT
+  // control (R-IX-1): a real stop in the same surface that never reopens
+  // anything, so Escape never strands the keyboard on <body>. On mount the
+  // effect stays quiet (was-open gate) or the panel would open itself.
+  const restingGoRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasOpenRef.current && !open) requestAnimationFrame(() => restingGoRef.current?.focus());
+    wasOpenRef.current = open;
+  }, [open]);
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [rows, streaming]);
@@ -225,7 +237,7 @@ export default function GroveAgent({
             onFocus={() => setOpen(true)}
             aria-label="Ask Grove"
           />
-          <button className="go" type="submit" aria-label="Ask Grove">
+          <button ref={restingGoRef} className="go" type="submit" aria-label="Ask Grove">
             <Icon name="send" />
           </button>
         </form>

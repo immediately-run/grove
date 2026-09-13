@@ -92,7 +92,7 @@ export default function GroveNav() {
               <Icon name="plus" />
             </button>
             {editRefused && (
-              <span className="grove-edit-refused" role="status">
+              <span className="grove-edit-refused" role="status" title={EDIT_REFUSED_NOTICE}>
                 {EDIT_REFUSED_NOTICE}
               </span>
             )}

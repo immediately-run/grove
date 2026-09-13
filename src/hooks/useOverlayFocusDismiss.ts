@@ -66,6 +66,12 @@ export function useOverlayFocusDismiss(
         onCloseRef.current();
         return;
       }
+      if (!trapTab && e.key === 'Tab') {
+        // APG Menu: Tab is LEAVE — the focus move proceeds (no preventDefault)
+        // and the menu closes behind it, never stranded over a scrim.
+        if (isTop) onCloseRef.current();
+        return;
+      }
       if (!trapTab || e.key !== 'Tab' || !root) return;
       const list = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.hasAttribute('disabled'));
       if (!list.length) {
