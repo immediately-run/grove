@@ -5,6 +5,7 @@ import fs from 'fs';
 import type { Metadata } from '@immediately-run/sdk';
 import {
   Include,
+  ScrollRestoration,
   useAllMetadata,
   useFileMetadata,
   useHostTheme,
@@ -445,6 +446,11 @@ export default function GroveWiki({
             outgoing set and re-mints. */}
         <ThemeAssets declarations={themeAssetsFor(theme)} />
         <ContentTheme sheets={contentSheets} onRejected={(path, v) => setRejectedSheet(`${path}:${v.line} — ${v.reason}`)} />
+        {/* R3-627: remember where the reader was on the entry they leave, and put
+            them back there on Back. Grove's scroller is its own container, so the
+            ref goes across; `useScrollReset` above stands down on the same
+            traversal so the two do not fight. */}
+        <ScrollRestoration scroller={scrollRef} />
         <div className="device__scroll" ref={scrollRef}>
           {rejectedSheet ? (
             <div className="grove-decl-error" role="status">
