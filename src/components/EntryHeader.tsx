@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useFileMetadata } from '@immediately-run/sdk';
-import { useShell } from '../lib/shell';
+import { useShell, EDIT_REFUSED_NOTICE } from '../lib/shell';
 import { crumb } from '../lib/wiki';
 import Icon from './Icon';
 import InlineProse from './InlineProse';
@@ -17,7 +17,7 @@ export default function EntryHeader({
   writable: boolean;
   mins: number;
 }) {
-  const { openEditor, editBusy, editHint } = useShell();
+  const { openEditor, editBusy, editRefused, editHint } = useShell();
   const meta = useFileMetadata(entryKey) as any;
   if (!meta) return null;
   const tags: string[] = Array.isArray(meta.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
@@ -37,15 +37,22 @@ export default function EntryHeader({
           <span key={t} className="grove-tag">#{t}</span>
         ))}
         {writable && (
-          <button
-            className="grove-edit-affordance"
-            data-busy={editBusy ? '1' : '0'}
-            title={editHint}
-            onClick={() => openEditor(entryKey)}
-          >
-            <Icon name="pencil" />
-            {editBusy ? 'Opening editor…' : 'Edit'}
-          </button>
+          <>
+            <button
+              className="grove-edit-affordance"
+              data-busy={editBusy ? '1' : '0'}
+              title={editHint}
+              onClick={() => openEditor(entryKey)}
+            >
+              <Icon name="pencil" />
+              {editBusy ? 'Opening editor…' : 'Edit'}
+            </button>
+            {editRefused && (
+              <span className="grove-edit-refused" role="status">
+                {EDIT_REFUSED_NOTICE}
+              </span>
+            )}
+          </>
         )}
       </div>
     </header>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Include, Link } from '@immediately-run/sdk';
-import { useShell } from '../lib/shell';
+import { useShell, EDIT_REFUSED_NOTICE } from '../lib/shell';
 import { keyToHref, keyToRepoRel } from '../lib/content';
 import { crumb } from '../lib/wiki';
 import DirectoryView from './DirectoryView';
@@ -19,7 +19,7 @@ declare const module: any;
 // site chrome (nav / sidebar / footer) — that's the layout's job — so the page
 // stays free of shell concerns.
 export default function PageView() {
-  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, openEditor, editBusy, editHint, vw, safe, directory } =
+  const { entryKey, includePath, layout, showRails, mins, missing, suggestion, writable, openEditor, editBusy, editRefused, editHint, vw, safe, directory } =
     useShell();
 
   // A folder URL. `checking` renders nothing rather than the 404: the readdir that
@@ -40,6 +40,7 @@ export default function PageView() {
         <div className="grove-state__actions">
           <Link className="btn-ghost" href="/"><Icon name="chevron-right" /> Back to home</Link>
           {writable ? (
+            <>
             <button
               className="btn-primary"
               data-busy={editBusy ? '1' : '0'}
@@ -47,8 +48,12 @@ export default function PageView() {
               disabled={editBusy}
               onClick={() => openEditor(entryKey)}
             >
-              <Icon name="file-plus" /> {editBusy ? 'Opening editor…' : 'Create it'}
+              <Icon name="file-plus" />{editBusy ? 'Opening editor…' : 'Create it'}
             </button>
+              {editRefused && (
+                <span className="grove-edit-refused" role="status">{EDIT_REFUSED_NOTICE}</span>
+              )}
+            </>
           ) : null}
         </div>
       </div>

@@ -9,8 +9,9 @@ import {
   renderAgentContext,
   type AgentMessage,
 } from '@immediately-run/sdk';
-import { useShell } from '../lib/shell';
+import { useShell, EDIT_REFUSED_NOTICE } from '../lib/shell';
 import { useHeadings, useActiveHeading } from '../hooks/useHeadings';
+import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { getContentRoot } from '../lib/contentRoot';
 import { createReadEntryTool, createGroveMetadataTool, groveAgentTools, toolExecutor } from '../lib/agentTools';
 import { buildSystemPrompt } from '../lib/agentPrompt';
@@ -44,7 +45,7 @@ export default function GroveAgent({
   const index = useAllMetadata();
   const headings = useHeadings(entryKey);
   const activeHeading = useActiveHeading(headings);
-  const { openEditor } = useShell();
+  const { openEditor, editRefused } = useShell();
   const [open, setOpen] = useState(false);
   const [detent, setDetent] = useState<'half' | 'full'>('half');
   const [resting, setResting] = useState('');
@@ -54,6 +55,12 @@ export default function GroveAgent({
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLInputElement>(null);
+  // One AbortController per run (R3-608): the composer's stop control aborts the
+  // in-flight run through the SDK signal the loop already honours.
+  const abortRef = useRef<AbortController | null>(null);
+  // The panel carries the dialog contract (R3-608): focus in, Tab trapped,
+  // Escape, focus return — the shared hook, stack-aware.
+  const dialogRef = useOverlayFocusDismiss(open, () => setOpen(false));
 
   // The envelope, computed (R-GA-1). `llm:chat` appears in the grant-filtered
   // catalog iff this app holds the consent — an ungranted fork reads a DISTINCT
@@ -85,6 +92,18 @@ export default function GroveAgent({
 
   useEffect(() => {
     if (open) requestAnimationFrame(() => footRef.current?.focus());
+  }, [open]);
+  // The panel's only trigger (the resting input) UNMOUNTS when it opens, and
+  // its onFocus IS the open action — returning focus to it would reopen the
+  // panel. So the close path returns focus to the resting line's SUBMIT
+  // control (R-IX-1): a real stop in the same surface that never reopens
+  // anything, so Escape never strands the keyboard on <body>. On mount the
+  // effect stays quiet (was-open gate) or the panel would open itself.
+  const restingGoRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasOpenRef.current && !open) requestAnimationFrame(() => restingGoRef.current?.focus());
+    wasOpenRef.current = open;
   }, [open]);
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
@@ -133,6 +152,8 @@ export default function GroveAgent({
         else next.push({ kind: 'assistant', text });
         return next;
       });
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const final = await runAgent({
         client: createChatModelClient(),
@@ -142,6 +163,7 @@ export default function GroveAgent({
         prompt: q,
         history: transcriptRef.current,
         maxTurns: 8,
+        signal: controller.signal,
         events: {
           onAssistantDelta: (t) => {
             acc += t;
@@ -159,10 +181,24 @@ export default function GroveAgent({
         },
       });
       const rendered = transcriptToRows(final);
+      // The real loop RESOLVES an aborted run with the partial transcript (a
+      // clean stop, never a thrown error) — so the abort check lives here too,
+      // not only in the catch: a stopped run keeps what streamed and appends a
+      // named Stopped row (R3-608).
+      if (controller.signal.aborted) {
+        setRows((prev) => [...prev, { kind: 'activity', text: 'Stopped' }]);
+        return;
+      }
       if (!rendered.some((r) => r.kind === 'assistant')) throw new Error('empty');
       transcriptRef.current = final.slice();
       setRows(rendered);
     } catch (e) {
+      // A stop is not an error (R3-608): the aborted run settles with a named
+      // "Stopped" row, and the transcript keeps what streamed so far.
+      if (controller.signal.aborted) {
+        setRows((prev) => [...prev, { kind: 'activity', text: 'Stopped' }]);
+        return;
+      }
       const code = (e as { code?: string })?.code || (e as Error).message;
       setErrorToast(
         code === 'auth-required'
@@ -176,6 +212,7 @@ export default function GroveAgent({
       );
     } finally {
       setStreaming(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
   }
 
@@ -200,7 +237,7 @@ export default function GroveAgent({
             onFocus={() => setOpen(true)}
             aria-label="Ask Grove"
           />
-          <button className="go" type="submit" aria-label="Ask Grove">
+          <button ref={restingGoRef} className="go" type="submit" aria-label="Ask Grove">
             <Icon name="send" />
           </button>
         </form>
@@ -210,7 +247,15 @@ export default function GroveAgent({
       {open && (
         <>
           <div className="ga-scrim" onClick={() => setOpen(false)} />
-          <div className="ga-panel" data-detent={detent}>
+          <div
+            className="ga-panel"
+            data-detent={detent}
+            ref={dialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Ask Grove"
+          >
             <div className="ga-panel-inner">
               <div className="ga-head">
                 <span className="grip" onClick={() => setDetent((d) => (d === 'half' ? 'full' : 'half'))} />
@@ -302,12 +347,28 @@ export default function GroveAgent({
                     disabled={streaming || !canAsk}
                     onChange={(e) => setDraft(e.target.value)}
                   />
+                  {streaming ? (
+                    <button
+                      className="stop"
+                      type="button"
+                      aria-label="Stop"
+                      title="Stop"
+                      onClick={() => abortRef.current?.abort()}
+                    >
+                      <Icon name="x" />
+                    </button>
+                  ) : null}
                   <button className="go" type="submit" disabled={streaming || !canAsk || !draft.trim()} aria-label={streaming ? 'Answering…' : 'Send'} title={streaming ? 'Answering…' : 'Send'}>
                     <Icon name="send" />
                   </button>
                 </form>
                 <div className="ga-foot__hand">
                   <span>{EGRESS_DISCLOSURE}</span>
+                  {editRefused && (
+                    <span className="ga-edit-refused" role="status">
+                      {EDIT_REFUSED_NOTICE}
+                    </span>
+                  )}
                   <button type="button" onClick={() => openEditor(entryKey)}>
                     <Icon name="external" />
                     Open in the editor

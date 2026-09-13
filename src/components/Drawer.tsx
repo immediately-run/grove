@@ -1,4 +1,5 @@
 import { Link } from '@immediately-run/sdk';
+import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import Sidebar from './Sidebar';
 import Icon from './Icon';
 
@@ -9,7 +10,9 @@ interface NavItem {
 }
 
 // `.grove-drawer` — the mobile nav drawer: site mark + nav items + the full
-// namespace tree, over a dismiss scrim.
+// namespace tree, over a dismiss scrim. The panel carries the dialog contract
+// (R3-608): focus in, Tab trapped, Escape, focus return — via the shared
+// overlay hook, whose stack makes nested overlays close one per Escape.
 export default function Drawer({
   siteTitle,
   nav,
@@ -19,9 +22,18 @@ export default function Drawer({
   nav: NavItem[];
   onClose: () => void;
 }) {
+  const dialogRef = useOverlayFocusDismiss(true, onClose);
   return (
     <div className="grove-drawer" onClick={onClose}>
-      <div className="grove-drawer__panel" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="grove-drawer__panel"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site menu"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="grove-drawer__h">
           <span className="mk" />
           <span className="t">{siteTitle}</span>
