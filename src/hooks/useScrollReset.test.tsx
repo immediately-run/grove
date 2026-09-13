@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import { receiveNavigation, resetEntryState } from '@immediately-run/sdk';
 import { useScrollReset } from './useScrollReset';
 
 // A stand-in for `<GroveWiki>`'s `.device__scroll`: the hook's whole job is what it does
@@ -83,6 +84,48 @@ describe('useScrollReset', () => {
     const { el, navigate, unmount } = mount('/app/content/a.mdx', '#sec-4');
     el.scrollTop = 700;
     navigate('/app/content/a.mdx', '');
+    expect(el.scrollTop).toBe(0);
+    unmount();
+  });
+});
+
+describe('useScrollReset on a history traversal (R3-627)', () => {
+  // The platform now restores where the reader was on a page they return to. This
+  // hook runs on the same arrival, so if it still zeroed the container it would undo
+  // that restoration a moment after it happened — the feature would look like it had
+  // never shipped.
+  afterEach(() => resetEntryState());
+
+  it('stands down on Back, leaving the restored position alone', () => {
+    const { el, navigate, unmount } = mount('/app/content/a.mdx');
+    act(() => receiveNavigation({ state: { 'ir.scroll': 640 }, direction: 'back' }));
+    // What ScrollRestoration will have put back by the time this effect runs.
+    el.scrollTop = 640;
+    navigate('/app/content/projects/directory-as-content.mdx');
+    expect(el.scrollTop).toBe(640);
+    unmount();
+  });
+
+  it('stands down on Forward too — a traversal either way is a page already seen', () => {
+    const { el, navigate, unmount } = mount('/app/content/a.mdx');
+    act(() => receiveNavigation({ state: { 'ir.scroll': 120 }, direction: 'forward' }));
+    el.scrollTop = 120;
+    navigate('/app/content/b.mdx');
+    expect(el.scrollTop).toBe(120);
+    unmount();
+  });
+
+  it('still resets on an ordinary navigation after a traversal', () => {
+    // The guard must follow the CURRENT arrival, not latch on the first traversal.
+    const { el, navigate, unmount } = mount('/app/content/a.mdx');
+    act(() => receiveNavigation({ state: { 'ir.scroll': 640 }, direction: 'back' }));
+    el.scrollTop = 640;
+    navigate('/app/content/b.mdx');
+    expect(el.scrollTop).toBe(640);
+
+    act(() => receiveNavigation({ state: undefined, direction: 'push' }));
+    el.scrollTop = 900;
+    navigate('/app/content/c.mdx');
     expect(el.scrollTop).toBe(0);
     unmount();
   });

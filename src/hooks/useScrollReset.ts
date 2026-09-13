@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
+import { useNavigationDirection } from '@immediately-run/sdk';
 import { fragmentOf } from '../lib/fragment';
 
 /**
@@ -34,10 +35,18 @@ export function useScrollReset(
 ): RefObject<HTMLDivElement | null> {
   const container = useRef<HTMLDivElement>(null);
   const frag = fragmentOf(hash);
+  // A traversal is the second navigation this must not touch (R3-627). Going back
+  // means returning to a page the reader has already read, and the platform now
+  // restores where they were on it; resetting here would undo that restoration a
+  // moment after it happened — the same shape as the fragment case above. Until the
+  // host carried this signal, resetting unconditionally was the only correct
+  // behaviour available, which is why this guard did not exist before.
+  const direction = useNavigationDirection();
+  const traversed = direction !== 'push';
   useEffect(() => {
-    if (frag) return;
+    if (frag || traversed) return;
     const el = container.current;
     if (el) el.scrollTop = 0;
-  }, [entryKey, frag]);
+  }, [entryKey, frag, traversed]);
   return container;
 }
