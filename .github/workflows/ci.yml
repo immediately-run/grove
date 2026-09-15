@@ -74,6 +74,11 @@ jobs:
             # installs, and this notice is precisely what hid that for weeks (the
             # ^0.52.0-vs-^0.65.0 SDK drift that blocked R3-556). Fail instead, and say
             # to bump the version.
+            #
+            # NOT `--offline-ok` here, deliberately — unlike in `verify`, where a
+            # network blip must not redden every PR. By this line `npm view` has already
+            # told us the version EXISTS, so failing to read it now is a real problem
+            # and the release must not proceed on a question nobody answered.
             node scripts/check-published-parity.mjs
             echo "::notice::$PKG_NAME@$PKG_VER already published — skipping."
             exit 0
