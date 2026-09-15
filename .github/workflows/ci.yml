@@ -69,6 +69,12 @@ jobs:
           PKG_NAME=$(node -p "require('./package.json').name")
           PKG_VER=$(node -p "require('./package.json').version")
           if npm view "$PKG_NAME@$PKG_VER" version >/dev/null 2>&1; then
+            # A skip is benign only when it is a NO-OP. Same version with different
+            # declared dependencies means `main` has drifted from what every consumer
+            # installs, and this notice is precisely what hid that for weeks (the
+            # ^0.52.0-vs-^0.65.0 SDK drift that blocked R3-556). Fail instead, and say
+            # to bump the version.
+            node scripts/check-published-parity.mjs
             echo "::notice::$PKG_NAME@$PKG_VER already published — skipping."
             exit 0
           fi

@@ -19,13 +19,29 @@ throw at module load, naming what went wrong and what the available surface is.
 ## The dependency
 
 ```json
-"@immediately-run/grove": "github:immediately-run/grove#<commit-sha>"
+"@immediately-run/grove": "0.1.3",
+"@immediately-run/sdk": "^0.67.0"
 ```
 
-Pin a commit sha rather than `#main` for anything real — `LIBRARY_MOUNTS_SPEC §7` makes a
-commit-pinned ref immutable and cache-first, which is both reproducible and the fast path.
-A branch ref works and picks up new commits on reload, which is the right trade only while
-you are iterating on the engine and the shell together.
+The published package is the shape to copy, and the SDK line is not optional decoration.
+Grove declares the SDK and React in **both** `dependencies` and `peerDependencies` — the
+sandbox resolves an app's modules from `dependencies` alone, so the engine cannot drop
+them (its own `check:deps` gate enforces that), and the peer entry is what states the
+range a shell must agree with.
+
+The consequence for a shell: a range that does not satisfy the engine's peer does **not**
+raise `ERESOLVE`. npm quietly satisfies the engine privately, and the shell ends up with
+two SDK copies — one at the top level and one nested under `@immediately-run/grove` —
+whose `TinkerableContext` objects are not the same object, which is the failure R3-556 is
+about. So keep the two ranges satisfiable together and check with
+`npm ls @immediately-run/sdk` that exactly one copy resolves. Nothing will tell you if you
+do not look.
+
+`github:immediately-run/grove#<commit-sha>` is the other form, for when you are iterating
+on the engine and the shell together. Pin a commit sha rather than `#main` for anything
+real — `LIBRARY_MOUNTS_SPEC §7` makes a commit-pinned ref immutable and cache-first, which
+is both reproducible and the fast path. A branch ref works and picks up new commits on
+reload, which is the right trade only while you are iterating.
 
 The engine's bytes arrive from its own GitHub Pages cache zip, and since the library-mount
 artifact work its **pre-transpiled artifacts arrive with them** — the shell consumes the
