@@ -176,14 +176,38 @@ function selfTest() {
     },
   });
   check('an E404 body is ABSENT, not unreadable', classifyRegistryReply({ stdout: e404, failed: true }).kind === 'absent');
-  // The published body is equally real: the same command against 0.1.2.
+  // The published body is equally real: the SAME argv this script sends (`BLOCKS` +
+  // `FIELDS`), against 0.1.2, captured 2026-09-15. Capturing a narrower command would
+  // make the fixture stop being the producer's output the moment a field is added —
+  // and would leave this case green with the whole `main`/`exports` comparison deleted.
   const real = JSON.stringify({
     dependencies: { '@immediately-run/mdx-plugins': '0.4.0', '@immediately-run/sdk': '^0.52.0', react: '^19.2.5', 'react-dom': '^19.2.5' },
     peerDependencies: { '@immediately-run/sdk': '^0.52.0', react: '^19.2.5', 'react-dom': '^19.2.5' },
+    main: 'src/main.tsx',
+    exports: {
+      '.': './src/lib.ts',
+      './app': './src/App.tsx',
+      './manifest': './viewer.manifest.json',
+      './components': './src/mdxComponents.ts',
+      './styles.css': './src/GroveApp.css',
+      './theme.css': './src/index.css',
+      './package.json': './package.json',
+    },
   });
   const pub = classifyRegistryReply({ stdout: real, failed: false });
   check('a real packument reply is PUBLISHED', pub.kind === 'published');
-  check('…and drifts against this tree exactly where 0.1.2 really drifted', dependencyDrift(pub.manifest, JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))).length >= 3);
+  // EXACTLY the three real drifts, and NO `(root)` row: 0.1.2's `main`/`exports` match
+  // this tree, so a spurious root row would mean the comparison of those fields is wrong.
+  const realRows = dependencyDrift(pub.manifest, JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')));
+  check(
+    '…and drifts against this tree in EXACTLY the three places 0.1.2 really drifted',
+    JSON.stringify(realRows.map((r) => `${r.block}.${r.name}`)) ===
+      JSON.stringify([
+        'dependencies.@immediately-run/mdx-plugins',
+        'dependencies.@immediately-run/sdk',
+        'peerDependencies.@immediately-run/sdk',
+      ]),
+  );
   check('an absent-blocks manifest is published-with-nothing, not unreadable', classifyRegistryReply({ stdout: '', failed: false }).kind === 'published');
   check('…which then reads every local block as ADDED', dependencyDrift(classifyRegistryReply({ stdout: '', failed: false }).manifest, dep({ a: '1' })).length === 1);
   check('an empty reply that FAILED is unreadable', classifyRegistryReply({ stdout: '', failed: true }).kind === 'unreadable');
@@ -224,7 +248,17 @@ if (reply.kind === 'absent') {
 }
 
 if (reply.kind === 'unreadable') {
-  console.error(`✗ cannot read ${spec} from the registry (${reply.reason}) — not answering is not a pass.`);
+  // The two forms mean different things and must not print the same line. Under
+  // `--offline-ok` this IS a pass — the build is deliberately not failed for a registry
+  // that would not answer — and a log that says "not answering is not a pass" beside a
+  // zero exit tells a reader the opposite of what happened, and hides that the
+  // comparison never ran at all.
+  console.error(
+    offlineOk
+      ? `⚠ could not read ${spec} from the registry (${reply.reason}) — parity was NOT checked. ` +
+          `Not failing the build (--offline-ok); the publish job checks this strictly.`
+      : `✗ cannot read ${spec} from the registry (${reply.reason}) — not answering is not a pass.`,
+  );
   process.exit(offlineOk ? 0 : 2);
 }
 
