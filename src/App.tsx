@@ -93,7 +93,7 @@ export default function App() {
   // invariant): rendering into a half-composed map would flash a missing-component error
   // for `<RoadmapBoard>` until registration landed — the very error content components
   // exist to remove — and a nested provider patched in afterwards would do the same.
-  // Holding here costs nothing, because the gate already exists for the corpus scan.
+  // Holding here costs nothing, because the gate already exists for the bundle scan.
   if (boot.status === 'waiting' || bundle.status === 'scanning' || contentComponents.status === 'loading') {
     return (
       <div className="grove-boot">
@@ -121,7 +121,7 @@ export default function App() {
   // font-shaped waits on the scan from here.
 
   if (bundle.status === 'ready' && bundle.metadata) {
-    // Provide the scanned corpus as the metadata SOURCE through the supported
+    // Provide the scanned bundle as the metadata SOURCE through the supported
     // surface (R3-276), not a wholesale TinkerableContext re-provision: the
     // platform stays free to grow its own state, and the hooks read the nearest
     // MetadataSource — so every consumer works unchanged, and nothing re-states

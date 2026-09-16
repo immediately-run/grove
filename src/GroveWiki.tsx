@@ -385,11 +385,11 @@ export default function GroveWiki({
     directory,
   };
 
-  // The corpus scope handed to CONTENT (R3-174; MDX_FROM_MOUNT_SPEC §2, §7 1a).
+  // The bundle scope handed to CONTENT (R3-174; MDX_FROM_MOUNT_SPEC §2, §7 1a).
   //
-  // A component the corpus ships cannot import this engine — it would resolve a second
+  // A component the bundle ships cannot import this engine — it would resolve a second
   // copy from the registry, with its own `contentRoot` module state, and answer about the
-  // wrong corpus — so everything it needs about the corpus arrives through the SDK, which
+  // wrong bundle — so everything it needs about the bundle arrives through the SDK, which
   // both sides genuinely share (one `/node_modules` per frame). Three facts, and each is
   // one a content component cannot derive for itself:
   //
@@ -401,7 +401,7 @@ export default function GroveWiki({
   //    a `_layout.mdx` wraps the entry, so `<Include>`'s own module identity would name
   //    the layout; furniture in the layout chain (a status line, a dependency rail) needs
   //    the page it is describing.
-  //  • `toHref` — because corpus-path→URL is this VIEWER's policy and the two packagings
+  //  • `toHref` — because bundle-path→URL is this VIEWER's policy and the two packagings
   //    genuinely disagree (`urlAnchor`). Content that computed its own hrefs would be
   //    correct in exactly one packaging, which is the mode-invariance rule
   //    (PLATFORM_LAYERING §1.1) broken in the least visible possible way.
