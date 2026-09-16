@@ -13,7 +13,7 @@ import {
 } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { LinkSpaceContext } from '@immediately-run/sdk/linkSpace';
-import { CorpusContext, toCorpusPath, fromCorpusPath } from '@immediately-run/sdk/corpus';
+import { BundleContext, toBundlePath, fromBundlePath } from '@immediately-run/sdk/bundle';
 import {
   contentDir,
   homeKey,
@@ -65,17 +65,17 @@ function writePref(k: string, v: string): void {
   }
 }
 
-// Corpus-absolute path → the href that navigates to it, for CONTENT (R3-174).
+// Bundle-absolute path → the href that navigates to it, for CONTENT (R3-174).
 //
 // Module scope, and that is load-bearing rather than tidiness: this function is handed to
-// content through `CorpusContext`, and the SDK's `useCorpusEntries` memoizes on its
+// content through `BundleContext`, and the SDK's `useBundleEntries` memoizes on its
 // identity. A closure rebuilt each render would make that memo never hold, so the hook the
 // SDK documents as "safe in a dependency array" would quietly stop being one — from the
 // PROVIDER's side, where nobody using it would think to look. Nothing here is reactive:
 // `contentDir()` is boot-settled module state and `keyToHref` is a pure function of it.
-function corpusHref(corpusPath: string): string {
-  const absolute = fromCorpusPath(corpusPath, contentDir().replace(/\/+$/, ''));
-  return absolute === null ? corpusPath : keyToHref(absolute);
+function bundleHref(bundlePath: string): string {
+  const absolute = fromBundlePath(bundlePath, contentDir().replace(/\/+$/, ''));
+  return absolute === null ? bundlePath : keyToHref(absolute);
 }
 
 // Build the nested render for a layout chain (outermost first). Each layer wraps
@@ -385,11 +385,11 @@ export default function GroveWiki({
     directory,
   };
 
-  // The corpus scope handed to CONTENT (R3-174; MDX_FROM_MOUNT_SPEC §2, §7 1a).
+  // The bundle scope handed to CONTENT (R3-174; MDX_FROM_MOUNT_SPEC §2, §7 1a).
   //
-  // A component the corpus ships cannot import this engine — it would resolve a second
+  // A component the bundle ships cannot import this engine — it would resolve a second
   // copy from the registry, with its own `contentRoot` module state, and answer about the
-  // wrong corpus — so everything it needs about the corpus arrives through the SDK, which
+  // wrong bundle — so everything it needs about the bundle arrives through the SDK, which
   // both sides genuinely share (one `/node_modules` per frame). Three facts, and each is
   // one a content component cannot derive for itself:
   //
@@ -401,7 +401,7 @@ export default function GroveWiki({
   //    a `_layout.mdx` wraps the entry, so `<Include>`'s own module identity would name
   //    the layout; furniture in the layout chain (a status line, a dependency rail) needs
   //    the page it is describing.
-  //  • `toHref` — because corpus-path→URL is this VIEWER's policy and the two packagings
+  //  • `toHref` — because bundle-path→URL is this VIEWER's policy and the two packagings
   //    genuinely disagree (`urlAnchor`). Content that computed its own hrefs would be
   //    correct in exactly one packaging, which is the mode-invariance rule
   //    (PLATFORM_LAYERING §1.1) broken in the least visible possible way.
@@ -414,25 +414,28 @@ export default function GroveWiki({
   // rejects one here because `entryKey` derives from the metadata query's array).
   //
   // That is safe because the EXPENSIVE half does not key on this object's identity: the
-  // SDK's `useCorpusEntries` destructures `{root, toHref}` and memoizes on those, and both
+  // SDK's `useBundleEntries` destructures `{root, toHref}` and memoizes on those, and both
   // are stable — `root` is a string compared by value, `toHref` is the module-scope
-  // `corpusHref` above. A new wrapper re-renders consumers (cheap); it does not re-derive
+  // `bundleHref` above. A new wrapper re-renders consumers (cheap); it does not re-derive
   // 800-odd entries. Making `toHref` a closure would silently undo that, which is the
   // whole reason it is not one.
-  const corpusRoot = contentDir().replace(/\/+$/, '');
-  const corpusEntry = toCorpusPath(entryKey, corpusRoot);
-  const corpusScope = { root: corpusRoot, entry: corpusEntry, toHref: corpusHref };
+  const bundleRoot = contentDir().replace(/\/+$/, '');
+  const bundleEntry = toBundlePath(entryKey, bundleRoot);
+  const bundleScope = { root: bundleRoot, entry: bundleEntry, toHref: bundleHref };
 
   return (
-    // R3-277b: declare the enclosing corpus for the platform's link-space consumers
-    // (the shared resolver's corpus-anchored absolute + `$fs:` handling read this).
+    // R3-277b: declare the enclosing bundle for the platform's link-space consumers
+    // (the shared resolver's bundle-anchored absolute + `$fs:` handling read this).
+    // R3-482: the field keeps the deprecated `corpusRoot` spelling until grove's SDK
+    // pin reaches a release whose WikiLink reads `bundleRoot` (sdk#171 / 0.68.1) —
+    // stating only the new spelling now would silently un-anchor every absolute link.
     <LinkSpaceContext.Provider value={{ corpusRoot: getContentRoot() }}>
-    {/* R3-174: the corpus scope CONTENT reads — sibling to the link space, not a
+    {/* R3-174: the bundle scope CONTENT reads — sibling to the link space, not a
         replacement for it. The two answer different questions: `LinkSpaceContext` tells
-        the platform's link resolver where absolute hrefs are anchored; `CorpusContext`
-        tells a component the corpus ships which entries exist, which one is being read,
-        and how to turn a corpus path into a URL. */}
-    <CorpusContext value={corpusScope}>
+        the platform's link resolver where absolute hrefs are anchored; `BundleContext`
+        tells a component the bundle ships which entries exist, which one is being read,
+        and how to turn a bundle path into a URL. */}
+    <BundleContext value={bundleScope}>
     <GroveShellContext.Provider value={shell}>
       <div
         className="grove-root"
@@ -486,7 +489,7 @@ export default function GroveWiki({
         <GroveAgent writable={writable} entryKey={entryKey} entryTitle={plainLabel(meta?.title || 'this entry')} />
       </div>
     </GroveShellContext.Provider>
-    </CorpusContext>
+    </BundleContext>
     </LinkSpaceContext.Provider>
   );
 }

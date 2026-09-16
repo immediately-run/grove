@@ -24,7 +24,7 @@ import { MetadataSource } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { MDXProvider } from '@immediately-run/sdk/MDXProvider';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
-import { useCorpusMetadata } from './hooks/useCorpusMetadata';
+import { useBundleMetadata } from './hooks/useBundleMetadata';
 import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
 import { viewedDocumentForTarget } from './lib/content';
@@ -69,7 +69,7 @@ export default function App() {
     }
   }, [boot.status, outerHref]);
   // Only a dispatched viewer scans; a fork's index is already in the context.
-  const corpus = useCorpusMetadata(boot.status === 'ready' ? getContentRoot() : null);
+  const bundle = useBundleMetadata(boot.status === 'ready' ? getContentRoot() : null);
   // BOTH packagings, deliberately (R3-174). A corpus's own component vocabulary must not
   // depend on how it was composed — `PLATFORM_LAYERING_SPEC` §1.1's mode-invariance rule —
   // so a fork reads its marker too; that is one cheap open of a file already in `/app`.
@@ -93,8 +93,8 @@ export default function App() {
   // invariant): rendering into a half-composed map would flash a missing-component error
   // for `<RoadmapBoard>` until registration landed — the very error content components
   // exist to remove — and a nested provider patched in afterwards would do the same.
-  // Holding here costs nothing, because the gate already exists for the corpus scan.
-  if (boot.status === 'waiting' || corpus.status === 'scanning' || contentComponents.status === 'loading') {
+  // Holding here costs nothing, because the gate already exists for the bundle scan.
+  if (boot.status === 'waiting' || bundle.status === 'scanning' || contentComponents.status === 'loading') {
     return (
       <div className="grove-boot">
         <p className="grove-boot__msg">Opening…</p>
@@ -120,14 +120,14 @@ export default function App() {
   // the resolved theme (the catalogue looks change the reading face); nothing
   // font-shaped waits on the scan from here.
 
-  if (corpus.status === 'ready' && corpus.metadata) {
-    // Provide the scanned corpus as the metadata SOURCE through the supported
+  if (bundle.status === 'ready' && bundle.metadata) {
+    // Provide the scanned bundle as the metadata SOURCE through the supported
     // surface (R3-276), not a wholesale TinkerableContext re-provision: the
     // platform stays free to grow its own state, and the hooks read the nearest
     // MetadataSource — so every consumer works unchanged, and nothing re-states
     // host fields it does not own.
     return (
-      <MetadataSource value={corpus.metadata}>{withComponents}</MetadataSource>
+      <MetadataSource value={bundle.metadata}>{withComponents}</MetadataSource>
     );
   }
 

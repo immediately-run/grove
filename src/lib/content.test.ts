@@ -231,10 +231,18 @@ describe('link-space parity (LINK_SPACE_FIXTURE, R3-277b)', () => {
   // packaging's root. The mount-absolute corpus of the fixture is '/app/content'
   // — exactly the fork's — so the corpus-space cases translate verbatim; the
   // fs-rooted/no-corpus case and the chroot collapse are resolver-level (the
-  // checker + SDK suites own them) and are skipped by corpusRoot here.
+  // checker + SDK suites own them) and are skipped by their root field here.
+  //
+  // The root reads NEW-THEN-OLD (`bundleRoot`, else `corpusRoot` — R3-482), matching
+  // the resolver and the docs harness: matching on `corpusRoot` alone would let this
+  // harness go quietly vacuous as fixture cases adopt the new spelling — the filter
+  // would drop them and nothing would go red. An explicit `bundleRoot: null` is a
+  // VALUE ("no bundle root"), not "absent" — it must not fall back.
   const FORK_ROOT = '/app/content';
+  const statedRoot = (c: (typeof LINK_SPACE_FIXTURE)[number]): string | null =>
+    c.bundleRoot !== undefined ? c.bundleRoot : (c.corpusRoot ?? null);
   const contentCases = LINK_SPACE_FIXTURE.filter(
-    (c) => c.corpusRoot === FORK_ROOT && !c.bundleChrooted && c.currentFile !== undefined,
+    (c) => statedRoot(c) === FORK_ROOT && !c.bundleChrooted && c.currentFile !== undefined,
   );
 
   it('the fixture still reaches this harness (non-vacuous)', () => {
