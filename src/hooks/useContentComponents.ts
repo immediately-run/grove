@@ -96,7 +96,7 @@ async function loadDeclared(root: string): Promise<Omit<ContentComponents, 'stat
  * Returns `loading` until every declaration has resolved, so the caller can hold the
  * content paint. That is the §2 invariant — compose the complete provider before content
  * paints, never render into a partial one — and it costs nothing here because Grove
- * already gates on `useOpenWikiBoot` and `useCorpusMetadata`. Rendering into a
+ * already gates on `useOpenWikiBoot` and `useBundleMetadata`. Rendering into a
  * half-composed provider would flash a missing-component error for `<RoadmapBoard>` until
  * registration landed, which is exactly the error this path removes.
  */
