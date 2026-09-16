@@ -57,7 +57,11 @@ export default function ScrollToFragment({ entryKey }: { entryKey: string }) {
     const timer = setInterval(() => { if (attempt()) clearInterval(timer); }, 200);
     const stop = setTimeout(() => clearInterval(timer), 30_000);
     return () => { clearInterval(timer); clearTimeout(stop); };
-  }, [entryKey, frag]);
+    // R3-656 fault injection (reverted by the next commit): `entryKey` dropped from the
+    // dependency array — a react-hooks/exhaustive-deps WARNING. grove reaches lint
+    // through `npm run verify`, so this probes that CI path; sparkles probes the
+    // `npm run lint`-step path.
+  }, [frag]);
 
   return null;
 }
