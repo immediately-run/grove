@@ -17,8 +17,20 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+// ajv arrives transitively with eslint (the same arrangement docs' scripts rely on);
+// say so when it is absent rather than dying on a bare module-not-found.
+const require = createRequire(join(root, 'package.json'));
+const Ajv = (() => {
+  try {
+    return require('ajv');
+  } catch {
+    console.error('check-manifest: ajv is not resolvable — it rides with eslint; run npm install.');
+    process.exit(1);
+  }
+})();
 const manifest = JSON.parse(readFileSync(join(root, 'viewer.manifest.json'), 'utf8'));
 const source = readFileSync(join(root, 'src/mdxComponents.ts'), 'utf8');
 
@@ -97,6 +109,21 @@ const exported = new Set(groveMdxKeys(source));
 const declared = new Set(Object.keys(manifest.components));
 
 const errors = [];
+
+// Rule 0 — the manifest validates against the FORMAT schema. This pair lived
+// un-checked here for a year (the validation rule existed only in the docs fork's
+// port), which is how the schema could lack the `themes`/`pageVariants` blocks the
+// manifest already shipped (R3-661): nothing on this side ever read the two together.
+// The schema is viewer-generic by contract — a Lodestar-shaped manifest must validate
+// through it — so a drift here is a broken promise to every second viewer.
+const schema = JSON.parse(readFileSync(join(root, 'viewer-manifest.schema.json'), 'utf8'));
+{
+  const ajv = new Ajv({ logger: false });
+  const validate = ajv.compile(schema);
+  if (!validate(manifest)) {
+    errors.push(`  manifest fails viewer-manifest.schema.json: ${ajv.errorsText(validate.errors)}`);
+  }
+}
 
 for (const name of exported) {
   if (!declared.has(name)) {

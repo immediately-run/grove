@@ -58,6 +58,36 @@
         "passThrough": { "type": "boolean", "description": "Whether unknown keys are allowed (they are carried, unread). False makes the vocabulary closed." }
       }
     },
+    "themes": {
+      "type": "object",
+      "description": "The theme catalogue (R3-310, bucket-independent): every shipped look, keyed by its `theme:` id. The gallery enumerates THIS, so adding a theme adds a row with no edit to any entry.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "preferred", "ships", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "description": "The reader-facing name in the theme menu." },
+          "preferred": { "enum": ["light", "dark"], "description": "The polarity the theme opens in when the reader and host have both said nothing." },
+          "ships": { "type": "boolean", "description": "Whether the theme is selectable today." },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "pageVariants": {
+      "type": "object",
+      "description": "The page-variant catalogue (R3-309, bucket B): a frontmatter key on one entry — the page, not the chrome. Behaviour lives in CSS selected by the emitted data attribute; an undeclared value falls back rather than rendering unstyled.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["key", "value", "ships", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "description": "The frontmatter key (`layout`, `frame`)." },
+          "value": { "type": "string", "description": "The value that selects this variant." },
+          "ships": { "type": "boolean", "description": "Whether the variant has shipped CSS today." },
+          "summary": { "type": "string" }
+        }
+      }
+    },
     "layouts": {
       "type": "object",
       "description": "The layout-starters catalogue (R3-309, bucket A): `_layout.mdx` starters under `content/_layouts/` a contributor or agent copies from. Keyed by starter id (= filename); `layoutRole` is the declared kind the entry and the file must agree on — the field existed in the sample layouts for a year with nothing reading it, and the catalogue is what gives it a job.",
