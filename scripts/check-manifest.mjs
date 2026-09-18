@@ -112,20 +112,28 @@ function groveMdxKeys(rawSrc) {
 // The schema is viewer-generic by contract — a Lodestar-shaped manifest must validate
 // through it — so a drift here is a broken promise to every second viewer.
 //
-// It runs FIRST: every later rule assumes the shape this one enforces (a manifest
-// missing `components` would otherwise crash on a raw TypeError instead of the gate's
-// verdict). Extracted pure so the self-test can drive planted manifests through it.
+// It runs FIRST, and it HALTS: every later rule assumes the shape this one enforces,
+// so a rejected manifest reports the schema verdict and stops — never a raw TypeError
+// from a rule that trusted the shape (a missing `components`, a null entry, …).
+// Extracted pure so the self-test can drive planted manifests through it.
 const schema = JSON.parse(readFileSync(join(root, 'viewer-manifest.schema.json'), 'utf8'));
 function schemaErrors(m) {
   const ajv = new Ajv({ logger: false });
   const validate = ajv.compile(schema);
   return validate(m) ? [] : [ajv.errorsText(validate.errors)];
 }
+{
+  const rule0 = schemaErrors(manifest);
+  if (rule0.length) {
+    console.error(`FAIL manifest ↔ reality (${rule0.length}):\n  manifest fails viewer-manifest.schema.json: ${rule0.join('\n  ')}`);
+    process.exit(1);
+  }
+}
 
-const errors = [...schemaErrors(manifest).map((e) => `  manifest fails viewer-manifest.schema.json: ${e}`)];
+const errors = [];
 
 const exported = new Set(groveMdxKeys(source));
-const declared = new Set(Object.keys(manifest.components ?? {}));
+const declared = new Set(Object.keys(manifest.components));
 
 for (const name of exported) {
   if (!declared.has(name)) {
