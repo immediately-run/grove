@@ -105,25 +105,27 @@ function groveMdxKeys(rawSrc) {
   return keys;
 }
 
-const exported = new Set(groveMdxKeys(source));
-const declared = new Set(Object.keys(manifest.components));
-
-const errors = [];
-
 // Rule 0 — the manifest validates against the FORMAT schema. This pair lived
 // un-checked here for a year (the validation rule existed only in the docs fork's
 // port), which is how the schema could lack the `themes`/`pageVariants` blocks the
 // manifest already shipped (R3-661): nothing on this side ever read the two together.
 // The schema is viewer-generic by contract — a Lodestar-shaped manifest must validate
 // through it — so a drift here is a broken promise to every second viewer.
+//
+// It runs FIRST: every later rule assumes the shape this one enforces (a manifest
+// missing `components` would otherwise crash on a raw TypeError instead of the gate's
+// verdict). Extracted pure so the self-test can drive planted manifests through it.
 const schema = JSON.parse(readFileSync(join(root, 'viewer-manifest.schema.json'), 'utf8'));
-{
+function schemaErrors(m) {
   const ajv = new Ajv({ logger: false });
   const validate = ajv.compile(schema);
-  if (!validate(manifest)) {
-    errors.push(`  manifest fails viewer-manifest.schema.json: ${ajv.errorsText(validate.errors)}`);
-  }
+  return validate(m) ? [] : [ajv.errorsText(validate.errors)];
 }
+
+const errors = [...schemaErrors(manifest).map((e) => `  manifest fails viewer-manifest.schema.json: ${e}`)];
+
+const exported = new Set(groveMdxKeys(source));
+const declared = new Set(Object.keys(manifest.components ?? {}));
 
 for (const name of exported) {
   if (!declared.has(name)) {
@@ -250,3 +252,51 @@ console.log(
     `${Object.keys(pkg.exports ?? {}).length} export subpaths resolve, ` +
     `${starterIds.length} layout starter(s), ${Object.keys(collections).length} collection shape(s).`,
 );
+
+// ── self-test ─────────────────────────────────────────────────────────────────
+// Rule 0's teeth, planted rather than asserted (the reviewer was right to demand the
+// committed form of the manual fault injection): a gate nothing has watched reject
+// anything is an assumption. Driven through `schemaErrors` — the same function the
+// gate runs — so the cases move when the rule does.
+const selfTest = () => {
+  const cases = [];
+  cases.push(['the shipped pair validates', () => schemaErrors(manifest).length === 0]);
+  cases.push(['a planted top-level key fails', () =>
+    schemaErrors({ ...manifest, bogusKey: 'x' }).length > 0]);
+  cases.push(['a manifest missing components fails with the schema verdict, not a crash', () => {
+    const { components, ...rest } = manifest;
+    return schemaErrors(rest).length > 0;
+  }]);
+  // The viewer-generic contract (spec §5.1): a Lodestar-shaped manifest — node/edge
+  // vocabulary, its own themes — validates through the same schema.
+  const lodestar = {
+    schemaVersion: 1,
+    viewer: { name: '@fictional/lodestar', kind: 'mindmap', task: 'open-mindmap' },
+    components: {
+      MindNode: { tier: 'engine', overridable: true, sanitizing: false, props: { label: 'string?', depth: 'number?' }, summary: 'A node.' },
+      MindEdge: { tier: 'engine', overridable: true, sanitizing: false, props: { from: 'string', to: 'string' }, summary: 'An edge.' },
+      Legend: { tier: 'chrome', overridable: true, sanitizing: false, props: {}, summary: 'Map chrome.' },
+      RiskBadge: { tier: 'corpus', overridable: true, sanitizing: false, props: {}, summary: 'One corpus convention.' },
+    },
+    frontmatter: { engine: ['view', 'collapsed'], corpusTooling: ['risk'], passThrough: true },
+  };
+  cases.push(['a Lodestar manifest validates through the same schema', () => schemaErrors(lodestar).length === 0]);
+  cases.push(['a manifest with an unknown tier is rejected', () =>
+    schemaErrors({ ...lodestar, components: { X: { tier: 'galaxy', overridable: true } } }).length > 0]);
+
+  let failed = 0;
+  for (const [name, fn] of cases) {
+    let pass = false;
+    try {
+      pass = fn();
+    } catch {
+      pass = false;
+    }
+    console.log(`${pass ? '✓' : '✗'} ${name}`);
+    if (!pass) failed++;
+  }
+  console.log(`\n${cases.length - failed}/${cases.length} self-test cases.`);
+  return failed === 0;
+};
+
+if (process.argv.includes('--self-test')) process.exit(selfTest() ? 0 : 1);
