@@ -9,19 +9,29 @@
 // read either shows the wrong page or, for `render: safe`, runs code that must not run.
 import { homeKey } from './content';
 import { explicitFrameKey, layoutKeysOnPath } from './layout';
+import type { CorpusScanGate } from './corpusScan';
 
 /**
  * The keys to read before `entryKey` paints, given the index as it stands. `metadata` holds
  * every LISTED key (read or not), so a layout that does not exist is never asked for. The
  * set grows once the entry's own row is read and turns out to name a `frame:` — the caller
  * recomputes on every index update, so it converges.
+ *
+ * A file whose read FAILED has left `metadata`, but it exists; it stays in the set so the
+ * gate sees its failure and fails closed, rather than painting the entry without that
+ * layout. `readFailure` is the scan's; the default suits an index with no scan behind it.
  */
-export function criticalKeys(entryKey: string, metadata: Record<string, unknown>): string[] {
+export function criticalKeys(
+  entryKey: string,
+  metadata: Record<string, unknown>,
+  readFailure: CorpusScanGate['readFailure'] = () => null,
+): string[] {
+  const exists = (key: string) => key in metadata || readFailure(key) !== null;
   const keys = [homeKey(), entryKey];
   for (const lk of layoutKeysOnPath(entryKey)) {
-    if (lk in metadata) keys.push(lk);
+    if (exists(lk)) keys.push(lk);
   }
   const frame = explicitFrameKey(metadata[entryKey] as Record<string, unknown> | undefined);
-  if (frame !== null && frame in metadata) keys.push(frame);
+  if (frame !== null && exists(frame)) keys.push(frame);
   return [...new Set(keys)];
 }

@@ -1,8 +1,9 @@
 // The body gate (MDX_FROM_MOUNT_SPEC D8), driven by a REAL scan rather than a stubbed
 // `isSettled`, so "pending" means what the scan means by it.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { criticalFailure, entryPending } from './entryGate';
 import { createCorpusScan, type ScanFs } from './corpusScan';
+import { criticalKeys } from './criticalKeys';
 
 /** A two-file corpus whose reads wait for `release()`. */
 function corpus(files: Record<string, string>) {
@@ -56,5 +57,41 @@ describe('criticalFailure', () => {
       'Could not read /c/x.mdx (EIO). Reload to try again.',
     );
     expect(criticalFailure(['/c/home.mdx'], (k) => failed[k] ?? null)).toBeNull();
+  });
+});
+
+describe('fail closed on a failed LAYOUT read, end to end with a real scan', () => {
+  it('a layout whose read failed stays critical and fails the gate, instead of painting without it', async () => {
+    const files: Record<string, string> = {
+      '/app/content/home.mdx': '---\ntitle: H\n---\n',
+      '/app/content/guides/_layout.mdx': '---\n---\n',
+      '/app/content/guides/a.mdx': '---\ntitle: A\n---\n',
+    };
+    const fs: ScanFs = {
+      async readdir(dir) {
+        const names = new Map<string, boolean>();
+        for (const p of Object.keys(files)) {
+          if (!p.startsWith(dir)) continue;
+          const rest = p.slice(dir.length);
+          const slash = rest.indexOf('/');
+          names.set(slash === -1 ? rest : rest.slice(0, slash), slash !== -1);
+        }
+        return [...names].map(([name, isDir]) => ({ name, isDirectory: () => isDir }));
+      },
+      async readFile(path) {
+        if (path.endsWith('_layout.mdx')) throw new Error('EIO dropped');
+        return files[path]!;
+      },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const scan = createCorpusScan('/app/content/', fs, { flushMs: 0 });
+    await scan.done;
+    const entry = '/app/content/guides/a.mdx';
+    const critical = criticalKeys(entry, scan.snapshot().metadata, scan.readFailure);
+    expect(critical).toContain('/app/content/guides/_layout.mdx');
+    expect(criticalFailure(critical, scan.readFailure)).toBe(
+      'Could not read /app/content/guides/_layout.mdx (EIO dropped). Reload to try again.',
+    );
+    warn.mockRestore();
   });
 });

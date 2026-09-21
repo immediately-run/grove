@@ -290,7 +290,7 @@ export default function GroveWiki({
   // read ahead of the rest, and the body waits for them: an unread row reads as
   // `render` unset, which is the executing path. The chrome around it stays mounted.
   const scanGate = useContext(CorpusScanContext);
-  const critical = criticalKeys(entryKey, allMeta);
+  const critical = criticalKeys(entryKey, allMeta, scanGate.readFailure);
   const criticalSig = critical.join('|');
   useEffect(() => {
     scanGate.prioritize(criticalSig.split('|'));
