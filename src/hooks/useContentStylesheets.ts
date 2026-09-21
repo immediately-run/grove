@@ -23,6 +23,19 @@ interface Loaded {
 
 const NONE: Loaded = { sig: '', sheets: [], errors: [] };
 
+/** How long first paint waits for one declared sheet. A sheet read is one file over the
+ *  host channel — well under a second even as a cold GitHub blob — so a read still open
+ *  after this is stalled, and the page paints without it and says so. */
+const SHEET_READ_DEADLINE_MS = 15_000;
+
+function withDeadline<T>(read: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no answer after ${SHEET_READ_DEADLINE_MS / 1000} s`)), SHEET_READ_DEADLINE_MS);
+  });
+  return Promise.race([read, deadline]).finally(() => clearTimeout(timer));
+}
+
 export function useContentStylesheets(declared: unknown, homeKey: string): ContentStylesheets {
   const { keys, errors: declarationErrors } = declaredStylesheets(declared, homeKey);
   const sig = keys.join('|');
@@ -33,7 +46,7 @@ export function useContentStylesheets(declared: unknown, homeKey: string): Conte
     let alive = true;
     const paths = sig.split('|');
     // `allSettled` never rejects, so this chain has no rejection to lose.
-    void Promise.allSettled(paths.map((p) => safeSources.read(p))).then((results) => {
+    void Promise.allSettled(paths.map((p) => withDeadline(safeSources.read(p)))).then((results) => {
       if (!alive) return;
       const sheets: ContentStylesheet[] = [];
       const errors: string[] = [];

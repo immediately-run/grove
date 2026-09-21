@@ -49,7 +49,7 @@ import BootMessage from './components/BootMessage';
 import { themeAssetsFor } from './data/themeFonts';
 import { useContentStylesheets } from './hooks/useContentStylesheets';
 import { criticalKeys } from './lib/criticalKeys';
-import { entryPending } from './lib/entryGate';
+import { criticalFailure, entryPending } from './lib/entryGate';
 import { CorpusScanContext } from './lib/corpusScanContext';
 
 declare const module: any;
@@ -296,6 +296,7 @@ export default function GroveWiki({
     scanGate.prioritize(criticalSig.split('|'));
   }, [scanGate, criticalSig]);
   const pending = entryPending(critical, scanGate.isSettled, stylesheets.status);
+  const failure = criticalFailure(critical, scanGate.readFailure);
   const chain: string[] = layoutChainForKey(entryKey, allMeta);
   const frameNone = meta?.frame === 'none' || meta?.frame === false;
 
@@ -447,8 +448,8 @@ export default function GroveWiki({
             <div className="grove-decl-error" role="status">
               <strong>A stylesheet this corpus declares could not be applied.</strong>
               <ul>
-                {sheetErrors.map((e) => (
-                  <li key={e}>{e}</li>
+                {sheetErrors.map((e, i) => (
+                  <li key={i}>{e}</li>
                 ))}
               </ul>
             </div>
@@ -466,7 +467,7 @@ export default function GroveWiki({
             </div>
           ) : null}
           <div className="grove-shell" data-nav={frameNone ? undefined : navMode}>
-            {pending ? <BootMessage /> : renderLayers(chain, useDefault, safe)}
+            {failure ? <BootMessage>{failure}</BootMessage> : pending ? <BootMessage /> : renderLayers(chain, useDefault, safe)}
           </div>
         </div>
 

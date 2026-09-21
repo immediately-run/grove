@@ -56,10 +56,11 @@ function meta(home: Record<string, unknown> = {}) {
   };
 }
 
-function gate(settled: Set<string> | 'all') {
+function gate(settled: Set<string> | 'all', failed: Record<string, string> = {}) {
   return {
     isSettled: (k: string) => settled === 'all' || settled.has(k),
     prioritize: vi.fn<CorpusScanGate['prioritize']>(),
+    readFailure: (k: string) => failed[k] ?? null,
   } satisfies CorpusScanGate;
 }
 
@@ -114,6 +115,14 @@ describe('the entry gate (D8)', () => {
     expect(bootLine(container)).toBeNull();
     expect(container.textContent).toContain('The body text.');
     expect(container.querySelector('.grove-root')).toBe(shell); // not remounted
+    await act(async () => root.unmount());
+  });
+
+  it('a critical file that failed to read fails closed: the reason, never the layers', async () => {
+    const { container, root } = mount();
+    await render(root, gate('all', { [HOME]: 'EIO' }), meta());
+    expect(bootLine(container)).toBe(`Could not read ${HOME} (EIO). Reload to try again.`);
+    expect(container.textContent).not.toContain('The body text.');
     await act(async () => root.unmount());
   });
 
@@ -179,5 +188,29 @@ describe('declared stylesheets (D7)', () => {
     expect(container.querySelector('.grove-decl-error')?.textContent).toContain(`${broken} — could not be read`);
     expect(container.textContent).toContain('The body text.');
     await act(async () => root.unmount());
+  });
+});
+
+describe('declared stylesheets — the deadline', () => {
+  it('a sheet read that never answers stops holding the page, and says so', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const stalled = '/app/content/themes/stalled.mdx';
+      readFile.mockImplementation((path: string) =>
+        path === stalled ? new Promise(() => undefined) : Promise.resolve('---\ntitle: Reference entry.\nrender: safe\n---\n\nThe body text.\n'),
+      );
+      const { container, root } = mount();
+      await render(root, gate('all'), { ...meta({ stylesheets: ['themes/stalled.mdx'] }), [stalled]: {} });
+      expect(bootLine(container)).toBe('Opening…');
+      await act(async () => {
+        vi.advanceTimersByTime(15_000);
+      });
+      for (let i = 0; i < 6; i++) await act(async () => {});
+      expect(bootLine(container)).toBeNull();
+      expect(container.querySelector('.grove-decl-error')?.textContent).toContain(`${stalled} — could not be read (no answer after 15 s)`);
+      await act(async () => root.unmount());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

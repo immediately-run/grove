@@ -94,6 +94,11 @@ function rowFor(raw: string): Frontmatter {
   return row;
 }
 
+/** A file that is simply not there is a corpus property, not a failure. */
+function isNotFound(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'ENOENT';
+}
+
 export type CorpusScanStatus = 'listing' | 'reading' | 'complete';
 
 export interface CorpusScanSnapshot {
@@ -112,6 +117,8 @@ export interface CorpusScanGate {
   isSettled(key: string): boolean;
   /** Read these keys next, ahead of the rest of the corpus. */
   prioritize(keys: readonly string[]): void;
+  /** Why a settled key's read failed, when the cause was anything but "not found". */
+  readFailure(key: string): string | null;
 }
 
 export interface CorpusScan extends CorpusScanGate {
@@ -151,6 +158,10 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   // published.
   const settled = new Set<string>();
   const read = new Set<string>();
+  // Reads that failed for a reason other than "no such file" — a dropped RPC, a rate
+  // limit. The row is gone either way, but the entry gate must not treat a transient
+  // failure of a file it needs as "this file has no frontmatter".
+  const failures = new Map<string, string>();
   const wanted = new Set<string>();
   const listeners = new Set<() => void>();
   let listed: Set<string> | null = null;
@@ -188,8 +199,13 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   const readOne = async (path: string): Promise<void> => {
     try {
       rows[path] = rowFor(await fs.readFile(path, 'utf8'));
-    } catch {
+    } catch (err) {
       delete rows[path];
+      if (!isNotFound(err)) {
+        const message = err instanceof Error ? err.message : String(err);
+        failures.set(path, message);
+        console.warn(`[grove] could not read ${path}: ${message}`);
+      }
     }
   };
   const pump = (): void => {
@@ -239,6 +255,7 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       };
     },
     isSettled: (key) => settled.has(key) || (listed !== null && !listed.has(key)),
+    readFailure: (key) => (settled.has(key) ? (failures.get(key) ?? null) : null),
     prioritize(keys) {
       const front: string[] = [];
       let readButUnpublished = false;

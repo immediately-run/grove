@@ -1,7 +1,7 @@
 // The body gate (MDX_FROM_MOUNT_SPEC D8), driven by a REAL scan rather than a stubbed
 // `isSettled`, so "pending" means what the scan means by it.
 import { describe, it, expect } from 'vitest';
-import { entryPending } from './entryGate';
+import { criticalFailure, entryPending } from './entryGate';
 import { createCorpusScan, type ScanFs } from './corpusScan';
 
 /** A two-file corpus whose reads wait for `release()`. */
@@ -46,5 +46,15 @@ describe('entryPending', () => {
   it('pending while declared stylesheets load, even with every key read', () => {
     expect(entryPending(['/c/x.mdx'], () => true, 'loading')).toBe(true);
     expect(entryPending(['/c/x.mdx'], () => true, 'ready')).toBe(false);
+  });
+});
+
+describe('criticalFailure', () => {
+  it('names the first critical key whose read failed, and nothing when none did', () => {
+    const failed: Record<string, string> = { '/c/x.mdx': 'EIO' };
+    expect(criticalFailure(['/c/home.mdx', '/c/x.mdx'], (k) => failed[k] ?? null)).toBe(
+      'Could not read /c/x.mdx (EIO). Reload to try again.',
+    );
+    expect(criticalFailure(['/c/home.mdx'], (k) => failed[k] ?? null)).toBeNull();
   });
 });

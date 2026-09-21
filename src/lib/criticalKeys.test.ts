@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { criticalKeys } from './criticalKeys';
 import { listCorpusFiles, type ScanFs } from './corpusScan';
 import { APP_CONTENT_ROOT } from './contentRoot';
+import { folderIndexKey } from './directory';
 
 const DISK_ROOT = join(process.cwd(), 'content') + '/';
 
@@ -55,6 +56,24 @@ describe('criticalKeys', () => {
     expect(criticalKeys('/app/content/x.mdx', index)).toEqual(['/app/content/home.mdx', '/app/content/x.mdx']);
     index['/app/content/x.mdx'] = { frame: 'none' };
     expect(criticalKeys('/app/content/x.mdx', index)).toEqual(['/app/content/home.mdx', '/app/content/x.mdx']);
+  });
+
+  it('a folder route: the entry is the folder index the router resolves, wrapped by that folder\'s layout', () => {
+    // GroveWiki hands `folderIndexKey(route, keys) ?? route` to criticalKeys; the real
+    // resolver picks the entry here, so the case follows the router, not a guess at it.
+    const index = {
+      '/app/content/home.mdx': {},
+      '/app/content/guides/index.mdx': {},
+      '/app/content/guides/_layout.mdx': {},
+      '/app/content/guides/first.mdx': {},
+    };
+    const entry = folderIndexKey('/app/content/guides', Object.keys(index));
+    expect(entry).toBe('/app/content/guides/index.mdx');
+    expect(criticalKeys(entry!, index)).toEqual([
+      '/app/content/home.mdx',
+      '/app/content/guides/index.mdx',
+      '/app/content/guides/_layout.mdx',
+    ]);
   });
 
   it('home is named once when it is the entry', () => {

@@ -9,6 +9,7 @@ import type { CorpusScanGate } from './corpusScan';
 const COMPLETE: CorpusScanGate = {
   isSettled: () => true,
   prioritize: () => undefined,
+  readFailure: () => null,
 };
 
 export const CorpusScanContext = createContext<CorpusScanGate>(COMPLETE);

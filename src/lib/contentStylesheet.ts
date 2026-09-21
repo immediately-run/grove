@@ -20,7 +20,7 @@
 // values are legitimate: `--font-body: "Lora", serif;`), which is safe precisely
 // because the blanked scan already proved every line is a declaration.
 
-import { hrefTargetKey } from './content';
+import { hrefTargetKey, isEntryKey } from './content';
 import { parseFrontmatter } from './frontmatter';
 
 export type GateResult =
@@ -135,8 +135,10 @@ export function declaredStylesheets(value: unknown, homeKey: string): { keys: st
   const keys: string[] = [];
   const errors: string[] = [];
   for (const item of value) {
+    // `hrefTargetKey` deliberately lets a `$fs:` link address outside the corpus; a
+    // stylesheet may not, so the result must also be an entry key of THIS corpus.
     const key = typeof item === 'string' && item ? hrefTargetKey(item, homeKey) : null;
-    if (key === null || !/\.mdx?$/.test(key)) {
+    if (key === null || !isEntryKey(key)) {
       errors.push(`${String(item)} — does not name an entry inside this corpus`);
     } else if (!keys.includes(key)) {
       keys.push(key);

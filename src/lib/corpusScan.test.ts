@@ -343,3 +343,29 @@ describe('createCorpusScan — the progressive index (MDX_FROM_MOUNT_SPEC D8)', 
     expect(scan.snapshot()).toEqual({ status: 'complete', metadata: {} });
   });
 });
+
+describe('createCorpusScan — read failures', () => {
+  const notFound = () => Object.assign(new Error('no such file'), { code: 'ENOENT' });
+
+  it('a transient failure is reported for the key once settled; a missing file is not a failure', async () => {
+    const files = { '/mnt/c/a.mdx': entry('A'), '/mnt/c/b.mdx': entry('B') };
+    const base = fakeFs(files);
+    const fs: ScanFs = {
+      readdir: base.readdir,
+      async readFile(path) {
+        if (path === '/mnt/c/a.mdx') throw new Error('EIO: the channel dropped the request');
+        if (path === '/mnt/c/b.mdx') throw notFound();
+        return base.readFile(path, 'utf8');
+      },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const scan = createCorpusScan('/mnt/c', fs, { flushMs: 0 });
+    expect(scan.readFailure('/mnt/c/a.mdx')).toBeNull(); // nothing is known yet
+    await scan.done;
+    expect(scan.readFailure('/mnt/c/a.mdx')).toBe('EIO: the channel dropped the request');
+    expect(scan.readFailure('/mnt/c/b.mdx')).toBeNull();
+    expect(scan.snapshot().metadata).toEqual({}); // both rows leave the index either way
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+});

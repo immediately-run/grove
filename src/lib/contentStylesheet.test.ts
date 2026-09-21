@@ -108,6 +108,13 @@ describe('declaredStylesheets — the home entry names its sheets (MDX_FROM_MOUN
     expect(errors[2]).toContain('42');
   });
 
+  it('a `$fs:` value may address outside the corpus as a link; as a stylesheet it may not', () => {
+    const { keys, errors } = declaredStylesheets(['$fs:/app/src/evil.mdx', '$fs:/mnt/0123abcd/secret.mdx'], HOME);
+    expect(keys).toEqual([]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain('$fs:/app/src/evil.mdx');
+  });
+
   it('a sheet declared twice is read once', () => {
     expect(declaredStylesheets(['themes/paper.mdx', './themes/paper.mdx'], HOME).keys).toEqual([
       '/app/content/themes/paper.mdx',
