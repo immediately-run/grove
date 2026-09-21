@@ -60,6 +60,45 @@ describe('criticalFailure', () => {
   });
 });
 
+/** A listing-shaped fs over `files`; a read of any path in `failing` throws EIO. */
+function failingFs(files: Record<string, string>, failing: (path: string) => boolean): ScanFs {
+  return {
+    async readdir(dir) {
+      const names = new Map<string, boolean>();
+      for (const p of Object.keys(files)) {
+        if (!p.startsWith(dir)) continue;
+        const rest = p.slice(dir.length);
+        const slash = rest.indexOf('/');
+        names.set(slash === -1 ? rest : rest.slice(0, slash), slash !== -1);
+      }
+      return [...names].map(([name, isDir]) => ({ name, isDirectory: () => isDir }));
+    },
+    async readFile(path) {
+      if (failing(path)) throw new Error('EIO dropped');
+      return files[path]!;
+    },
+  };
+}
+
+describe('fail closed on a failed FRAME read, end to end with a real scan', () => {
+  it('a frame: target whose read failed stays critical and fails the gate', async () => {
+    const files: Record<string, string> = {
+      '/app/content/home.mdx': '---\ntitle: H\n---\n',
+      '/app/content/frames/wide.mdx': '---\n---\n',
+      '/app/content/a.mdx': '---\ntitle: A\nframe: frames/wide\n---\n',
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const scan = createCorpusScan('/app/content/', failingFs(files, (p) => p.endsWith('wide.mdx')), { flushMs: 0 });
+    await scan.done;
+    const critical = criticalKeys('/app/content/a.mdx', scan.snapshot().metadata, scan.readFailure);
+    expect(critical).toContain('/app/content/frames/wide.mdx');
+    expect(criticalFailure(critical, scan.readFailure)).toBe(
+      'Could not read /app/content/frames/wide.mdx (EIO dropped). Reload to try again.',
+    );
+    warn.mockRestore();
+  });
+});
+
 describe('fail closed on a failed LAYOUT read, end to end with a real scan', () => {
   it('a layout whose read failed stays critical and fails the gate, instead of painting without it', async () => {
     const files: Record<string, string> = {
