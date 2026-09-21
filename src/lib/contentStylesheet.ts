@@ -1,7 +1,13 @@
-// The content-stylesheet grammar gate (R3-316; plan 05-content-carried-themes).
+// Content stylesheets (R3-316; plan 05-content-carried-themes): how a corpus declares them
+// and the grammar gate every one passes.
 //
-// Author-supplied CSS is contained by a GRAMMAR, not by the CSP: a `ui/stylesheet`
-// entry may carry declarations and NOTHING else. A selector would let it reach
+// DECLARATION (MDX_FROM_MOUNT_SPEC D7). The home entry lists them — `stylesheets:
+// [themes/paper.mdx]` — resolved like a link in the home entry: relative to it, confined to
+// the corpus. They used to be discovered by a frontmatter tag, which made the wiki's look
+// depend on reading every file in the corpus before the first page could paint.
+//
+// GRAMMAR. Author-supplied CSS is contained by a GRAMMAR, not by the CSP: a content
+// stylesheet may carry declarations and NOTHING else. A selector would let it reach
 // the DOM (and hide the theme control); `url(`/`@import`/`@font-face` would let
 // it name a network location — the existence-oracle channel the CSP does not
 // close for an INTERPRETED, SHARED space (no CSP at all there), which is the gap
@@ -13,6 +19,9 @@
 // EMITTED declarations come from the original bytes (a declaration's quoted
 // values are legitimate: `--font-body: "Lora", serif;`), which is safe precisely
 // because the blanked scan already proved every line is a declaration.
+
+import { hrefTargetKey, isEntryKey } from './content';
+import { parseFrontmatter } from './frontmatter';
 
 export type GateResult =
   | { ok: true; declarations: string }
@@ -81,7 +90,7 @@ export function gateStylesheet(css: string): GateResult {
     return {
       ok: false,
       line,
-      reason: 'a selector/rule block — a ui/stylesheet carries declarations only',
+      reason: 'a selector/rule block — a content stylesheet carries declarations only',
       excerpt: css.split('\n')[line - 1]?.trim().slice(0, 80) ?? '',
     };
   }
@@ -100,4 +109,53 @@ export function gateStylesheet(css: string): GateResult {
     }
   }
   return { ok: true, declarations: origLines.map((l) => l.trim()).filter(Boolean).join('\n') };
+}
+
+/** A declared stylesheet, read: the body is the CSS the grammar gates. */
+export interface ContentStylesheet {
+  /** The entry's absolute fs path (the declaring file for its asset refs). */
+  path: string;
+  /** The raw body bytes (CSS). */
+  css: string;
+  /** The entry's declared fonts/assets, if any. */
+  declarations: { fonts?: unknown; assets?: unknown };
+}
+
+/**
+ * The stylesheet keys a home entry's `stylesheets:` value declares, resolved against the
+ * home entry, plus a reader-facing error for every value that cannot be one. Absent means
+ * none; any other non-list is an error rather than a guess, because the author has no
+ * other way to learn their theme did not load.
+ */
+export function declaredStylesheets(value: unknown, homeKey: string): { keys: string[]; errors: string[] } {
+  if (value === undefined || value === null) return { keys: [], errors: [] };
+  if (!Array.isArray(value)) {
+    return { keys: [], errors: ['`stylesheets:` on the home entry must be a list of entry paths'] };
+  }
+  const keys: string[] = [];
+  const errors: string[] = [];
+  for (const item of value) {
+    // `hrefTargetKey` deliberately lets a `$fs:` link address outside the corpus; a
+    // stylesheet may not, so the result must also be an entry key of THIS corpus.
+    const key = typeof item === 'string' && item ? hrefTargetKey(item, homeKey) : null;
+    if (key === null || !isEntryKey(key)) {
+      errors.push(`${String(item)} — does not name an entry inside this corpus`);
+    } else if (!keys.includes(key)) {
+      keys.push(key);
+    }
+  }
+  return { keys, errors };
+}
+
+/** A stylesheet entry's source → its body CSS and declared `fonts:`/`assets:`. */
+export function sheetFromSource(path: string, raw: string): ContentStylesheet {
+  const { data, body } = parseFrontmatter(raw);
+  return {
+    path,
+    css: body,
+    declarations: {
+      ...(Array.isArray(data.fonts) ? { fonts: data.fonts } : {}),
+      ...(data.assets && typeof data.assets === 'object' ? { assets: data.assets } : {}),
+    },
+  };
 }

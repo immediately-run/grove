@@ -202,8 +202,9 @@ editing (see *Versioning & collaboration* for the v1 limits).
 - **Editing:** the `edit-file` task delegates exactly the one file being edited
   (`EDITOR_FIRST_EDITING_SPEC` §3.1) — see the §6 Delta B honesty note below for the
   current main-pane-vs-overlay limitation.
-- **Customization:** the engine is stock; theming is still possible via the `ui/stylesheet`
-  tag (content-carried CSS), but a heavily customized look favours forking into Mode A.
+- **Customization:** the engine is stock; theming is still possible via the stylesheets
+  the home entry declares (content-carried CSS), but a heavily customized look favours
+  forking into Mode A.
 
 > **The two modes are a spectrum, not a fork in the road.** The engine discovers its
 > content source the same way in both (a scan over MDX files); only the *mount* differs.
@@ -506,11 +507,16 @@ that the engine applies as a theme. This lets a **space-backed** Grove (Mode B) 
 re-themed *without forking the engine* — the theme travels with the content, edited like
 any other entry.
 
+*(2026-09-21 — the discovery half is superseded by `MDX_FROM_MOUNT_SPEC` D7: the home
+entry declares its stylesheets in a `stylesheets:` list, and the tag no longer does
+anything. Finding tagged entries meant reading every file before the first page could
+paint. The theme still travels with the content.)*
+
 **Guardrails (carry into the spec).** UI tags compose authority-free chrome from
 content, so the spec must bound them: reserved tags live in a documented namespace
 (`ui/*`) so a normal content tag can't accidentally inject chrome; a `ui/action` entry
 can only invoke a **curated, declared** action set (navigation and built-ins) — it is
-*not* an arbitrary code-execution surface; and CSS from `ui/stylesheet` entries is
+*not* an arbitrary code-execution surface; and CSS from content stylesheet entries is
 applied within the app's own sandboxed iframe under the platform **content-trust** posture
 (`core_concepts` §8) — a multi-writer space is lower-trust input, so the spec decides how
 freely author-supplied CSS/chrome is honored. (TiddlyWiki trusts its single author; Grove
@@ -720,7 +726,7 @@ extension surface, kept deliberately small enough for an agent to wield.
 > engine — not as content alone. That's by design: forking is the platform's native
 > customization model, and the agent is what makes a fork cheap *to write*. The
 > *maintenance* cost of a fork (re-merging upstream engine improvements) is real and is
-> the price of deep customization; content-only customization (theme via `ui/stylesheet`,
+> the price of deep customization; content-only customization (theme via declared content stylesheets,
 > chrome via tag-driven UI) avoids it. The spec should keep that line bright so users know
 > which asks stay in content and which produce a fork.
 
@@ -838,7 +844,7 @@ specifies. An agent uses the contract to *understand structure*, not to *take or
 - **Content-trust aware.** A Grove rendering a *multi-writer* space is reading
   lower-trust bytes (`core_concepts` §8). MDX executes JSX, so the engine renders the
   curated import-free component set by default and treats arbitrary author-imported
-  components and `ui/stylesheet` CSS under the platform's content-trust posture — a
+  components and content-stylesheet CSS under the platform's content-trust posture — a
   consideration to carry into the spec, not hand-wave.
 - **Composes, doesn't reimplement** (value 7). Publishing & versioning = git (GitHub).
   Manual editing = the platform editor. Contribution/PRs = the host contribute flow +
@@ -920,7 +926,7 @@ Stated plainly so the product isn't mistaken for something it isn't:
 8. **Search & scale** — client-side over the in-memory index for v1; define the entry
    count at which scan-everything/index-in-memory stops being acceptable, and the fallback.
 9. **MDX & CSS content-trust posture** — how far to let entries import/execute arbitrary
-   JSX, and how freely to honor `ui/action` chrome and `ui/stylesheet` CSS, when the
+   JSX, and how freely to honor `ui/action` chrome and content-stylesheet CSS, when the
    source is a low-trust multi-writer space (`core_concepts` §8).
 10. **Agent-contract specifics** (own spec, `GROVE_AGENT_CONTRACT_SPEC.md`) — the
     direction is committed (layered durable contract; derived manifest + authored

@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.4",
   "exports": [
     ".",
     "./app",
@@ -24,6 +24,7 @@
     "Infobox",
     "Kbd",
     "KeyValue",
+    "LayoutGallery",
     "Lede",
     "More",
     "Outlet",
@@ -33,6 +34,7 @@
     "TableOfContents",
     "TagCloud",
     "TagList",
+    "ThemeGallery",
     "Timeline",
     "Toc",
     "a",
@@ -40,13 +42,16 @@
   ],
   "manifestFrontmatter": {
     "engine": [
+      "cover",
       "frame",
       "layout",
       "nav",
       "order",
       "render",
       "site",
+      "stylesheets",
       "tags",
+      "theme",
       "view"
     ],
     "corpusTooling": []

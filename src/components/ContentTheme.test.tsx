@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // R3-316's component + escape-hatch exits:
-//   • a clean ui/stylesheet renders into @layer grove.content (and its declared
+//   • a clean content stylesheet renders into @layer grove.content (and its declared
 //     faces mint through the R3-315 path — never a url());
 //   • a rejected sheet names the line and degrades (no style element for it);
 //   • THE ESCAPE HATCH: the hiding vectors a content stylesheet would try are

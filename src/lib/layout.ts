@@ -21,6 +21,26 @@ function layoutKeyForDir(dir: string): string {
 }
 
 /**
+ * The folder-convention layout keys that COULD wrap `entryKey`, outermost first: one per
+ * directory from the content root down to the entry's own. Whether each exists is the
+ * caller's question — the chain asks the index, the entry gate asks it too, and both must
+ * walk the same directories.
+ */
+export function layoutKeysOnPath(entryKey: string): string[] {
+  const root = contentDir();
+  if (!entryKey.startsWith(root)) return [];
+  // Directories from the content root down to (but not including) the entry file.
+  const segs = entryKey.slice(root.length).split('/').slice(0, -1); // "people/ada.mdx" → ["people"]
+  const keys = [layoutKeyForDir(root)];
+  let dir = root;
+  for (const s of segs) {
+    dir = dir + s + '/';
+    keys.push(layoutKeyForDir(dir));
+  }
+  return keys;
+}
+
+/**
  * R3-309 — which nav arrangement the ROOT layout asks for. The root `_layout.mdx`'s
  * frontmatter may carry `nav: top | nav: side`; anything else (absent, misspelled,
  * another shape) falls back to `'side'`, the arrangement Grove has always shipped —
@@ -47,6 +67,14 @@ export function resolvePageLayout(
 ): 'doc' | 'post' | 'full' {
   const v = entryMeta?.layout;
   return v === 'post' || v === 'full' ? v : 'doc';
+}
+
+/** The layout key an entry names with `frame: '<slug>'`, or null when it names none
+ *  (absent, `none`, `false`, or not a string). Whether that layout exists is the caller's
+ *  question. */
+export function explicitFrameKey(entryMeta: Record<string, unknown> | undefined): string | null {
+  const f = entryMeta?.frame;
+  return typeof f === 'string' && f && f !== 'none' ? slugToKey(f) : null;
 }
 
 /** Does an entry/layout opt out of an inherited layout chain? `frame: none`
@@ -82,29 +110,12 @@ export function layoutChainForKey(
   const entryMeta = metaOf(entryKey);
   if (optsOut(entryMeta)) return [];
 
-  const explicit = entryMeta?.frame;
-  if (typeof explicit === 'string' && explicit && explicit !== 'none') {
-    const key = slugToKey(explicit);
-    return allKeys.includes(key) ? [key] : [];
-  }
+  const explicit = explicitFrameKey(entryMeta);
+  if (explicit !== null) return allKeys.includes(explicit) ? [explicit] : [];
 
   const present = new Set(allKeys.filter(isLayoutKey));
-  const root = contentDir();
-  if (!entryKey.startsWith(root)) return [];
-
-  // Directories from the content root down to (but not including) the entry file.
-  const rel = entryKey.slice(root.length); // e.g. "people/ada.mdx"
-  const segs = rel.split('/').slice(0, -1); // e.g. ["people"]
-  const dirs = [root];
-  let dir = root;
-  for (const s of segs) {
-    dir = dir + s + '/';
-    dirs.push(dir);
-  }
-
   const chain: string[] = [];
-  for (const d of dirs) {
-    const lk = layoutKeyForDir(d);
+  for (const lk of layoutKeysOnPath(entryKey)) {
     if (!present.has(lk)) continue;
     if (optsOut(metaOf(lk))) chain.length = 0; // this layout is a new root
     chain.push(lk);

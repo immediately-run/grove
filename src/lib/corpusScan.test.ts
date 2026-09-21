@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { scanCorpus, listCorpusFiles, type ScanFs } from './corpusScan';
+import { describe, it, expect, vi } from 'vitest';
+import { createCorpusScan, scanCorpus, listCorpusFiles, type ScanFs } from './corpusScan';
 import { parseFrontmatter } from './frontmatter';
 
 /** An in-memory tree, shaped like the fs slice the scan injects. */
@@ -187,5 +187,185 @@ describe('scanCorpus — the additive headings index (GROVE_AGENT_SPEC §4)', ()
     const fs = fakeFs({ '/mnt/c/a.mdx': '---\ntitle: A\n---\n\nprose only\n' });
     const meta = await scanCorpus('/mnt/c', fs);
     expect(meta['/mnt/c/a.mdx']).toEqual({ title: 'A' });
+  });
+});
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+/** The same tree as `fakeFs`, but every `readFile` waits until the test releases it — so
+ *  a test can observe the scan between the listing and the reads, and see read order. */
+function heldFs(files: Record<string, string>, opts: { unreadable?: string[] } = {}) {
+  const base = fakeFs(files, opts);
+  const calls: string[] = [];
+  const held = new Map<string, () => void>();
+  const fs: ScanFs = {
+    readdir: base.readdir,
+    readFile(path, enc) {
+      calls.push(path);
+      return new Promise<void>((resolve) => held.set(path, resolve)).then(() => base.readFile(path, enc));
+    },
+  };
+  const release = async (path: string) => {
+    held.get(path)!();
+    held.delete(path);
+    await tick(); // let the settle + pump run
+  };
+  return { fs, calls, held, release };
+}
+
+
+describe('createCorpusScan — the progressive index (MDX_FROM_MOUNT_SPEC D8)', () => {
+  const tree = {
+    '/mnt/c/home.mdx': entry('Home'),
+    '/mnt/c/a.mdx': entry('A'),
+    '/mnt/c/z.mdx': entry('Z'),
+  };
+
+  it('seeds EVERY listed key with an empty row before any file is read', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { flushMs: 60_000 });
+    expect(scan.snapshot().status).toBe('listing');
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    expect(scan.snapshot().metadata).toEqual({ '/mnt/c/a.mdx': {}, '/mnt/c/home.mdx': {}, '/mnt/c/z.mdx': {} });
+    expect(h.held.size).toBeGreaterThan(0); // reads started, none resolved
+    scan.dispose();
+  });
+
+  it('isSettled: false while listing and for a listed-unread key; true once read, once failed, or never listed', async () => {
+    const h = heldFs(tree, { unreadable: ['/mnt/c/z.mdx'] });
+    const scan = createCorpusScan('/mnt/c', h.fs, { flushMs: 0 }); // settled = read AND published
+    expect(scan.isSettled('/mnt/c/a.mdx')).toBe(false);
+    expect(scan.isSettled('/mnt/c/missing.mdx')).toBe(false); // the listing has not answered yet
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    expect(scan.isSettled('/mnt/c/a.mdx')).toBe(false);
+    expect(scan.isSettled('/mnt/c/missing.mdx')).toBe(true);
+    await h.release('/mnt/c/a.mdx');
+    await vi.waitFor(() => expect(scan.isSettled('/mnt/c/a.mdx')).toBe(true));
+    await h.release('/mnt/c/z.mdx');
+    await vi.waitFor(() => expect(scan.isSettled('/mnt/c/z.mdx')).toBe(true));
+    await h.release('/mnt/c/home.mdx');
+    await scan.done;
+    // The unreadable entry leaves the index, exactly as the whole-corpus scan always did.
+    expect(Object.keys(scan.snapshot().metadata).sort()).toEqual(['/mnt/c/a.mdx', '/mnt/c/home.mdx']);
+    expect(scan.snapshot().status).toBe('complete');
+  });
+
+  it('prioritize: a key asked for is the NEXT read, ahead of the rest of the corpus', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 60_000 });
+    await vi.waitFor(() => expect(h.calls).toEqual(['/mnt/c/a.mdx'])); // sorted order, one at a time
+    scan.prioritize(['/mnt/c/z.mdx']);
+    await h.release('/mnt/c/a.mdx');
+    await vi.waitFor(() => expect(h.calls).toEqual(['/mnt/c/a.mdx', '/mnt/c/z.mdx']));
+    scan.dispose();
+  });
+
+  it('prioritize before the listing finishes: the wanted key is read first', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 60_000 });
+    scan.prioritize(['/mnt/c/z.mdx']);
+    await vi.waitFor(() => expect(h.calls).toEqual(['/mnt/c/z.mdx']));
+    scan.dispose();
+  });
+
+  it('a prioritized key publishes as soon as it settles, without waiting for the flush timer', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 60_000 });
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    const before = scan.snapshot();
+    const seen = vi.fn();
+    scan.subscribe(seen);
+    scan.prioritize(['/mnt/c/a.mdx']); // already in flight — still wanted
+    await h.release('/mnt/c/a.mdx');
+    await vi.waitFor(() => expect(seen).toHaveBeenCalledTimes(1));
+    expect(scan.snapshot()).not.toBe(before);
+    expect(scan.snapshot().metadata['/mnt/c/a.mdx'].title).toBe('A');
+    scan.dispose();
+  });
+
+  it('a read key is not settled until its row is published — the gate never runs ahead of the index', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 60_000 });
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    await h.release('/mnt/c/a.mdx'); // read, nobody asked for it: waits for the flush
+    expect(scan.snapshot().metadata['/mnt/c/a.mdx']).toEqual({});
+    expect(scan.isSettled('/mnt/c/a.mdx')).toBe(false);
+    scan.prioritize(['/mnt/c/a.mdx']); // now it is wanted: published at once
+    expect(scan.isSettled('/mnt/c/a.mdx')).toBe(true);
+    expect(scan.snapshot().metadata['/mnt/c/a.mdx'].title).toBe('A');
+    scan.dispose();
+  });
+
+  it('an unprioritized read is batched into the next flush', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 20 });
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    const seen = vi.fn();
+    scan.subscribe(seen);
+    await h.release('/mnt/c/a.mdx');
+    await tick();
+    expect(seen).not.toHaveBeenCalled(); // not per file
+    await vi.waitFor(() => expect(seen).toHaveBeenCalledTimes(1)); // the timer's flush
+    scan.dispose();
+  });
+
+  it('dispose stops handing out reads and cancels the pending publish', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 5 });
+    await vi.waitFor(() => expect(h.calls).toHaveLength(1));
+    const seen = vi.fn();
+    scan.subscribe(seen);
+    scan.dispose();
+    await h.release(h.calls[0]!);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(h.calls).toHaveLength(1);
+    expect(seen).not.toHaveBeenCalled();
+    await scan.done; // resolves on dispose rather than hanging
+  });
+
+  it('unsubscribe removes exactly that listener', async () => {
+    const h = heldFs(tree);
+    const scan = createCorpusScan('/mnt/c', h.fs, { flushMs: 60_000 });
+    const kept = vi.fn();
+    const dropped = vi.fn();
+    scan.subscribe(kept);
+    const off = scan.subscribe(dropped);
+    off();
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    expect(kept).toHaveBeenCalledTimes(1);
+    expect(dropped).not.toHaveBeenCalled();
+    scan.dispose();
+  });
+
+  it('an empty bundle completes straight from the listing', async () => {
+    const scan = createCorpusScan('/mnt/c', fakeFs({ '/mnt/c/notes.txt': 'x' }));
+    await scan.done;
+    expect(scan.snapshot()).toEqual({ status: 'complete', metadata: {} });
+  });
+});
+
+describe('createCorpusScan — read failures', () => {
+  const notFound = () => Object.assign(new Error('no such file'), { code: 'ENOENT' });
+
+  it('a transient failure is reported for the key once settled; a missing file is not a failure', async () => {
+    const files = { '/mnt/c/a.mdx': entry('A'), '/mnt/c/b.mdx': entry('B') };
+    const base = fakeFs(files);
+    const fs: ScanFs = {
+      readdir: base.readdir,
+      async readFile(path) {
+        if (path === '/mnt/c/a.mdx') throw new Error('EIO: the channel dropped the request');
+        if (path === '/mnt/c/b.mdx') throw notFound();
+        return base.readFile(path, 'utf8');
+      },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const scan = createCorpusScan('/mnt/c', fs, { flushMs: 0 });
+    expect(scan.readFailure('/mnt/c/a.mdx')).toBeNull(); // nothing is known yet
+    await scan.done;
+    expect(scan.readFailure('/mnt/c/a.mdx')).toBe('EIO: the channel dropped the request');
+    expect(scan.readFailure('/mnt/c/b.mdx')).toBeNull();
+    expect(scan.snapshot().metadata).toEqual({}); // both rows leave the index either way
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });

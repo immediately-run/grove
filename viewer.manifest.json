@@ -271,6 +271,7 @@
     "engine": [
       "site",
       "theme",
+      "stylesheets",
       "layout",
       "view",
       "frame",

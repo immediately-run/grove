@@ -2,7 +2,7 @@
 // NAMED; comment- and string-hidden attempts do not change the verdict; clean
 // declarations pass with their quoted values intact.
 import { describe, it, expect } from 'vitest';
-import { gateStylesheet, blankCssNoise } from './contentStylesheet';
+import { gateStylesheet, blankCssNoise, declaredStylesheets, sheetFromSource } from './contentStylesheet';
 
 describe('clean sheets pass', () => {
   it('declarations-only CSS is admitted, quoted values intact', () => {
@@ -76,5 +76,61 @@ describe('the existence-oracle payload — the attack the grammar exists for', (
     // Either catch is a correct rejection: the url( (the exfil channel) or the
     // selector (the reach). Both are named, line-accurate verdicts.
     if (!v.ok) expect(v.reason).toMatch(/selector|url\(/);
+  });
+});
+
+describe('declaredStylesheets — the home entry names its sheets (MDX_FROM_MOUNT_SPEC D7)', () => {
+  const HOME = '/app/content/home.mdx';
+
+  it('resolves each value like a link in the home entry', () => {
+    expect(declaredStylesheets(['themes/paper.mdx', './themes/ink.md'], HOME)).toEqual({
+      keys: ['/app/content/themes/paper.mdx', '/app/content/themes/ink.md'],
+      errors: [],
+    });
+  });
+
+  it('absent means none, silently', () => {
+    expect(declaredStylesheets(undefined, HOME)).toEqual({ keys: [], errors: [] });
+  });
+
+  it('a value that is not a list is an error naming the key, not a guess', () => {
+    const { keys, errors } = declaredStylesheets('themes/paper.mdx', HOME);
+    expect(keys).toEqual([]);
+    expect(errors).toEqual([expect.stringContaining('`stylesheets:`')]);
+  });
+
+  it('a value that names no entry inside the corpus is an error naming the value', () => {
+    const { keys, errors } = declaredStylesheets(['../outside.mdx', 'themes/paper.css', 42, 'themes/paper.mdx'], HOME);
+    expect(keys).toEqual(['/app/content/themes/paper.mdx']);
+    expect(errors).toHaveLength(3);
+    expect(errors[0]).toContain('../outside.mdx');
+    expect(errors[1]).toContain('themes/paper.css');
+    expect(errors[2]).toContain('42');
+  });
+
+  it('a `$fs:` value may address outside the corpus as a link; as a stylesheet it may not', () => {
+    const { keys, errors } = declaredStylesheets(['$fs:/app/src/evil.mdx', '$fs:/mnt/0123abcd/secret.mdx'], HOME);
+    expect(keys).toEqual([]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain('$fs:/app/src/evil.mdx');
+  });
+
+  it('a sheet declared twice is read once', () => {
+    expect(declaredStylesheets(['themes/paper.mdx', './themes/paper.mdx'], HOME).keys).toEqual([
+      '/app/content/themes/paper.mdx',
+    ]);
+  });
+});
+
+describe('sheetFromSource', () => {
+  it('splits the body CSS from the declared fonts and assets', () => {
+    const sheet = sheetFromSource(
+      '/app/content/themes/paper.mdx',
+      '---\nfonts:\n  - family: Lora\nassets:\n  paper: ./paper.jpg\n---\n--wash: var(--asset-paper);\n',
+    );
+    expect(sheet.path).toBe('/app/content/themes/paper.mdx');
+    expect(sheet.css.trim()).toBe('--wash: var(--asset-paper);');
+    expect(sheet.declarations.assets).toEqual({ paper: './paper.jpg' });
+    expect(Array.isArray(sheet.declarations.fonts)).toBe(true);
   });
 });
