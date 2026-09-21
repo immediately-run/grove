@@ -8,7 +8,7 @@
 
 /* R3-316 — the escape hatch, pinned where content cannot reach: for !important
    declarations EARLIER layers win, so grove.reset (the first layer, ordered in
-   index.css) beats grove.content no matter what a ui/stylesheet tries. A reader
+   index.css) beats grove.content no matter what a content stylesheet tries. A reader
    can always reach a shipped theme without clearing storage — the one guarantee
    the content layer must not be able to revoke. Proven by test (the hiding
    vectors are enumerated), not by reading this comment. */
@@ -2994,9 +2994,9 @@ button.grove-search__row {
   padding: 0 18px;
 }
 
-/* Boot gate (R3-169) — shown only while a dispatched viewer resolves its delegated
-   corpus, or when that delegation never arrived. Deliberately plain: at this point the
-   corpus is not readable, so none of its theming applies. */
+/* Boot gate (R3-169) — shown while a dispatched viewer resolves its delegated corpus,
+   lists it, or reads the few files the requested entry needs; and when that delegation
+   never arrived. Deliberately plain: the corpus's own theming is not applied yet. */
 .grove-boot {
   display: grid;
   place-items: center;

@@ -12,8 +12,12 @@
 // Every helper the wiki is made of — which keys are entries, what their hrefs are, which
 // layouts wrap them — is a function of the root; every surface a reader sees — nav,
 // sidebar, search, backlinks, routing, the 404 index — is a function of the index. A
-// component that rendered before either was settled would show the VIEWER's corpus, or an
-// empty one, and then not correct itself. Both are outcomes dispatch may never produce.
+// component that rendered before the root was settled would show the VIEWER's corpus, and
+// then not correct itself; so would one that rendered with no index in scope, because the
+// metadata hooks fall back to the host's store. So this file holds until the root is
+// settled and the bundle is LISTED — every key known, rows filling in — and from then on
+// always provides the bundle's index. Which rows an entry needs READ before it paints is
+// GroveWiki's call (MDX_FROM_MOUNT_SPEC D8).
 //
 // Hence the split: this file resolves, `GroveWiki` renders.
 
@@ -29,6 +33,8 @@ import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
 import { viewedDocumentForTarget } from './lib/content';
 import GroveWiki from './GroveWiki';
+import BootMessage from './components/BootMessage';
+import { CorpusScanContext } from './lib/corpusScanContext';
 
 // R3-268 — the viewed-document rule, registered ONCE at module load: every
 // `navigate()`/`<Link>` navigation declares which file the destination renders,
@@ -81,25 +87,18 @@ export default function App() {
     boot.status === 'ready' || boot.status === 'fork' ? getContentRoot() : null,
   );
 
-  if (boot.status === 'failed') {
-    return (
-      <div className="grove-boot">
-        <p className="grove-boot__msg">{boot.message}</p>
-      </div>
-    );
-  }
+  if (boot.status === 'failed') return <BootMessage>{boot.message}</BootMessage>;
 
   // The provider must be COMPLETE before content paints (MDX_FROM_MOUNT_SPEC §2's
   // invariant): rendering into a half-composed map would flash a missing-component error
   // for `<RoadmapBoard>` until registration landed — the very error content components
   // exist to remove — and a nested provider patched in afterwards would do the same.
-  // Holding here costs nothing, because the gate already exists for the bundle scan.
-  if (boot.status === 'waiting' || bundle.status === 'scanning' || contentComponents.status === 'loading') {
-    return (
-      <div className="grove-boot">
-        <p className="grove-boot__msg">Opening…</p>
-      </div>
-    );
+  //
+  // The frontmatter index is NOT held for (D8). Once the bundle is listed every key is
+  // known; the rows the requested entry needs are GroveWiki's to wait for, and the rest
+  // fill in around a painted page.
+  if (boot.status === 'waiting' || bundle.status === 'listing' || contentComponents.status === 'loading') {
+    return <BootMessage />;
   }
 
   // Corpus-declared components (R3-174) go on as a nested provider, which the SDK's
@@ -120,14 +119,17 @@ export default function App() {
   // the resolved theme (the catalogue looks change the reading face); nothing
   // font-shaped waits on the scan from here.
 
-  if (bundle.status === 'ready' && bundle.metadata) {
+  if (bundle.metadata && bundle.scan) {
     // Provide the scanned bundle as the metadata SOURCE through the supported
     // surface (R3-276), not a wholesale TinkerableContext re-provision: the
     // platform stays free to grow its own state, and the hooks read the nearest
     // MetadataSource — so every consumer works unchanged, and nothing re-states
-    // host fields it does not own.
+    // host fields it does not own. Provided from the first partial index on, so the
+    // tree keeps its shape when the scan completes rather than remounting the wiki.
     return (
-      <MetadataSource value={bundle.metadata}>{withComponents}</MetadataSource>
+      <CorpusScanContext value={bundle.scan}>
+        <MetadataSource value={bundle.metadata}>{withComponents}</MetadataSource>
+      </CorpusScanContext>
     );
   }
 

@@ -97,6 +97,7 @@ is one corpus's conventions (declared by that corpus, not this repo).
 
 - `site`
 - `theme`
+- `stylesheets`
 - `layout`
 - `view`
 - `frame`

@@ -38,6 +38,11 @@ export interface ScanFs {
  *  floods the channel the rest of the app shares. A small pool is the honest middle. */
 const READ_CONCURRENCY = 8;
 
+/** How often a running scan publishes a new metadata map. Every consumer of the index
+ *  re-derives on a new identity, so a map per file would re-render the wiki a thousand
+ *  times on a large corpus; a key the entry is waiting on publishes at once instead. */
+const FLUSH_MS = 250;
+
 /** Entry files. `_layout.mdx` is INCLUDED deliberately: `layoutChainForKey` resolves the
  *  chain by looking for layout keys in this very map, so excluding structural files here
  *  would silently drop every layout under dispatch. Reader-facing enumerations filter with
@@ -47,7 +52,8 @@ const ENTRY_RE = /\.mdx?$/;
 /** Directories never worth walking in a content mount. */
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.immediately.run']);
 
-/** Every entry path under `root`, depth-first, absolute. */
+/** Every entry path under `root`, absolute and sorted. Sibling directories are walked
+ *  concurrently: the listing is on the path to first paint, and it reads no file bodies. */
 export async function listCorpusFiles(root: string, fs: ScanFs, maxDepth = 12): Promise<string[]> {
   const out: string[] = [];
   const walk = async (dir: string, depth: number): Promise<void> => {
@@ -66,55 +72,205 @@ export async function listCorpusFiles(root: string, fs: ScanFs, maxDepth = 12): 
         out.push(`${dir}${it.name}`);
       }
     }
-    for (const d of dirs) await walk(d, depth + 1);
+    await Promise.all(dirs.map((d) => walk(d, depth + 1)));
   };
   await walk(root.endsWith('/') ? root : `${root}/`, 0);
   return out.sort();
 }
 
-/** Read + parse a list of entries into the metadata map, bounded-concurrently.
- *
- * The additive headings index extension (GROVE_AGENT_SPEC §4): a dispatched row
- * carries its entry's `headings: [{id, text, depth}]`, ids from the same
- * mdx-plugins canon the render path emits (via the SDK's `collectHeadings` — one
- * implementation, shared with the tool that reads the field). The author's own
- * frontmatter `headings` key wins; a row with none of either simply lacks the
- * field (readers degrade to body reads). */
-async function readAll(paths: string[], fs: ScanFs): Promise<CorpusMetadata> {
-  const meta: CorpusMetadata = {};
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    for (;;) {
-      const i = next++;
-      if (i >= paths.length) return;
-      const path = paths[i];
-      try {
-        const raw = await fs.readFile(path, 'utf8');
-        const parsed = parseFrontmatter(raw);
-        const row = parsed.data;
-        const headings = collectHeadings(parsed.body);
-        if (headings.length && !Object.prototype.hasOwnProperty.call(row, 'headings')) {
-          meta[path] = { ...row, headings } as Frontmatter & { headings?: unknown };
-        } else {
-          meta[path] = row;
-        }
-      } catch {
-        // One unreadable entry must not empty the whole corpus. It is simply absent from
-        // the index — the same state it would be in if the author had not written it.
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, paths.length) }, worker));
-  return meta;
+/** One entry's index row: its frontmatter, plus the additive headings index extension
+ *  (GROVE_AGENT_SPEC §4). A dispatched row carries its entry's `headings: [{id, text,
+ *  depth}]`, ids from the same mdx-plugins canon the render path emits (via the SDK's
+ *  `collectHeadings` — one implementation, shared with the tool that reads the field). The
+ *  author's own frontmatter `headings` key wins; a row with none of either simply lacks the
+ *  field (readers degrade to body reads). */
+function rowFor(raw: string): Frontmatter {
+  const parsed = parseFrontmatter(raw);
+  const row = parsed.data;
+  const headings = collectHeadings(parsed.body);
+  if (headings.length && !Object.prototype.hasOwnProperty.call(row, 'headings')) {
+    return { ...row, headings } as Frontmatter & { headings?: unknown };
+  }
+  return row;
+}
+
+export type CorpusScanStatus = 'listing' | 'reading' | 'complete';
+
+export interface CorpusScanSnapshot {
+  status: CorpusScanStatus;
+  /** Every listed entry, keyed by absolute path. A row is `{}` until its file is read, so
+   *  existence and link resolution are right from the first render; whether a row has been
+   *  READ is `isSettled`'s question, never the row's. */
+  metadata: CorpusMetadata;
+}
+
+/** The part of a scan the wiki's entry gate needs. The fork packaging's index is complete
+ *  at boot, so its stand-in answers "settled" for every key. */
+export interface CorpusScanGate {
+  /** True once `key` has been read, has failed to read, or the listing has finished
+   *  without it. False while the listing is still running. */
+  isSettled(key: string): boolean;
+  /** Read these keys next, ahead of the rest of the corpus. */
+  prioritize(keys: readonly string[]): void;
+}
+
+export interface CorpusScan extends CorpusScanGate {
+  /** The current published state. Stable identity between publishes. */
+  snapshot(): CorpusScanSnapshot;
+  subscribe(listener: () => void): () => void;
+  /** Resolves when the scan completes or is disposed. */
+  readonly done: Promise<void>;
+  /** Stop reading, cancel the pending publish, drop every listener. */
+  dispose(): void;
+}
+
+export interface CorpusScanOptions {
+  concurrency?: number;
+  flushMs?: number;
 }
 
 /**
- * Build the frontmatter index for a corpus resident at `root`.
+ * Start building the frontmatter index for a corpus resident at `root`.
+ *
+ * The listing comes first and reads no file bodies; every listed path is then in the index
+ * as an empty row, and the rows fill in as the files are read, a bounded pool at a time.
+ * A key passed to `prioritize` jumps the queue, which is how an entry the reader is waiting
+ * for is read before the rest of the corpus.
  *
  * Failure is per-file by design: a corpus is a foreign author's tree, and one malformed or
- * unreadable entry may not take the wiki down with it.
+ * unreadable entry may not take the wiki down with it. An unreadable entry leaves the index
+ * — the same state it would be in if the author had not written it — and counts as settled.
  */
+export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptions = {}): CorpusScan {
+  const concurrency = Math.max(1, opts.concurrency ?? READ_CONCURRENCY);
+  const flushMs = opts.flushMs ?? FLUSH_MS;
+  const rows: CorpusMetadata = {};
+  // A key is SETTLED only once its row is in a published snapshot — `isSettled` must never
+  // run ahead of the metadata a render can see, or the entry gate would open on an empty
+  // row that reads as `render` unset. `read` holds keys whose row is in `rows` but not yet
+  // published.
+  const settled = new Set<string>();
+  const read = new Set<string>();
+  const wanted = new Set<string>();
+  const listeners = new Set<() => void>();
+  let listed: Set<string> | null = null;
+  let queue: string[] = [];
+  let status: CorpusScanStatus = 'listing';
+  let snap: CorpusScanSnapshot = { status, metadata: {} };
+  let active = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
+  let resolveDone!: () => void;
+  const done = new Promise<void>((resolve) => {
+    resolveDone = resolve;
+  });
+
+  const publish = (): void => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (disposed) return;
+    for (const key of read) settled.add(key);
+    read.clear();
+    snap = { status, metadata: { ...rows } };
+    for (const listener of [...listeners]) listener();
+  };
+  const schedule = (): void => {
+    if (timer === null && !disposed) timer = setTimeout(publish, flushMs);
+  };
+  const finish = (): void => {
+    status = 'complete';
+    publish();
+    resolveDone();
+  };
+
+  const readOne = async (path: string): Promise<void> => {
+    try {
+      rows[path] = rowFor(await fs.readFile(path, 'utf8'));
+    } catch {
+      delete rows[path];
+    }
+  };
+  const pump = (): void => {
+    while (!disposed && active < concurrency && queue.length) {
+      const path = queue.shift()!;
+      active++;
+      // `readOne` settles every failure itself, so this chain has no rejection to lose.
+      void readOne(path).then(() => {
+        active--;
+        if (disposed) return;
+        read.add(path);
+        if (wanted.delete(path)) publish();
+        else schedule();
+        pump();
+      });
+    }
+    if (!disposed && status === 'reading' && active === 0 && queue.length === 0) finish();
+  };
+
+  void listCorpusFiles(root, fs)
+    .then((paths) => {
+      if (disposed) return;
+      listed = new Set(paths);
+      for (const path of paths) rows[path] = {};
+      const first = [...wanted].filter((k) => listed!.has(k));
+      const firstSet = new Set(first);
+      queue = [...first, ...paths.filter((p) => !firstSet.has(p))];
+      status = 'reading';
+      publish();
+      pump();
+    })
+    .catch((err: unknown) => {
+      // `listCorpusFiles` swallows per-directory failures, so this is a bug, not a corpus
+      // property: say so, and settle as an empty corpus rather than "Opening…" forever.
+      console.error('[grove] corpus listing failed', err);
+      if (disposed) return;
+      listed = new Set();
+      finish();
+    });
+
+  return {
+    snapshot: () => snap,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    isSettled: (key) => settled.has(key) || (listed !== null && !listed.has(key)),
+    prioritize(keys) {
+      const front: string[] = [];
+      let readButUnpublished = false;
+      for (const key of keys) {
+        if (read.has(key)) readButUnpublished = true;
+        if (settled.has(key) || read.has(key) || wanted.has(key)) continue;
+        wanted.add(key);
+        const at = queue.indexOf(key);
+        if (at !== -1) {
+          queue.splice(at, 1);
+          front.push(key);
+        }
+      }
+      queue.unshift(...front);
+      // Wanted, and already read before anyone asked: publish now rather than at the timer.
+      if (readButUnpublished) publish();
+    },
+    done,
+    dispose() {
+      disposed = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      queue = [];
+      listeners.clear();
+      resolveDone();
+    },
+  };
+}
+
+/** Build the whole index and resolve with it — for callers that want the finished map. */
 export async function scanCorpus(root: string, fs: ScanFs): Promise<CorpusMetadata> {
-  const files = await listCorpusFiles(root, fs);
-  return readAll(files, fs);
+  const scan = createCorpusScan(root, fs);
+  await scan.done;
+  return scan.snapshot().metadata;
 }

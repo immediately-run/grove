@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { gateStylesheet } from '../lib/contentStylesheet';
+import { gateStylesheet, type ContentStylesheet } from '../lib/contentStylesheet';
 import { mintThemeAssets, type MintedThemeAssets } from '../lib/themeAssets';
 import { openFs } from '@immediately-run/sdk';
 
-// A bundle's own look, carried as content (R3-316): each `ui/stylesheet` entry's
-// body is gated by the grammar (declarations only — a selector, at-rule, `url(`,
-// `@import` or `@font-face` is rejected with the line named, never silently
-// dropped) and admitted ONLY into the lowest cascade layer (`grove.content`),
+// A bundle's own look, carried as content (R3-316): each stylesheet the home entry
+// declares (`stylesheets:`, MDX_FROM_MOUNT_SPEC D7) has its body gated by the grammar
+// (declarations only — a selector, at-rule, `url(`, `@import` or `@font-face` is
+// rejected with the line named, never silently dropped) and admitted ONLY into the lowest cascade layer (`grove.content`),
 // where it can style tokens and nothing else. The entry's frontmatter may
 // declare `fonts:`/`assets:` — minted by the engine exactly as an engine theme's
 // are, so a content theme can change the reading face without naming a location.
@@ -21,15 +21,6 @@ import { openFs } from '@immediately-run/sdk';
 // reading the layer declaration.
 
 const ROOT_MOUNT = { path: '/', type: 'repo' } as const;
-
-export interface ContentStylesheet {
-  /** The entry's absolute fs path (the declaring file for its asset refs). */
-  path: string;
-  /** The raw body bytes (CSS). */
-  css: string;
-  /** The entry's declared fonts/assets, if any. */
-  declarations: { fonts?: unknown; assets?: unknown };
-}
 
 interface Props {
   sheets: ContentStylesheet[];
