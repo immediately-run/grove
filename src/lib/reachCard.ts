@@ -11,12 +11,17 @@
 // on WHY the source reads as shared (R-SP-3/R-SP-6), and the tool-less degrade is a
 // visible qualifier on the Q&A row instead of a silent downgrade (SPEC_AUDIT §2.8u).
 
-import type { ChatProviderState } from '@immediately-run/sdk';
+import type { AgentContextBlock, ChatProviderState } from '@immediately-run/sdk';
 
-/** Why `sourceShared` reads as it does — mirrors the SDK's `AgentContextBlock`
- *  field (`src/agentContext.tsx`); the SDK cannot be imported for a type the app
- *  also feeds, so the union is spelled here once, beside its only consumer. */
-export type SourceSharedBasis = 'git-indeterminate' | 'mount-trust-mode';
+/** Why `sourceShared` reads as it does — the SDK's own union, indexed off the
+ *  exported block so the two can never drift (R6: one home, the SDK's). */
+export type SourceSharedBasis = AgentContextBlock['sourceSharedBasis'];
+
+/** The visually-hidden word for a row's state — one home for the map the panel
+ *  renders per row and announces through its live region (R6). */
+export function stateWord(state: ReachRow['state']): string {
+  return state === 'ok' ? 'available' : state === 'blocked' ? 'unavailable' : state === 'elsewhere' ? 'opens elsewhere' : 'not applicable';
+}
 
 /** One reach-card row. `state: 'neutral'` renders neither ✓ nor ✗ — used only for
  *  the unknown provider state (rendering a cause there re-creates the false banner

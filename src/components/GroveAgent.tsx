@@ -15,7 +15,7 @@ import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { getContentRoot } from '../lib/contentRoot';
 import { createReadEntryTool, createGroveMetadataTool, groveAgentTools, toolExecutor } from '../lib/agentTools';
 import { buildSystemPrompt } from '../lib/agentPrompt';
-import { computeReachRows, reachChips, sourceTrustLine, showEgressDisclosure, EGRESS_DISCLOSURE, type ReachRow } from '../lib/reachCard';
+import { computeReachRows, reachChips, sourceTrustLine, stateWord, showEgressDisclosure, EGRESS_DISCLOSURE } from '../lib/reachCard';
 import { getCorpusMountId } from '../lib/contentRoot';
 import { transcriptToRows, toolActivityLine, type AgentRow } from '../lib/agentTranscript';
 import { safeSources } from '../lib/safeSources';
@@ -94,10 +94,10 @@ export default function GroveAgent({
   // polite live region whose text is the card's computed summary. A grant flip
   // changes the text, which is what a status region announces; the visually hidden
   // per-row words are static text and announce nothing.
-  const reachAnnouncement = useMemo(() => {
-    const word = (s: ReachRow['state']): string => (s === 'ok' ? 'available' : s === 'blocked' ? 'unavailable' : s === 'elsewhere' ? 'opens elsewhere' : 'not applicable');
-    return `What the agent can do here: ${reachRows.map((r) => `${r.label} — ${word(r.state)}`).join('; ')}`;
-  }, [reachRows]);
+  const reachAnnouncement = useMemo(
+    () => `What the agent can do here: ${reachRows.map((r) => `${r.label} — ${stateWord(r.state)}`).join('; ')}`,
+    [reachRows],
+  );
   const canAsk = providerState.status === 'configured' && chatGranted;
 
   // Read at CALL time (a scan may land, the reader may navigate) — refs kept fresh
@@ -306,9 +306,7 @@ export default function GroveAgent({
                     <span className="ga-reach__mark" aria-hidden>
                       {r.state === 'ok' ? '✓' : r.state === 'blocked' ? '✗' : r.state === 'elsewhere' ? '→' : '·'}
                     </span>
-                    <span className="ga-reach__stateword">
-                      {r.state === 'ok' ? 'available' : r.state === 'blocked' ? 'unavailable' : r.state === 'elsewhere' ? 'opens elsewhere' : ''}
-                    </span>
+                    <span className="ga-reach__stateword">{stateWord(r.state)}</span>
                     <span className="ga-reach__label">{r.label}</span>
                     {r.cause && <span className="ga-reach__cause">{r.cause}</span>}
                     {r.destination && <span className="ga-reach__cause">{`→ ${r.destination}`}</span>}
