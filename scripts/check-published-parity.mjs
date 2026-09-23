@@ -52,7 +52,7 @@
  *        payload comparison could not run)
  *          …unless --offline-ok, which downgrades ONLY that case to 0.
  */
-import { readFileSync, mkdtempSync, rmSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -357,7 +357,7 @@ function selfTest() {
   // `packTarball` deleted (R3-751, R2). No `prepack` script exists, so the pack is
   // offline and side-effect-free.
   const emptyDir = mkdtempSync(join(tmpdir(), 'published-parity-empty-'));
-  const packDir = mkdtempSync(join(tmpdir(), 'published-parity-selftest-'));
+  const synthDir = mkdtempSync(join(tmpdir(), 'published-parity-synth-'));
   let packed;
   try {
     let threw = null;
@@ -367,6 +367,25 @@ function selfTest() {
       threw = e;
     }
     check('onlyTarball refuses a directory with no tarball, by name', threw instanceof Error && threw.message === 'npm pack wrote no tarball');
+
+    // The digest walk, pinned against DIRECT hashes of a synthetic tree (a file, and a
+    // file one level down): a `fileDigest` that returned a constant, or a `treeDigests`
+    // that skipped subdirectories, would otherwise leave every real-pack case green —
+    // the gate could silently never fire, which is the exact failure R3-751 closes.
+    mkdirSync(join(synthDir, 'package', 'sub'), { recursive: true });
+    writeFileSync(join(synthDir, 'package', 'a.txt'), 'alpha');
+    writeFileSync(join(synthDir, 'package', 'sub', 'b.txt'), 'beta');
+    execFileSync('tar', ['-czf', join(synthDir, 'synth.tgz'), '-C', synthDir, 'package'], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      timeout: 30_000,
+    });
+    const synth = entryDigests(join(synthDir, 'synth.tgz'));
+    const direct = (p) => createHash('sha256').update(readFileSync(join(synthDir, 'package', p))).digest('hex');
+    check(
+      'entryDigests returns the exact content digests, nested keys included',
+      synth.size === 2 && synth.get('a.txt') === direct('a.txt') && synth.get('sub/b.txt') === direct('sub/b.txt'),
+    );
+
     packed = packTarball([], ROOT);
     const real = entryDigests(packed.tarball);
     check('entryDigests reads a real pack of this repo (non-empty, package.json included)', real.size > 0 && real.has('package.json'));
@@ -377,8 +396,26 @@ function selfTest() {
     const mutatedRows = payloadDrift(real, mutated);
     check('…a one-file mutation against the real Map is exactly one row', mutatedRows.length === 1 && mutatedRows[0].path === firstPath && mutatedRows[0].published === real.get(firstPath) && mutatedRows[0].local === 'deadbeef');
     check('…and the pack directory it made is the one `onlyTarball` finds', onlyTarball(packed.dir) === packed.tarball.split('/').pop());
+
+    // The one downgrade policy, called directly: strict is exit 2 with the honest line,
+    // `--offline-ok` is exit 0 and says the comparison never ran. A flipped ternary or a
+    // re-pasted message turns these red (round-2 R2).
+    const seen = [];
+    const realError = console.error;
+    console.error = (m) => seen.push(m);
+    const strictCode = cannotAnswerExit('read X from the registry', 'boom', false);
+    const offlineCode = cannotAnswerExit('read X from the registry', 'boom', true);
+    console.error = realError;
+    check(
+      'cannotAnswerExit: strict is 2 and names what did not answer; --offline-ok is 0 and says parity was NOT checked',
+      strictCode === 2 &&
+        seen[0].includes('read X from the registry') &&
+        seen[0].includes('not answering is not a pass') &&
+        offlineCode === 0 &&
+        seen[1].includes('parity was NOT checked'),
+    );
   } finally {
-    for (const dir of [emptyDir, packDir, packed?.dir]) {
+    for (const dir of [emptyDir, synthDir, packed?.dir]) {
       if (dir) rmSync(dir, { recursive: true, force: true });
     }
   }
