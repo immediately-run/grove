@@ -15,7 +15,8 @@ import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { getContentRoot } from '../lib/contentRoot';
 import { createReadEntryTool, createGroveMetadataTool, groveAgentTools, toolExecutor } from '../lib/agentTools';
 import { buildSystemPrompt } from '../lib/agentPrompt';
-import { computeReachRows, reachChips, showEgressDisclosure, EGRESS_DISCLOSURE } from '../lib/reachCard';
+import { computeReachRows, reachChips, sourceTrustLine, stateWord, showEgressDisclosure, EGRESS_DISCLOSURE } from '../lib/reachCard';
+import { getCorpusMountId } from '../lib/contentRoot';
 import { transcriptToRows, toolActivityLine, type AgentRow } from '../lib/agentTranscript';
 import { safeSources } from '../lib/safeSources';
 import Icon from './Icon';
@@ -24,9 +25,10 @@ import Icon from './Icon';
 //
 // The surface is a FUNCTION of the session's envelope (R-GA-1): the reach card in
 // the expanded header is computed from the provider three-state, the `llm:chat`
-// grant (the grant-filtered catalog), mount writability, and source trust — never
-// hand-written copy. The loop rides the workbench's seam — SDK `runAgent` over the
-// host `llm.chat` slot — and its two tools are the mount-chrooted `read_entry` and
+// grant (the grant-filtered catalog), mount writability, the corpus packaging,
+// tools support, and source trust — never hand-written copy. The loop rides the
+// workbench's seam — SDK `runAgent` over the host `llm.chat` slot — and its two
+// tools are the mount-chrooted `read_entry` and
 // the index query (R-GA-2). The widget never writes (R-GA-3): every change is a
 // hand-off to the editor / workbench. Read-only never blocks Q&A (R-GA-5). When a
 // provider is bound the egress line is shown unconditionally (R-GA-6). Every
@@ -67,11 +69,35 @@ export default function GroveAgent({
   // cause from a user without a key (G-GA-10).
   const chatGranted = catalog.some((m) => m.name === 'llm:chat');
   const context = useAgentContext({ entryPath: entryKey, entryTitle, heading: activeHeading || undefined });
+  // G-GA-8: a provider without `features.tools` degrades to context-stuffing.
+  // Computed ONCE at render scope — the reach card's Q&A qualifier (R3-752) and the
+  // ask() path below read the same fact, never two computations of it.
+  const toolsSupported = providerState.status === 'configured' && providerState.provider.features.tools === true;
   const reachRows = useMemo(
-    () => computeReachRows({ providerState, chatGranted, writable, sourceShared: context.sourceShared }),
-    [providerState, chatGranted, writable, context.sourceShared],
+    () =>
+      computeReachRows({
+        providerState,
+        chatGranted,
+        writable,
+        sourceShared: context.sourceShared,
+        mountId: getCorpusMountId(),
+        toolsSupported,
+      }),
+    [providerState, chatGranted, writable, context.sourceShared, toolsSupported],
   );
   const chips = useMemo(() => reachChips(reachRows), [reachRows]);
+  const trustLine = useMemo(
+    () => sourceTrustLine(context.sourceShared, context.sourceSharedBasis),
+    [context.sourceShared, context.sourceSharedBasis],
+  );
+  // R-IX-7 (R3-752): a state flip is ANNOUNCED, not only re-rendered — one standing
+  // polite live region whose text is the card's computed summary. A grant flip
+  // changes the text, which is what a status region announces; the visually hidden
+  // per-row words are static text and announce nothing.
+  const reachAnnouncement = useMemo(
+    () => `What the agent can do here: ${reachRows.map((r) => `${r.label} — ${stateWord(r.state)}`).join('; ')}`,
+    [reachRows],
+  );
   const canAsk = providerState.status === 'configured' && chatGranted;
 
   // Read at CALL time (a scan may land, the reader may navigate) — refs kept fresh
@@ -121,8 +147,8 @@ export default function GroveAgent({
 
     // G-GA-8: a provider without `features.tools` degrades to context-stuffing —
     // the deixis block, an index summary, and the current entry body ride the
-    // prompt; the request carries ZERO tools.
-    const toolsSupported = providerState.status === 'configured' && providerState.provider.features.tools === true;
+    // prompt; the request carries ZERO tools. The same hoisted fact the reach
+    // card's Q&A qualifier reads (R3-752) — computed once at render scope.
     const chroot = getContentRoot();
     const currentKey = entryRef.current;
     const contextBlock = renderAgentContext({
@@ -271,17 +297,27 @@ export default function GroveAgent({
                 </span>
               </div>
 
-              {/* The reach card — the envelope, computed (R-GA-1). */}
+              {/* The reach card — the envelope, computed (R-GA-1). State is text as
+                  well as glyph (R3-752): the hidden word beside the mark keeps the
+                  card from reading as four identical lines to a screen reader. */}
               <div className="ga-reach" role="list" aria-label="What the agent can do here">
                 {reachRows.map((r) => (
                   <div className={`ga-reach__row ga-reach__row--${r.state}`} role="listitem" key={r.key}>
                     <span className="ga-reach__mark" aria-hidden>
-                      {r.state === 'ok' ? '✓' : r.state === 'blocked' ? '✗' : '·'}
+                      {r.state === 'ok' ? '✓' : r.state === 'blocked' ? '✗' : r.state === 'elsewhere' ? '→' : '·'}
                     </span>
+                    <span className="ga-reach__stateword">{stateWord(r.state)}</span>
                     <span className="ga-reach__label">{r.label}</span>
                     {r.cause && <span className="ga-reach__cause">{r.cause}</span>}
+                    {r.destination && <span className="ga-reach__cause">{`→ ${r.destination}`}</span>}
                   </div>
                 ))}
+              </div>
+              {trustLine && <p className="ga-egress">{trustLine}</p>}
+              {/* The standing live region (R-IX-7): the computed card summary, so a
+                  state flip is announced politely and not only re-rendered. */}
+              <div className="ga-reach__stateword" role="status">
+                {reachAnnouncement}
               </div>
               {showEgressDisclosure(providerState) && <p className="ga-egress">{EGRESS_DISCLOSURE}</p>}
               {errorToast && (

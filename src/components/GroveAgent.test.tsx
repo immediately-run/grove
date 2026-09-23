@@ -168,6 +168,79 @@ describe('G-GA-2 / R-GA-5 — read-only never blocks Q&A', () => {
     await openPanel(container);
     expect(container.textContent).toContain('answers come from your connected model provider');
   });
+
+  // R3-752 — the apply row is a DESTINATION: `→` on the row, no ✗ anywhere on the
+  // card, and every row's state is text as well as glyph.
+  it('R3-752 — read-only + configured granted provider: the apply row renders → elsewhere, never ✗, with hidden state words', async () => {
+    const { container } = await renderAgent({ writable: false });
+    await push({
+      type: 'llm-provider',
+      provider: {
+        providerId: 'llm.chat.anthropic',
+        hostVouched: true,
+        features: { vision: false, tools: true, jsonMode: true, reasoning: false, maxContextTokens: 100000 },
+      },
+    });
+    await push({ type: 'api-catalog', methods: [{ name: 'llm:chat', capability: 'llm:chat', stream: true }] });
+    await openPanel(container);
+    const card = container.querySelector('.ga-reach')!;
+    const applyRow = card.querySelector('.ga-reach__row--elsewhere')!;
+    expect(applyRow.textContent).toContain('Apply changes');
+    expect(applyRow.textContent).toContain('→ in the editor or workbench, where you confirm them');
+    // A destination is never rendered as a denial: the card's only ✗ is the draft
+    // row's (read-only), the apply row's mark is the arrow.
+    expect(applyRow.querySelector('.ga-reach__mark')!.textContent).toBe('→');
+    expect(card.textContent).not.toContain('changes open in the editor'); // the old cause copy is gone
+    // State is text, never glyph alone: the hidden words are in the tree.
+    const words = [...card.querySelectorAll('.ga-reach__stateword')].map((n) => n.textContent);
+    expect(words).toContain('available');
+    expect(words).toContain('unavailable');
+    expect(words).toContain('opens elsewhere');
+    // The substrate is context, stated, with the git-indeterminate trust line under
+    // the card (the SDK's fail-closed default basis).
+    expect(card.textContent).toContain('Reads its own entries');
+    expect(card.parentElement!.textContent).toContain('anyone who can push to this repo can change what the agent reads');
+  });
+
+  it('R3-752 — a grant flip is ANNOUNCED, not only re-rendered (R-IX-7): the standing live region tracks the card', async () => {
+    const { container } = await renderAgent({ writable: false });
+    await push({
+      type: 'llm-provider',
+      provider: {
+        providerId: 'llm.chat.anthropic',
+        hostVouched: true,
+        features: { vision: false, tools: true, jsonMode: true, reasoning: false, maxContextTokens: 100000 },
+      },
+    });
+    await push({ type: 'api-catalog', methods: [] }); // key, but NOT granted chat
+    await openPanel(container);
+    const live = container.querySelector('[role="status"].ga-reach__stateword')!;
+    expect(live.getAttribute('aria-live') ?? 'polite').toBe('polite'); // role=status is polite by default
+    expect(live.textContent).toContain('unavailable'); // the blocked Q&A row, in words
+
+    // Grant chat: the flip must change the announcement — the Q&A segment goes
+    // unavailable → available (the draft row stays honestly unavailable; read-only).
+    await push({ type: 'api-catalog', methods: [{ name: 'llm:chat', capability: 'llm:chat', stream: true }] });
+    expect(live.textContent).toContain('Answer questions about this wiki — available');
+    expect(live.textContent).not.toContain('Answer questions about this wiki — unavailable');
+  });
+
+  it('R3-752 — a configured provider WITHOUT tools keeps Q&A ✓ and shows the degrade qualifier, not silence', async () => {
+    const { container } = await renderAgent({ writable: false });
+    await push({
+      type: 'llm-provider',
+      provider: {
+        providerId: 'llm.chat.anthropic',
+        hostVouched: true,
+        features: { vision: false, tools: false, jsonMode: true, reasoning: false, maxContextTokens: 100000 },
+      },
+    });
+    await push({ type: 'api-catalog', methods: [{ name: 'llm:chat', capability: 'llm:chat', stream: true }] });
+    await openPanel(container);
+    const answerRow = container.querySelector('.ga-reach__row--ok')!;
+    expect(answerRow.textContent).toContain('Answer questions about this wiki');
+    expect(answerRow.textContent).toContain('reads a summary of this wiki, not entries on demand');
+  });
 });
 
 describe('R3-608 — the composer stops the run; a refusal surfaces, a cancel does not', () => {
