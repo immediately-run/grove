@@ -154,6 +154,19 @@ describe('G-GA-2 / R-GA-5 — read-only never blocks Q&A', () => {
     expect(input.disabled).toBe(true); // cannot ask — but reading works, and the card says why
   });
 
+  it('R3-688 — the host-marked grantless answer renders the consent cause without any provider', async () => {
+    // The ungranted fork is answered {provider:null, ungranted:true} — never the
+    // provider — so before the mark this fork could only render the KEY copy. The
+    // mark is the host's grant decision; the card repeats it, never invents it.
+    const { container } = await renderAgent({ writable: true });
+    await push({ type: 'llm-provider', provider: null, ungranted: true });
+    await push({ type: 'api-catalog', methods: [] });
+    await openPanel(container);
+    const text = container.textContent ?? '';
+    expect(text).toContain("this Grove wasn't granted chat — reading works as normal");
+    expect(text).not.toContain('add one in Settings'); // the KEY copy — never conflated (G-GA-10)
+  });
+
   it('R-GA-6 — the egress disclosure shows whenever a provider is bound', async () => {
     const { container } = await renderAgent({ writable: false });
     await push({

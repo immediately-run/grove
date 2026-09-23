@@ -14,7 +14,7 @@ const configured = (tools = true): ChatProviderState => ({
 
 const row = (rows: ReturnType<typeof computeReachRows>, key: string) => rows.find((r) => r.key === key)!;
 
-describe('G-GA-10 — the Q&A row renders the provider three-state honestly', () => {
+describe('G-GA-10 — the Q&A row renders the provider state honestly', () => {
   it('unknown renders NEUTRAL — no cause, no connect copy (the R3-300 rule)', () => {
     const rows = computeReachRows({ providerState: { status: 'unknown' }, chatGranted: true, writable: true, sourceShared: true, mountId: null, toolsSupported: true });
     expect(row(rows, 'answer').state).toBe('neutral');
@@ -30,6 +30,19 @@ describe('G-GA-10 — the Q&A row renders the provider three-state honestly', ()
     expect(row(forbidden, 'answer').state).toBe('blocked');
     expect(row(forbidden, 'answer').cause).toContain("wasn't granted chat");
     expect(row(forbidden, 'answer').cause).not.toContain('Settings');
+  });
+
+  it('the host-marked UNGRANTED state names the consent cause WITHOUT a configured provider (R3-688)', () => {
+    // The R3-688 exit: an ungranted fork is never told the provider, so before the
+    // host mark the consent cause was uncomputable — the fork read not-configured and
+    // rendered the KEY copy at a user who had one. The marked state fixes the cause
+    // with nothing but the grant decision.
+    const marked = computeReachRows({ providerState: { status: 'ungranted' }, chatGranted: false, writable: true, sourceShared: false });
+    expect(row(marked, 'answer').state).toBe('blocked');
+    expect(row(marked, 'answer').cause).toContain("wasn't granted chat");
+    expect(row(marked, 'answer').cause).not.toContain('Settings');
+    // The egress line stays hidden: no provider is bound for this frame.
+    expect(showEgressDisclosure({ status: 'ungranted' })).toBe(false);
   });
 
   it('configured + granted is ✓ and carries the read-flavored chips', () => {

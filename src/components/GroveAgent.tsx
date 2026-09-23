@@ -24,7 +24,8 @@ import Icon from './Icon';
 // `.grove-agent` — Grove's own embedded agent (GROVE_AGENT_SPEC).
 //
 // The surface is a FUNCTION of the session's envelope (R-GA-1): the reach card in
-// the expanded header is computed from the provider three-state, the `llm:chat`
+// the expanded header is computed from the provider four-state (R3-688 added the
+// host-marked `ungranted` — the distinct not-granted cause), the `llm:chat`
 // grant (the grant-filtered catalog), mount writability, the corpus packaging,
 // tools support, and source trust — never hand-written copy. The loop rides the
 // workbench's seam — SDK `runAgent` over the host `llm.chat` slot — and its two

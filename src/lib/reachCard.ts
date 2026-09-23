@@ -1,6 +1,6 @@
 // The reach card (GROVE_AGENT_SPEC §6) — the agent's envelope, rendered as rows in
 // the two-word vocabulary with a cause for every ✗ (R-SP-3). R-GA-1: every row is
-// COMPUTED from the session's envelope (provider three-state, chat grant, mount
+// COMPUTED from the session's envelope (provider four-state, chat grant, mount
 // writability, packaging, source trust); no capability claim on any pixel of this
 // surface is hand-written copy. The four old banners collapse into these rows; chips
 // render only for rows that are ✓ — derived, not curated.
@@ -80,28 +80,33 @@ export function computeReachRows({
     state: 'neutral',
   };
 
-  // Row 1 — Q&A. Three provider states × the grant, with the two NOT-causes never
+  // Row 1 — Q&A. The provider states × the grant, with the two NOT-causes never
   // conflated (G-GA-10): "no key" is the user's to fix in Settings; "not granted"
   // is this copy's consent state, and reading works either way. A configured
   // provider without `features.tools` keeps the ✓ — asking still works — and
   // carries the degrade as a qualifier (G-GA-8, SPEC_AUDIT §2.8u).
+  //
+  // R3-688: the host now marks the grantless answer on the provider channel itself
+  // (`ungranted`), so the consent cause is computable even though an ungranted frame
+  // is never told the provider — the host's grant decision IS the fact, and the
+  // catalog check (`chatGranted`) stays as the belt for a host predating the mark.
   let answer: ReachRow;
   const degrade = toolsSupported ? '' : ' (reads a summary of this wiki, not entries on demand)';
   if (providerState.status === 'unknown') {
     answer = { key: 'answer', label: 'Answer questions about this wiki', state: 'neutral' };
+  } else if (providerState.status === 'ungranted' || !chatGranted) {
+    answer = {
+      key: 'answer',
+      label: 'Answer questions about this wiki',
+      state: 'blocked',
+      cause: "this Grove wasn't granted chat — reading works as normal",
+    };
   } else if (providerState.status === 'not-configured') {
     answer = {
       key: 'answer',
       label: 'Answer questions about this wiki',
       state: 'blocked',
       cause: 'no model key connected — add one in Settings',
-    };
-  } else if (!chatGranted) {
-    answer = {
-      key: 'answer',
-      label: 'Answer questions about this wiki',
-      state: 'blocked',
-      cause: "this Grove wasn't granted chat — reading works as normal",
     };
   } else {
     answer = {
