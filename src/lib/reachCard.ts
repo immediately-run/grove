@@ -1,20 +1,36 @@
 // The reach card (GROVE_AGENT_SPEC §6) — the agent's envelope, rendered as rows in
 // the two-word vocabulary with a cause for every ✗ (R-SP-3). R-GA-1: every row is
 // COMPUTED from the session's envelope (provider three-state, chat grant, mount
-// writability, source trust); no capability claim on any pixel of this surface is
-// hand-written copy. The four old banners collapse into these rows; chips render
-// only for rows that are ✓ — derived, not curated.
+// writability, packaging, source trust); no capability claim on any pixel of this
+// surface is hand-written copy. The four old banners collapse into these rows; chips
+// render only for rows that are ✓ — derived, not curated.
+//
+// R3-752: a row whose outcome is a destination is not a denial — the apply row
+// renders `→ elsewhere` (R-GA-3 still holds: never from this panel), the packaging
+// substrate is its own neutral row, the source-trust sentence is its own line keyed
+// on WHY the source reads as shared (R-SP-3/R-SP-6), and the tool-less degrade is a
+// visible qualifier on the Q&A row instead of a silent downgrade (SPEC_AUDIT §2.8u).
 
 import type { ChatProviderState } from '@immediately-run/sdk';
 
+/** Why `sourceShared` reads as it does — mirrors the SDK's `AgentContextBlock`
+ *  field (`src/agentContext.tsx`); the SDK cannot be imported for a type the app
+ *  also feeds, so the union is spelled here once, beside its only consumer. */
+export type SourceSharedBasis = 'git-indeterminate' | 'mount-trust-mode';
+
 /** One reach-card row. `state: 'neutral'` renders neither ✓ nor ✗ — used only for
  *  the unknown provider state (rendering a cause there re-creates the false banner
- *  R3-300 fixed: `unknown` means unanswered, not ungranted). */
+ *  R3-300 fixed: `unknown` means unanswered, not ungranted) and, since R3-752, for
+ *  the packaging row (substrate context, not a capability claim). `state:
+ *  'elsewhere'` is the apply row: the outcome happens at another surface, which is
+ *  where to go — never a ✗. */
 export interface ReachRow {
-  key: 'answer' | 'read' | 'draft' | 'apply';
+  key: 'packaging' | 'answer' | 'read' | 'draft' | 'apply';
   label: string;
-  state: 'ok' | 'blocked' | 'neutral';
+  state: 'ok' | 'blocked' | 'neutral' | 'elsewhere';
   cause?: string;
+  /** Where a `'elsewhere'` row's outcome happens — rendered after `→`, never a ✗. */
+  destination?: string;
   /** Chips this row contributes when ✓ — the panel renders exactly these. */
   chips?: string[];
 }
@@ -25,16 +41,47 @@ export interface ReachInputs {
    *  capability — absent on an ungranted fork, a distinct cause from "no key"). */
   chatGranted: boolean;
   writable: boolean;
-  /** Fail-closed source trust (git ⇒ indeterminate ⇒ treated as shared). */
+  /** Fail-closed source trust (git ⇒ indeterminate ⇒ treated as shared). Not
+   *  rendered on any row since R3-752 — it is the source-trust LINE's input (see
+   *  `sourceTrustLine`) — but part of the envelope, so the cross-product over the
+   *  card's inputs can assert no input re-blocks the apply row. */
   sourceShared: boolean;
+  /** The corpus mount id (`getCorpusMountId()`): `null` is a fork reading its own
+   *  bundled corpus, an id is a wiki mounted into it. One fact, decided once at
+   *  boot by the same delegation as the root — never a second source of truth. */
+  mountId: string | null;
+  /** Whether the configured provider advertises `features.tools`. `false` with a
+   *  configured provider degrades the agent to context-stuffing (G-GA-8) — a real
+   *  capability change the card must show, not hide (SPEC_AUDIT §2.8u). */
+  toolsSupported: boolean;
 }
 
-/** The rows, computed. Order is the card's display order. */
-export function computeReachRows({ providerState, chatGranted, writable, sourceShared }: ReachInputs): ReachRow[] {
+/** The rows, computed. Order is the card's display order: the substrate first
+ *  (context for every row under it), then the capability rows. */
+export function computeReachRows({
+  providerState,
+  chatGranted,
+  writable,
+  mountId,
+  toolsSupported,
+}: ReachInputs): ReachRow[] {
+  // Row 0 — packaging (R3-752). Context, not a claim: `neutral`, no chips, no
+  // capability words. A pinned-library consumer is indistinguishable from a fork at
+  // runtime and the distinction does not change reach, so the row states the
+  // substrate — never a guess at how the app was assembled.
+  const packaging: ReachRow = {
+    key: 'packaging',
+    label: mountId === null ? 'Reads its own entries' : 'Reads a wiki mounted into it',
+    state: 'neutral',
+  };
+
   // Row 1 — Q&A. Three provider states × the grant, with the two NOT-causes never
   // conflated (G-GA-10): "no key" is the user's to fix in Settings; "not granted"
-  // is this copy's consent state, and reading works either way.
+  // is this copy's consent state, and reading works either way. A configured
+  // provider without `features.tools` keeps the ✓ — asking still works — and
+  // carries the degrade as a qualifier (G-GA-8, SPEC_AUDIT §2.8u).
   let answer: ReachRow;
+  const degrade = toolsSupported ? '' : ' (reads a summary of this wiki, not entries on demand)';
   if (providerState.status === 'unknown') {
     answer = { key: 'answer', label: 'Answer questions about this wiki', state: 'neutral' };
   } else if (providerState.status === 'not-configured') {
@@ -54,7 +101,7 @@ export function computeReachRows({ providerState, chatGranted, writable, sourceS
   } else {
     answer = {
       key: 'answer',
-      label: 'Answer questions about this wiki',
+      label: `Answer questions about this wiki${degrade}`,
       state: 'ok',
       chips: ['Summarize this entry', 'What entries are tagged security?'],
     };
@@ -81,24 +128,38 @@ export function computeReachRows({ providerState, chatGranted, writable, sourceS
     : { key: 'draft', label: 'Draft changes', state: 'blocked', cause: 'you’re a reader here' };
 
   // Row 4 — applying. NEVER from this panel (R-GA-3): the widget renders content and
-  // is exactly the broker core_concepts §8a Axis D forbids. The cause is where
-  // changes go, plus the shared-source sentence when trust says others can write.
+  // is exactly the broker core_concepts §8a Axis D forbids. That is a DESTINATION,
+  // not a denial — where to go, stated as one — so it renders `→`, never ✗. The
+  // source-trust sentence does not ride here: it is a property of the source, and it
+  // has its own line under the card (`sourceTrustLine`).
   const apply: ReachRow = {
     key: 'apply',
     label: 'Apply changes',
-    state: 'blocked',
-    cause:
-      'changes open in the editor / workbench, where you confirm them' +
-      (sourceShared ? ' — this repo is treated as if others can write (sole authorship can’t be verified yet), so agent actions go past you first' : ''),
+    state: 'elsewhere',
+    destination: 'in the editor or workbench, where you confirm them',
   };
 
-  return [answer, read, draft, apply];
+  return [packaging, answer, read, draft, apply];
 }
 
 /** The chips the panel shows: exactly the ✓ rows' chips, in card order (R-GA-1 —
  *  derived from the envelope, never curated). */
 export function reachChips(rows: ReachRow[]): string[] {
   return rows.flatMap((r) => (r.state === 'ok' ? r.chips ?? [] : []));
+}
+
+/**
+ * The source-trust line under the card (R3-752). It is a property of the SOURCE,
+ * not of the apply row it used to be glued to, and its copy is chosen by WHY the
+ * source reads as shared — a cause the reader can act on (R-SP-3), never a
+ * classification (R-SP-6). `null` when the source is not shared: no line, no
+ * reassurance about a regime that is not running.
+ */
+export function sourceTrustLine(shared: boolean, basis: SourceSharedBasis): string | null {
+  if (!shared) return null;
+  return basis === 'git-indeterminate'
+    ? 'anyone who can push to this repo can change what the agent reads'
+    : 'others can change what the agent reads here';
 }
 
 /** R-GA-6's unconditional egress line — shown whenever a provider is bound,
