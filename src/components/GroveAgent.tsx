@@ -15,7 +15,7 @@ import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { getContentRoot } from '../lib/contentRoot';
 import { createReadEntryTool, createGroveMetadataTool, groveAgentTools, toolExecutor } from '../lib/agentTools';
 import { buildSystemPrompt } from '../lib/agentPrompt';
-import { computeReachRows, reachChips, sourceTrustLine, showEgressDisclosure, EGRESS_DISCLOSURE } from '../lib/reachCard';
+import { computeReachRows, reachChips, sourceTrustLine, showEgressDisclosure, EGRESS_DISCLOSURE, type ReachRow } from '../lib/reachCard';
 import { getCorpusMountId } from '../lib/contentRoot';
 import { transcriptToRows, toolActivityLine, type AgentRow } from '../lib/agentTranscript';
 import { safeSources } from '../lib/safeSources';
@@ -25,9 +25,10 @@ import Icon from './Icon';
 //
 // The surface is a FUNCTION of the session's envelope (R-GA-1): the reach card in
 // the expanded header is computed from the provider three-state, the `llm:chat`
-// grant (the grant-filtered catalog), mount writability, and source trust — never
-// hand-written copy. The loop rides the workbench's seam — SDK `runAgent` over the
-// host `llm.chat` slot — and its two tools are the mount-chrooted `read_entry` and
+// grant (the grant-filtered catalog), mount writability, the corpus packaging,
+// tools support, and source trust — never hand-written copy. The loop rides the
+// workbench's seam — SDK `runAgent` over the host `llm.chat` slot — and its two
+// tools are the mount-chrooted `read_entry` and
 // the index query (R-GA-2). The widget never writes (R-GA-3): every change is a
 // hand-off to the editor / workbench. Read-only never blocks Q&A (R-GA-5). When a
 // provider is bound the egress line is shown unconditionally (R-GA-6). Every
@@ -89,6 +90,14 @@ export default function GroveAgent({
     () => sourceTrustLine(context.sourceShared, context.sourceSharedBasis),
     [context.sourceShared, context.sourceSharedBasis],
   );
+  // R-IX-7 (R3-752): a state flip is ANNOUNCED, not only re-rendered — one standing
+  // polite live region whose text is the card's computed summary. A grant flip
+  // changes the text, which is what a status region announces; the visually hidden
+  // per-row words are static text and announce nothing.
+  const reachAnnouncement = useMemo(() => {
+    const word = (s: ReachRow['state']): string => (s === 'ok' ? 'available' : s === 'blocked' ? 'unavailable' : s === 'elsewhere' ? 'opens elsewhere' : 'not applicable');
+    return `What the agent can do here: ${reachRows.map((r) => `${r.label} — ${word(r.state)}`).join('; ')}`;
+  }, [reachRows]);
   const canAsk = providerState.status === 'configured' && chatGranted;
 
   // Read at CALL time (a scan may land, the reader may navigate) — refs kept fresh
@@ -307,6 +316,11 @@ export default function GroveAgent({
                 ))}
               </div>
               {trustLine && <p className="ga-egress">{trustLine}</p>}
+              {/* The standing live region (R-IX-7): the computed card summary, so a
+                  state flip is announced politely and not only re-rendered. */}
+              <div className="ga-reach__stateword" role="status">
+                {reachAnnouncement}
+              </div>
               {showEgressDisclosure(providerState) && <p className="ga-egress">{EGRESS_DISCLOSURE}</p>}
               {errorToast && (
                 <div className="ga-toast" role="status">

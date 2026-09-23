@@ -202,6 +202,29 @@ describe('G-GA-2 / R-GA-5 — read-only never blocks Q&A', () => {
     expect(card.parentElement!.textContent).toContain('anyone who can push to this repo can change what the agent reads');
   });
 
+  it('R3-752 — a grant flip is ANNOUNCED, not only re-rendered (R-IX-7): the standing live region tracks the card', async () => {
+    const { container } = await renderAgent({ writable: false });
+    await push({
+      type: 'llm-provider',
+      provider: {
+        providerId: 'llm.chat.anthropic',
+        hostVouched: true,
+        features: { vision: false, tools: true, jsonMode: true, reasoning: false, maxContextTokens: 100000 },
+      },
+    });
+    await push({ type: 'api-catalog', methods: [] }); // key, but NOT granted chat
+    await openPanel(container);
+    const live = container.querySelector('[role="status"].ga-reach__stateword')!;
+    expect(live.getAttribute('aria-live') ?? 'polite').toBe('polite'); // role=status is polite by default
+    expect(live.textContent).toContain('unavailable'); // the blocked Q&A row, in words
+
+    // Grant chat: the flip must change the announcement — the Q&A segment goes
+    // unavailable → available (the draft row stays honestly unavailable; read-only).
+    await push({ type: 'api-catalog', methods: [{ name: 'llm:chat', capability: 'llm:chat', stream: true }] });
+    expect(live.textContent).toContain('Answer questions about this wiki — available');
+    expect(live.textContent).not.toContain('Answer questions about this wiki — unavailable');
+  });
+
   it('R3-752 — a configured provider WITHOUT tools keeps Q&A ✓ and shows the degrade qualifier, not silence', async () => {
     const { container } = await renderAgent({ writable: false });
     await push({

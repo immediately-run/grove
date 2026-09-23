@@ -122,9 +122,11 @@ describe('R3-752 — R-SP-6: no model nouns anywhere on the card, checked mechan
         for (const providerState of states) {
           for (const mountId of [null, 'space:abc']) {
             for (const toolsSupported of [true, false]) {
-              const rows = computeReachRows({ providerState, chatGranted: true, writable, sourceShared, mountId, toolsSupported });
-              const strings = rows.flatMap((r) => [r.label, r.cause, r.destination, ...(r.chips ?? [])].filter((s): s is string => typeof s === 'string'));
-              for (const s of strings) expect(s).not.toMatch(banned);
+              for (const chatGranted of [true, false]) {
+                const rows = computeReachRows({ providerState, chatGranted, writable, sourceShared, mountId, toolsSupported });
+                const strings = rows.flatMap((r) => [r.label, r.cause, r.destination, ...(r.chips ?? [])].filter((s): s is string => typeof s === 'string'));
+                for (const s of strings) expect(s).not.toMatch(banned);
+              }
             }
           }
         }
