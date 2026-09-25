@@ -7,7 +7,7 @@
 // the hooks — the component reads what the host would have said.
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 
 // `useHeadings` scans the DOM (no .grove-prose in this harness ⇒ no headings — fine).
 // `fs` is read only through safeSources on the stuffing path, never in these cases.
@@ -21,77 +21,11 @@ vi.mock('@immediately-run/sdk', async (importOriginal) => ({
   runAgent: (opts: unknown) => runAgentMock(opts),
 }));
 
-// An EMITTING stub transport: push channels subscribe per type and tests emit
-// host→app messages through it (the same wire the real host speaks).
-// The transport contract (`hostTransport.ts`): `onMessage(handler)` receives EVERY
-// host→app message; the SDK's addListener filters by `msg.type` itself.
-type Handler = (msg: Record<string, unknown>) => void;
-const handlers = new Set<Handler>();
-const emit = (msg: Record<string, unknown>): void => {
-  for (const h of handlers) h(msg);
-};
-// Controllable per-case (the edit-refusal probe rejects through it); the
-// default resolves like a permissive host.
-const protocolRequest = vi.fn(async () => ({}));
-(globalThis as { __immediatelyRun__?: unknown }).__immediatelyRun__ = {
-  transport: {
-    sendMessage: vi.fn(),
-    protocolRequest,
-    onMessage: (handler: Handler) => {
-      handlers.add(handler);
-      return { dispose: () => handlers.delete(handler) };
-    },
-  },
-};
-
-import type { GroveShell } from '../lib/shell';
-import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-const { default: GroveAgent } = await import('./GroveAgent');
-const { GroveShellContext } = await import('../lib/shell');
-
-const NAV = {
-  mode: 'github',
-  namespace: 'immediately-run',
-  provider: 'github',
-  repository: 'docs',
-  ref: 'main',
-  sandboxPath: '/app',
-  hash: '',
-  search: '',
-};
-
-const shell: GroveShell = { openEditor: vi.fn() } as unknown as GroveShell;
-
-async function renderAgent(props: { writable: boolean }): Promise<{ root: Root; container: HTMLElement }> {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  await act(async () => {
-    root.render(
-      <GroveShellContext.Provider value={shell}>
-        <TinkerableContext.Provider
-          value={{ outerHref: '', navigationState: NAV, routingSpec: {} as never, filesMetadata: {} }}
-        >
-          <GroveAgent {...props} entryKey="/app/content/wiki/security.mdx" entryTitle="Security" />
-        </TinkerableContext.Provider>
-      </GroveShellContext.Provider>,
-    );
-  });
-  return { root, container };
-}
-
-const openPanel = async (container: HTMLElement): Promise<void> => {
-  await act(async () => {
-    (container.querySelector('.ga-line input') as HTMLInputElement)?.focus();
-  });
-};
-
-/** Drive host→app pushes the way the host would: after the app subscribed. */
-const push = async (msg: Record<string, unknown>): Promise<void> => {
-  await act(async () => {
-    emit(msg);
-  });
-};
+// The transport stub, the renderer and the push driver live in
+// `src/test/groveAgentHarness.tsx` — shared rather than copied, because
+// `GroveAgent.unanswered.test.tsx` needs the same harness in a module registry where the
+// catalog has never been answered (grove#75 round 3).
+const { renderAgent, openPanel, push, protocolRequest } = await import('../../test/groveAgentHarness');
 
 // NOTE: no per-test handler reset. The SDK's push channels are module-global and
 // subscribe to the transport exactly once (the `started` flag in `createPushChannel`),
@@ -101,15 +35,29 @@ const push = async (msg: Record<string, unknown>): Promise<void> => {
 describe('G-GA-1 — no unbacked capability claims in the DOM', () => {
   it('writable=false + no provider: no write-flavored chip, no phantom-write copy', async () => {
     const { container } = await renderAgent({ writable: false });
-    await push({ type: 'llm-provider', provider: null }); // answered: not-configured
-    await push({ type: 'api-catalog', methods: [] }); // nothing granted
+    // The host generation this models matters, because the two pushes below only make
+    // sense together on ONE of them. R-LLM-2 says a frame lacking `llm:chat` is answered
+    // `{ provider: null }` — the SAME payload as a granted frame with no key — so on a
+    // host that predates R3-688's `ungranted` mark this pair (null provider, empty
+    // catalog) is exactly what an ungranted fork sees, and it is indistinguishable at the
+    // provider channel from keyless-but-granted. That indistinguishability IS R3-688.
+    // A 0.72.0 host would instead mark the answer, which the R3-688 case below covers.
+    await push({ type: 'llm-provider', provider: null }); // pre-mark host: null either way
+    await push({ type: 'api-catalog', methods: [] }); // nothing granted — the deciding fact
     await openPanel(container);
     const text = container.textContent ?? '';
     expect(text).not.toMatch(/add an entry|fix broken links|reorganize the sidebar|add a timeline/i);
     expect(text).not.toMatch(/proposes the edit|host confirms the write/i);
     expect(container.querySelectorAll('.ga-chip').length).toBe(0); // no ✓ rows ⇒ no chips
-    // And the honest causes ARE there:
-    expect(text).toContain('no model key connected');
+    // And the honest causes ARE there. R3-688 CHANGED which one this case gets, and the
+    // change is the point of the item. On a pre-mark host the provider channel cannot
+    // tell keyless from ungranted, so the CATALOG is the only fact that discriminates —
+    // and it says not granted. The old order asked not-configured first and therefore
+    // told a user who may well have a key to go add one, which cannot unblock them.
+    // The key cause is still rendered for a frame the catalog says IS granted
+    // (`reachCard.test.ts` — "not-configured names the KEY cause").
+    expect(text).toContain("wasn't granted chat");
+    expect(text).not.toContain('no model key connected');
     expect(text).toContain('you’re a reader here');
   });
 });
@@ -135,6 +83,22 @@ describe('G-GA-2 / R-GA-5 — read-only never blocks Q&A', () => {
     expect(container.textContent).not.toMatch(/Suggest an edit/i); // no write chip while read-only
   });
 
+  it('keyless but GRANTED renders the KEY cause — the case the catalog decides the other way', async () => {
+    // The counterpart the suite lost when the G-GA-1 case above changed verdict, and the
+    // one that proves the reorder did not simply make the grant cause win everywhere.
+    // Same provider payload as that case — `{ provider: null }`, which R-LLM-2 gives both
+    // a keyless frame and (on a pre-mark host) an ungranted one — but the catalog says
+    // `llm:chat` IS granted. So the only actionable fact is the missing key, and that is
+    // what the card must say.
+    const { container } = await renderAgent({ writable: true });
+    await push({ type: 'llm-provider', provider: null });
+    await push({ type: 'api-catalog', methods: [{ name: 'llm:chat', capability: 'llm:chat', stream: true }] });
+    await openPanel(container);
+    const text = container.textContent ?? '';
+    expect(text).toContain('no model key connected — add one in Settings');
+    expect(text).not.toContain("wasn't granted chat");
+  });
+
   it('an ungranted fork renders the DISTINCT forbidden cause, never connect-a-key copy', async () => {
     const { container } = await renderAgent({ writable: true });
     await push({
@@ -152,6 +116,19 @@ describe('G-GA-2 / R-GA-5 — read-only never blocks Q&A', () => {
     expect(text).not.toContain('add one in Settings');
     const input = container.querySelector('.ga-foot input') as HTMLInputElement;
     expect(input.disabled).toBe(true); // cannot ask — but reading works, and the card says why
+  });
+
+  it('R3-688 — the host-marked grantless answer renders the consent cause without any provider', async () => {
+    // The ungranted fork is answered {provider:null, ungranted:true} — never the
+    // provider — so before the mark this fork could only render the KEY copy. The
+    // mark is the host's grant decision; the card repeats it, never invents it.
+    const { container } = await renderAgent({ writable: true });
+    await push({ type: 'llm-provider', provider: null, ungranted: true });
+    await push({ type: 'api-catalog', methods: [] });
+    await openPanel(container);
+    const text = container.textContent ?? '';
+    expect(text).toContain("this Grove wasn't granted chat — reading works as normal");
+    expect(text).not.toContain('add one in Settings'); // the KEY copy — never conflated (G-GA-10)
   });
 
   it('R-GA-6 — the egress disclosure shows whenever a provider is bound', async () => {
@@ -351,21 +328,10 @@ describe('R3-608 — the composer stops the run; a refusal surfaces, a cancel do
   });
 
   it('the agent panel renders the refusal text where the affordance is offered', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const refusingShell: GroveShell = { openEditor: vi.fn(), editRefused: true } as unknown as GroveShell;
-    await act(async () => {
-      root.render(
-        <GroveShellContext.Provider value={refusingShell}>
-          <TinkerableContext.Provider
-            value={{ outerHref: '', navigationState: NAV, routingSpec: {} as never, filesMetadata: {} }}
-          >
-            <GroveAgent writable={false} entryKey="/app/content/wiki/security.mdx" entryTitle="Security" />
-          </TinkerableContext.Provider>
-        </GroveShellContext.Provider>,
-      );
-    });
+    const { root, container: host } = await renderAgent(
+      { writable: false },
+      { shell: { editRefused: true } as Partial<import('../lib/shell').GroveShell> },
+    );
     await openPanel(host);
     expect(host.textContent).toContain('Could not open the editor — the host refused');
     await act(async () => {

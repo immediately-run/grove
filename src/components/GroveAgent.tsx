@@ -18,13 +18,15 @@ import { buildSystemPrompt } from '../lib/agentPrompt';
 import { computeReachRows, reachChips, sourceTrustLine, stateWord, showEgressDisclosure, EGRESS_DISCLOSURE } from '../lib/reachCard';
 import { getCorpusMountId } from '../lib/contentRoot';
 import { transcriptToRows, toolActivityLine, type AgentRow } from '../lib/agentTranscript';
+import { useCatalogAnswered } from '../hooks/useCatalogAnswered';
 import { safeSources } from '../lib/safeSources';
 import Icon from './Icon';
 
 // `.grove-agent` — Grove's own embedded agent (GROVE_AGENT_SPEC).
 //
 // The surface is a FUNCTION of the session's envelope (R-GA-1): the reach card in
-// the expanded header is computed from the provider three-state, the `llm:chat`
+// the expanded header is computed from the provider four-state (R3-688 added the
+// host-marked `ungranted` — the distinct not-granted cause), the `llm:chat`
 // grant (the grant-filtered catalog), mount writability, the corpus packaging,
 // tools support, and source trust — never hand-written copy. The loop rides the
 // workbench's seam — SDK `runAgent` over the host `llm.chat` slot — and its two
@@ -68,6 +70,9 @@ export default function GroveAgent({
   // catalog iff this app holds the consent — an ungranted fork reads a DISTINCT
   // cause from a user without a key (G-GA-10).
   const chatGranted = catalog.some((m) => m.name === 'llm:chat');
+  // Distinguishes "granted nothing" from "has not replied yet" — `catalog` alone cannot,
+  // because an empty catalog is a legitimate answer. See the hook for how it is derived.
+  const catalogAnswered = useCatalogAnswered();
   const context = useAgentContext({ entryPath: entryKey, entryTitle, heading: activeHeading || undefined });
   // G-GA-8: a provider without `features.tools` degrades to context-stuffing.
   // Computed ONCE at render scope — the reach card's Q&A qualifier (R3-752) and the
@@ -78,12 +83,13 @@ export default function GroveAgent({
       computeReachRows({
         providerState,
         chatGranted,
+        catalogAnswered,
         writable,
         sourceShared: context.sourceShared,
         mountId: getCorpusMountId(),
         toolsSupported,
       }),
-    [providerState, chatGranted, writable, context.sourceShared, toolsSupported],
+    [providerState, chatGranted, catalogAnswered, writable, context.sourceShared, toolsSupported],
   );
   const chips = useMemo(() => reachChips(reachRows), [reachRows]);
   const trustLine = useMemo(
