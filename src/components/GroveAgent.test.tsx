@@ -101,20 +101,27 @@ const push = async (msg: Record<string, unknown>): Promise<void> => {
 describe('G-GA-1 — no unbacked capability claims in the DOM', () => {
   it('writable=false + no provider: no write-flavored chip, no phantom-write copy', async () => {
     const { container } = await renderAgent({ writable: false });
-    await push({ type: 'llm-provider', provider: null }); // answered: not-configured
-    await push({ type: 'api-catalog', methods: [] }); // nothing granted
+    // The host generation this models matters, because the two pushes below only make
+    // sense together on ONE of them. R-LLM-2 says a frame lacking `llm:chat` is answered
+    // `{ provider: null }` — the SAME payload as a granted frame with no key — so on a
+    // host that predates R3-688's `ungranted` mark this pair (null provider, empty
+    // catalog) is exactly what an ungranted fork sees, and it is indistinguishable at the
+    // provider channel from keyless-but-granted. That indistinguishability IS R3-688.
+    // A 0.72.0 host would instead mark the answer, which the R3-688 case below covers.
+    await push({ type: 'llm-provider', provider: null }); // pre-mark host: null either way
+    await push({ type: 'api-catalog', methods: [] }); // nothing granted — the deciding fact
     await openPanel(container);
     const text = container.textContent ?? '';
     expect(text).not.toMatch(/add an entry|fix broken links|reorganize the sidebar|add a timeline/i);
     expect(text).not.toMatch(/proposes the edit|host confirms the write/i);
     expect(container.querySelectorAll('.ga-chip').length).toBe(0); // no ✓ rows ⇒ no chips
-    // And the honest causes ARE there. R3-688 CHANGED which one this case gets, and
-    // the change is the point of the item: this frame is BOTH keyless and ungranted,
-    // and only one of those is actionable. The old order named the key first, so a
-    // user with a key already connected was told to go add one — advice that cannot
-    // unblock them, because the grant is what is missing. The grant cause now wins
-    // whenever it applies; the key cause is still rendered for a GRANTED frame with
-    // no key (`reachCard.test.ts` — "not-configured names the KEY cause").
+    // And the honest causes ARE there. R3-688 CHANGED which one this case gets, and the
+    // change is the point of the item. On a pre-mark host the provider channel cannot
+    // tell keyless from ungranted, so the CATALOG is the only fact that discriminates —
+    // and it says not granted. The old order asked not-configured first and therefore
+    // told a user who may well have a key to go add one, which cannot unblock them.
+    // The key cause is still rendered for a frame the catalog says IS granted
+    // (`reachCard.test.ts` — "not-configured names the KEY cause").
     expect(text).toContain("wasn't granted chat");
     expect(text).not.toContain('no model key connected');
     expect(text).toContain('you’re a reader here');
@@ -140,6 +147,22 @@ describe('G-GA-2 / R-GA-5 — read-only never blocks Q&A', () => {
     expect(text).toContain('Answer questions about this wiki');
     expect(text).toContain('you’re a reader here'); // draft row still honest
     expect(container.textContent).not.toMatch(/Suggest an edit/i); // no write chip while read-only
+  });
+
+  it('keyless but GRANTED renders the KEY cause — the case the catalog decides the other way', async () => {
+    // The counterpart the suite lost when the G-GA-1 case above changed verdict, and the
+    // one that proves the reorder did not simply make the grant cause win everywhere.
+    // Same provider payload as that case — `{ provider: null }`, which R-LLM-2 gives both
+    // a keyless frame and (on a pre-mark host) an ungranted one — but the catalog says
+    // `llm:chat` IS granted. So the only actionable fact is the missing key, and that is
+    // what the card must say.
+    const { container } = await renderAgent({ writable: true });
+    await push({ type: 'llm-provider', provider: null });
+    await push({ type: 'api-catalog', methods: [{ name: 'llm:chat', capability: 'llm:chat', stream: true }] });
+    await openPanel(container);
+    const text = container.textContent ?? '';
+    expect(text).toContain('no model key connected — add one in Settings');
+    expect(text).not.toContain("wasn't granted chat");
   });
 
   it('an ungranted fork renders the DISTINCT forbidden cause, never connect-a-key copy', async () => {

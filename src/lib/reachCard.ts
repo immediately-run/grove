@@ -43,7 +43,16 @@ export interface ReachRow {
 export interface ReachInputs {
   providerState: ChatProviderState;
   /** Whether the grant-filtered catalog advertises `llm:chat` (the consented
-   *  capability — absent on an ungranted fork, a distinct cause from "no key"). */
+   *  capability — absent on an ungranted fork, a distinct cause from "no key").
+   *
+   *  Since R3-688 this is the BELT, not the primary discriminator: a 0.72.0 host marks
+   *  the grantless answer on the provider channel itself, and that mark is read first.
+   *  But it is still checked BEFORE `not-configured`, not after, because a host
+   *  predating the mark answers an ungranted fork with `{ provider: null }` — the same
+   *  payload as keyless — so not-configured would otherwise win and send a user who HAS
+   *  a key to Settings. See the ordering note in `computeReachRows` for the one
+   *  imprecision that buys, and why gating this on "the catalog answered" does not fix
+   *  it. */
   chatGranted: boolean;
   writable: boolean;
   /** Fail-closed source trust (git ⇒ indeterminate ⇒ treated as shared). Not
@@ -87,9 +96,26 @@ export function computeReachRows({
   // carries the degrade as a qualifier (G-GA-8, SPEC_AUDIT §2.8u).
   //
   // R3-688: the host now marks the grantless answer on the provider channel itself
-  // (`ungranted`), so the consent cause is computable even though an ungranted frame
-  // is never told the provider — the host's grant decision IS the fact, and the
-  // catalog check (`chatGranted`) stays as the belt for a host predating the mark.
+  // (`ungranted`), so the consent cause is computable even though an ungranted frame is
+  // never told the provider — the host's grant decision IS the fact. The catalog check is
+  // the BELT for a host predating the mark, and it is checked BEFORE not-configured
+  // because a pre-mark host answers an ungranted fork with `{provider: null}` — the same
+  // payload as keyless — so not-configured would win and send a user who has a key to
+  // Settings.
+  //
+  // KNOWN IMPRECISION, grove#75 round 1, not fixable here. `useCatalog()` starts `[]` and
+  // cannot distinguish "granted nothing" from "has not answered yet", and the provider
+  // channel usually answers first — so between the two answers a keyless-but-GRANTED frame
+  // reads `!chatGranted` and renders the consent cause for a moment before correcting.
+  //
+  // Gating the belt on `catalog.length > 0` does NOT fix it: an empty catalog is a
+  // legitimate answer (a frame granted nothing), and the G-GA-10 case directly below in
+  // `GroveAgent.test.tsx` pins exactly that state. Tried; it turns a permanent, correct ✗
+  // into a permanent, unbacked ✓, which is the R-GA-1 violation the card exists to prevent.
+  // The real fix is an answered/unanswered signal on the SDK's catalog channel; filed.
+  //
+  // Until then the transient errs toward claiming LESS capability than the session has,
+  // which is the safe direction: R-GA-1 forbids claiming a capability the session lacks.
   let answer: ReachRow;
   const degrade = toolsSupported ? '' : ' (reads a summary of this wiki, not entries on demand)';
   if (providerState.status === 'unknown') {
@@ -108,13 +134,22 @@ export function computeReachRows({
       state: 'blocked',
       cause: 'no model key connected — add one in Settings',
     };
-  } else {
+  } else if (providerState.status === 'configured') {
     answer = {
       key: 'answer',
       label: `Answer questions about this wiki${degrade}`,
       state: 'ok',
       chips: ['Summarize this entry', 'What entries are tagged security?'],
     };
+  } else {
+    // The ✓ arm is NARROWED to `configured` and this is the exhaustiveness check. The `||`
+    // above defeats narrowing, so before R3-752 an open `else` meant a FIFTH provider
+    // state would land on ✓ with chips — an unbacked capability claim (R-GA-1) that `tsc`
+    // would not mention. A fourth state was just added; the fifth must be a compile error,
+    // not a silent grant.
+    const unreachable: never = providerState;
+    void unreachable;
+    answer = { key: 'answer', label: 'Answer questions about this wiki', state: 'neutral' };
   }
 
   // Row 2 — the body source. Both packagings define one post-S2 (the fork's own

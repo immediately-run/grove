@@ -45,6 +45,24 @@ describe('G-GA-10 — the Q&A row renders the provider state honestly', () => {
     expect(showEgressDisclosure({ status: 'ungranted' })).toBe(false);
   });
 
+  it('the mark ALONE blocks — ungranted with a granted-looking catalog (R3-688, isolating)', () => {
+    // THE test for this item, and it was missing: every other ungranted case also sets
+    // `chatGranted: false`, so `!chatGranted` satisfies them on its own and the whole
+    // R3-688 arm could be deleted with the suite green. Round 1 proved that by deleting
+    // `providerState.status === 'ungranted' ||` — 499/499 still passed.
+    //
+    // This is the one input that isolates the mark: a stale or racing catalog still
+    // advertising `llm:chat` beside a host that has marked the answer ungranted. Without
+    // the arm this renders `state: 'ok'` WITH both chips — an unbacked capability claim
+    // (R-GA-1), not merely a wrong cause.
+    const marked = computeReachRows({ providerState: { status: 'ungranted' }, chatGranted: true, writable: true, sourceShared: false, mountId: null, toolsSupported: true });
+    expect(row(marked, 'answer').state).toBe('blocked');
+    expect(row(marked, 'answer').cause).toContain("wasn't granted chat");
+    expect(row(marked, 'answer').cause).not.toContain('Settings');
+    expect(row(marked, 'answer').chips).toBeUndefined();
+    expect(reachChips(marked).some((c) => /summarize|tagged security/i.test(c))).toBe(false);
+  });
+
   it('configured + granted is ✓ and carries the read-flavored chips', () => {
     const ok = computeReachRows({ providerState: configured(), chatGranted: true, writable: false, sourceShared: false, mountId: null, toolsSupported: true });
     expect(row(ok, 'answer').state).toBe('ok');
