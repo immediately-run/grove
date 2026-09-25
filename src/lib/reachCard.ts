@@ -23,13 +23,21 @@ export function stateWord(state: ReachRow['state']): string {
   return state === 'ok' ? 'available' : state === 'blocked' ? 'unavailable' : state === 'elsewhere' ? 'opens elsewhere' : 'not applicable';
 }
 
-/** One reach-card row. `state: 'neutral'` renders neither ✓ nor ✗ — used for the unknown
- *  provider state (rendering a cause there re-creates the false banner R3-300 fixed:
- *  `unknown` means unanswered, not ungranted), since R3-752 for the packaging row
- *  (substrate context, not a capability claim), and since R3-688 for the Q&A row while
- *  the CATALOG is unanswered, which is the same "not told yet" case one channel over.
- *  `state:
- *  'elsewhere'` is the apply row: the outcome happens at another surface, which is
+/** One reach-card row.
+ *
+ *  `state: 'neutral'` renders neither ✓ nor ✗. Four producers, all of them "we are not
+ *  claiming anything here":
+ *   1. the `unknown` provider state — rendering a cause there re-creates the false banner
+ *      R3-300 fixed: `unknown` means unanswered, not ungranted;
+ *   2. since R3-752, the packaging row — substrate context, not a capability claim;
+ *   3. since R3-688, the Q&A row while the CATALOG is unanswered — the same "not told
+ *      yet" as (1), one channel over;
+ *   4. since R3-688, the exhaustiveness fallback at the end of the Q&A chain. Unreachable
+ *      while `ChatProviderState` has four members, and deliberately neutral rather than ✓
+ *      so that a fifth member added without updating this file degrades to claiming
+ *      nothing instead of claiming everything.
+ *
+ *  `state: 'elsewhere'` is the apply row: the outcome happens at another surface, which is
  *  where to go — never a ✗. */
 export interface ReachRow {
   key: 'packaging' | 'answer' | 'read' | 'draft' | 'apply';

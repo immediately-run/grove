@@ -7,7 +7,7 @@
 // the hooks — the component reads what the host would have said.
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 
 // `useHeadings` scans the DOM (no .grove-prose in this harness ⇒ no headings — fine).
 // `fs` is read only through safeSources on the stuffing path, never in these cases.
@@ -21,77 +21,11 @@ vi.mock('@immediately-run/sdk', async (importOriginal) => ({
   runAgent: (opts: unknown) => runAgentMock(opts),
 }));
 
-// An EMITTING stub transport: push channels subscribe per type and tests emit
-// host→app messages through it (the same wire the real host speaks).
-// The transport contract (`hostTransport.ts`): `onMessage(handler)` receives EVERY
-// host→app message; the SDK's addListener filters by `msg.type` itself.
-type Handler = (msg: Record<string, unknown>) => void;
-const handlers = new Set<Handler>();
-const emit = (msg: Record<string, unknown>): void => {
-  for (const h of handlers) h(msg);
-};
-// Controllable per-case (the edit-refusal probe rejects through it); the
-// default resolves like a permissive host.
-const protocolRequest = vi.fn(async () => ({}));
-(globalThis as { __immediatelyRun__?: unknown }).__immediatelyRun__ = {
-  transport: {
-    sendMessage: vi.fn(),
-    protocolRequest,
-    onMessage: (handler: Handler) => {
-      handlers.add(handler);
-      return { dispose: () => handlers.delete(handler) };
-    },
-  },
-};
-
-import type { GroveShell } from '../lib/shell';
-import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-const { default: GroveAgent } = await import('./GroveAgent');
-const { GroveShellContext } = await import('../lib/shell');
-
-const NAV = {
-  mode: 'github',
-  namespace: 'immediately-run',
-  provider: 'github',
-  repository: 'docs',
-  ref: 'main',
-  sandboxPath: '/app',
-  hash: '',
-  search: '',
-};
-
-const shell: GroveShell = { openEditor: vi.fn() } as unknown as GroveShell;
-
-async function renderAgent(props: { writable: boolean }): Promise<{ root: Root; container: HTMLElement }> {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  await act(async () => {
-    root.render(
-      <GroveShellContext.Provider value={shell}>
-        <TinkerableContext.Provider
-          value={{ outerHref: '', navigationState: NAV, routingSpec: {} as never, filesMetadata: {} }}
-        >
-          <GroveAgent {...props} entryKey="/app/content/wiki/security.mdx" entryTitle="Security" />
-        </TinkerableContext.Provider>
-      </GroveShellContext.Provider>,
-    );
-  });
-  return { root, container };
-}
-
-const openPanel = async (container: HTMLElement): Promise<void> => {
-  await act(async () => {
-    (container.querySelector('.ga-line input') as HTMLInputElement)?.focus();
-  });
-};
-
-/** Drive host→app pushes the way the host would: after the app subscribed. */
-const push = async (msg: Record<string, unknown>): Promise<void> => {
-  await act(async () => {
-    emit(msg);
-  });
-};
+// The transport stub, the renderer and the push driver live in
+// `src/test/groveAgentHarness.tsx` — shared rather than copied, because
+// `GroveAgent.unanswered.test.tsx` needs the same harness in a module registry where the
+// catalog has never been answered (grove#75 round 3).
+const { renderAgent, openPanel, push, protocolRequest } = await import('../../test/groveAgentHarness');
 
 // NOTE: no per-test handler reset. The SDK's push channels are module-global and
 // subscribe to the transport exactly once (the `started` flag in `createPushChannel`),
@@ -394,21 +328,10 @@ describe('R3-608 — the composer stops the run; a refusal surfaces, a cancel do
   });
 
   it('the agent panel renders the refusal text where the affordance is offered', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const refusingShell: GroveShell = { openEditor: vi.fn(), editRefused: true } as unknown as GroveShell;
-    await act(async () => {
-      root.render(
-        <GroveShellContext.Provider value={refusingShell}>
-          <TinkerableContext.Provider
-            value={{ outerHref: '', navigationState: NAV, routingSpec: {} as never, filesMetadata: {} }}
-          >
-            <GroveAgent writable={false} entryKey="/app/content/wiki/security.mdx" entryTitle="Security" />
-          </TinkerableContext.Provider>
-        </GroveShellContext.Provider>,
-      );
-    });
+    const { root, container: host } = await renderAgent(
+      { writable: false },
+      { shell: { editRefused: true } as Partial<import('../lib/shell').GroveShell> },
+    );
     await openPanel(host);
     expect(host.textContent).toContain('Could not open the editor — the host refused');
     await act(async () => {
