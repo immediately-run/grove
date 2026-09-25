@@ -108,8 +108,15 @@ describe('G-GA-1 — no unbacked capability claims in the DOM', () => {
     expect(text).not.toMatch(/add an entry|fix broken links|reorganize the sidebar|add a timeline/i);
     expect(text).not.toMatch(/proposes the edit|host confirms the write/i);
     expect(container.querySelectorAll('.ga-chip').length).toBe(0); // no ✓ rows ⇒ no chips
-    // And the honest causes ARE there:
-    expect(text).toContain('no model key connected');
+    // And the honest causes ARE there. R3-688 CHANGED which one this case gets, and
+    // the change is the point of the item: this frame is BOTH keyless and ungranted,
+    // and only one of those is actionable. The old order named the key first, so a
+    // user with a key already connected was told to go add one — advice that cannot
+    // unblock them, because the grant is what is missing. The grant cause now wins
+    // whenever it applies; the key cause is still rendered for a GRANTED frame with
+    // no key (`reachCard.test.ts` — "not-configured names the KEY cause").
+    expect(text).toContain("wasn't granted chat");
+    expect(text).not.toContain('no model key connected');
     expect(text).toContain('you’re a reader here');
   });
 });

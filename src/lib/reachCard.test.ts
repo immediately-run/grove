@@ -37,7 +37,7 @@ describe('G-GA-10 — the Q&A row renders the provider state honestly', () => {
     // host mark the consent cause was uncomputable — the fork read not-configured and
     // rendered the KEY copy at a user who had one. The marked state fixes the cause
     // with nothing but the grant decision.
-    const marked = computeReachRows({ providerState: { status: 'ungranted' }, chatGranted: false, writable: true, sourceShared: false });
+    const marked = computeReachRows({ providerState: { status: 'ungranted' }, chatGranted: false, writable: true, sourceShared: false, mountId: null, toolsSupported: true });
     expect(row(marked, 'answer').state).toBe('blocked');
     expect(row(marked, 'answer').cause).toContain("wasn't granted chat");
     expect(row(marked, 'answer').cause).not.toContain('Settings');
