@@ -18,6 +18,7 @@ import { buildSystemPrompt } from '../lib/agentPrompt';
 import { computeReachRows, reachChips, sourceTrustLine, stateWord, showEgressDisclosure, EGRESS_DISCLOSURE } from '../lib/reachCard';
 import { getCorpusMountId } from '../lib/contentRoot';
 import { transcriptToRows, toolActivityLine, type AgentRow } from '../lib/agentTranscript';
+import { useCatalogAnswered } from '../hooks/useCatalogAnswered';
 import { safeSources } from '../lib/safeSources';
 import Icon from './Icon';
 
@@ -69,6 +70,9 @@ export default function GroveAgent({
   // catalog iff this app holds the consent — an ungranted fork reads a DISTINCT
   // cause from a user without a key (G-GA-10).
   const chatGranted = catalog.some((m) => m.name === 'llm:chat');
+  // Distinguishes "granted nothing" from "has not replied yet" — `catalog` alone cannot,
+  // because an empty catalog is a legitimate answer. See the hook for how it is derived.
+  const catalogAnswered = useCatalogAnswered();
   const context = useAgentContext({ entryPath: entryKey, entryTitle, heading: activeHeading || undefined });
   // G-GA-8: a provider without `features.tools` degrades to context-stuffing.
   // Computed ONCE at render scope — the reach card's Q&A qualifier (R3-752) and the
@@ -79,12 +83,13 @@ export default function GroveAgent({
       computeReachRows({
         providerState,
         chatGranted,
+        catalogAnswered,
         writable,
         sourceShared: context.sourceShared,
         mountId: getCorpusMountId(),
         toolsSupported,
       }),
-    [providerState, chatGranted, writable, context.sourceShared, toolsSupported],
+    [providerState, chatGranted, catalogAnswered, writable, context.sourceShared, toolsSupported],
   );
   const chips = useMemo(() => reachChips(reachRows), [reachRows]);
   const trustLine = useMemo(

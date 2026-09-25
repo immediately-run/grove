@@ -23,10 +23,12 @@ export function stateWord(state: ReachRow['state']): string {
   return state === 'ok' ? 'available' : state === 'blocked' ? 'unavailable' : state === 'elsewhere' ? 'opens elsewhere' : 'not applicable';
 }
 
-/** One reach-card row. `state: 'neutral'` renders neither ✓ nor ✗ — used only for
- *  the unknown provider state (rendering a cause there re-creates the false banner
- *  R3-300 fixed: `unknown` means unanswered, not ungranted) and, since R3-752, for
- *  the packaging row (substrate context, not a capability claim). `state:
+/** One reach-card row. `state: 'neutral'` renders neither ✓ nor ✗ — used for the unknown
+ *  provider state (rendering a cause there re-creates the false banner R3-300 fixed:
+ *  `unknown` means unanswered, not ungranted), since R3-752 for the packaging row
+ *  (substrate context, not a capability claim), and since R3-688 for the Q&A row while
+ *  the CATALOG is unanswered, which is the same "not told yet" case one channel over.
+ *  `state:
  *  'elsewhere'` is the apply row: the outcome happens at another surface, which is
  *  where to go — never a ✗. */
 export interface ReachRow {
@@ -51,9 +53,16 @@ export interface ReachInputs {
    *  predating the mark answers an ungranted fork with `{ provider: null }` — the same
    *  payload as keyless — so not-configured would otherwise win and send a user who HAS
    *  a key to Settings. See the ordering note in `computeReachRows` for the one
-   *  imprecision that buys, and why gating this on "the catalog answered" does not fix
-   *  it. */
+   *  imprecision that buys, and how `catalogAnswered` bounds it. */
   chatGranted: boolean;
+  /** Whether the host has actually ANSWERED the catalog (`useCatalogAnswered()`).
+   *
+   *  `!chatGranted` is true both for "not granted" and for "has not replied yet", and
+   *  the value cannot tell them apart because an empty catalog is a legitimate answer.
+   *  This does, because the push channel has no value-equality check: a second
+   *  notification means the host spoke. While it is `false`, the card declines to name
+   *  a cause rather than guessing one. */
+  catalogAnswered: boolean;
   writable: boolean;
   /** Fail-closed source trust (git ⇒ indeterminate ⇒ treated as shared). Not
    *  rendered on any row since R3-752 — it is the source-trust LINE's input (see
@@ -75,6 +84,7 @@ export interface ReachInputs {
 export function computeReachRows({
   providerState,
   chatGranted,
+  catalogAnswered,
   writable,
   mountId,
   toolsSupported,
@@ -103,30 +113,48 @@ export function computeReachRows({
   // payload as keyless — so not-configured would win and send a user who has a key to
   // Settings.
   //
-  // KNOWN IMPRECISION, grove#75 round 1, not fixable here. `useCatalog()` starts `[]` and
-  // cannot distinguish "granted nothing" from "has not answered yet", and the provider
-  // channel usually answers first — so between the two answers a keyless-but-GRANTED frame
-  // reads `!chatGranted` and renders the consent cause for a moment before correcting.
+  // THE UNANSWERED CATALOG, and the two wrong answers before this one (grove#75 r1, r2).
   //
-  // Gating the belt on `catalog.length > 0` does NOT fix it: an empty catalog is a
-  // legitimate answer (a frame granted nothing), and the G-GA-10 case directly below in
-  // `GroveAgent.test.tsx` pins exactly that state. Tried; it turns a permanent, correct ✗
-  // into a permanent, unbacked ✓, which is the R-GA-1 violation the card exists to prevent.
-  // The real fix is an answered/unanswered signal on the SDK's catalog channel; filed.
+  // `!chatGranted` is true both for "not granted" and for "the host has not replied yet",
+  // and the catalog's VALUE cannot separate them because an empty catalog is a legitimate
+  // answer. Round 1 caught the belt firing on the unanswered case and claiming a consent
+  // state about a frame that may hold the grant.
   //
-  // Until then the transient errs toward claiming LESS capability than the session has,
-  // which is the safe direction: R-GA-1 forbids claiming a capability the session lacks.
+  // Wrong answer 1: gate on `catalog.length > 0`. That reads an empty ANSWER as silence,
+  // which turns the G-GA-10 case below (a configured provider beside an empty catalog)
+  // from a permanent correct ✗ into a permanent unbacked ✓ — the R-GA-1 violation this
+  // card exists to prevent. Measured; two tests catch it.
+  //
+  // Wrong answer 2: declare it unfixable without an SDK change. Round 2 found it is
+  // derivable here, because the push channel has no value-equality check — a second
+  // notification means the host spoke, even when the value equals the initial `[]`. That
+  // is `useCatalogAnswered()`.
+  //
+  // So: while the catalog is unanswered the row is NEUTRAL — no cause named. `catalogAnswered`
+  // alone is not enough, because falling through to the ✓ arm would trade an under-claim
+  // for an over-claim, and over-claiming is the one R-GA-1 forbids outright.
   let answer: ReachRow;
   const degrade = toolsSupported ? '' : ' (reads a summary of this wiki, not entries on demand)';
   if (providerState.status === 'unknown') {
     answer = { key: 'answer', label: 'Answer questions about this wiki', state: 'neutral' };
-  } else if (providerState.status === 'ungranted' || !chatGranted) {
+  } else if (providerState.status === 'ungranted') {
     answer = {
       key: 'answer',
       label: 'Answer questions about this wiki',
       state: 'blocked',
       cause: "this Grove wasn't granted chat — reading works as normal",
     };
+  } else if (!chatGranted) {
+    answer = catalogAnswered
+      ? {
+          key: 'answer',
+          label: 'Answer questions about this wiki',
+          state: 'blocked',
+          cause: "this Grove wasn't granted chat — reading works as normal",
+        }
+      : // The host has not answered the catalog. We know nothing about the grant, so name
+        // nothing — the same shape `unknown` uses for an unanswered provider.
+        { key: 'answer', label: 'Answer questions about this wiki', state: 'neutral' };
   } else if (providerState.status === 'not-configured') {
     answer = {
       key: 'answer',
@@ -142,11 +170,11 @@ export function computeReachRows({
       chips: ['Summarize this entry', 'What entries are tagged security?'],
     };
   } else {
-    // The ✓ arm is NARROWED to `configured` and this is the exhaustiveness check. The `||`
-    // above defeats narrowing, so before R3-752 an open `else` meant a FIFTH provider
-    // state would land on ✓ with chips — an unbacked capability claim (R-GA-1) that `tsc`
-    // would not mention. A fourth state was just added; the fifth must be a compile error,
-    // not a silent grant.
+    // The ✓ arm is NARROWED to `configured` and this is the exhaustiveness check. The open
+    // `else` it replaces dates from R3-489, the file's first commit, and survived R3-752
+    // untouched; R3-688 is what closes it. Left open, a FIFTH provider state would land on
+    // ✓ with chips — an unbacked capability claim (R-GA-1) that `tsc` would not mention.
+    // A fourth was just added; the fifth must be a compile error, not a silent grant.
     const unreachable: never = providerState;
     void unreachable;
     answer = { key: 'answer', label: 'Answer questions about this wiki', state: 'neutral' };
