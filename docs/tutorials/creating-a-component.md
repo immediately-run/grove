@@ -39,7 +39,10 @@ breaks in the sandbox," so honor them up front:
   Don't hard-code colors, radii, or fonts. Apply the signature gradient to text
   with `className="grad-text"`. **No emoji**; icons come from `<Icon>` (Lucide).
 - **No Node / build-only APIs** in the rendered tree — it runs in a browser
-  iframe. `localStorage`, `document`, `window`, `fetch` are available.
+  iframe. `document`, `window`, and `fetch` are available. **Web storage is
+  not** (opaque origin, no `allow-same-origin`): device-local state goes in the
+  mount from `openLocalStore()`, synced state in `openSettings()` — hard
+  rule 8.
 
 ## Step 1 — Write the component
 
