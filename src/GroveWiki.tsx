@@ -33,7 +33,7 @@ import { preferredPolarity } from './data/themes';
 import { useDirectoryListing } from './hooks/useDirectoryListing';
 import { useScrollReset } from './hooks/useScrollReset';
 import { useEditAffordance } from './hooks/useEditAffordance';
-import { getContentRoot } from './lib/contentRoot';
+import { getContentRoot, isDispatched } from './lib/contentRoot';
 import type { RejectedComponent } from './lib/corpusComponents';
 import { GroveShellContext, OutletContext } from './lib/shell';
 import type { GroveShell, NavItem } from './lib/shell';
@@ -418,7 +418,23 @@ export default function GroveWiki({
     // R3-482: the field keeps the deprecated `corpusRoot` spelling until grove's SDK
     // pin reaches a release whose WikiLink reads `bundleRoot` (sdk#171 / 0.68.1) —
     // stating only the new spelling now would silently un-anchor every absolute link.
-    <LinkSpaceContext.Provider value={{ corpusRoot: getContentRoot() }}>
+    <LinkSpaceContext.Provider
+      value={{
+        corpusRoot: getContentRoot(),
+        // R3-184 S2 (PERSISTENCE_SPEC §8.3) — the `$fs:` clamp, called at last.
+        // R3-319 built the resolver-side chroot (`bundleChrooted` makes `$fs:/p`
+        // resolve exactly like `/p` under the bundle root) but NOTHING in
+        // production set it — the mechanism was built and unit-proven while the
+        // clamp was not in force on any real render. A DISPATCHED corpus is a
+        // host-minted chroot: its documents render inside a bundle-chroot'd view,
+        // so `$fs:` resolves within the corpus and a federated mount materialised
+        // beside it (`/mnt/{hash}` in the app's tree) is NOT nameable from a
+        // corpus document — the outer bundle cannot bypass the bundle layer by
+        // spelling the mount point. The fork (own repo, not a corpus mount) keeps
+        // the flag false: its `$fs:` stays mount-absolute, as shipped.
+        bundleChrooted: isDispatched(),
+      }}
+    >
     {/* R3-174: the bundle scope CONTENT reads — sibling to the link space, not a
         replacement for it. The two answer different questions: `LinkSpaceContext` tells
         the platform's link resolver where absolute hrefs are anchored; `BundleContext`

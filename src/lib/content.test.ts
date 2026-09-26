@@ -147,7 +147,7 @@ describe('linkKind — which hrefs may become a navigating <a>', () => {
 // dispatch declares CORPUS-relative (the host joins its chroot prefix — the corpus's
 // repo-side location is host knowledge this app cannot see).
 import { viewedDocumentForTarget } from './content';
-import { setContentRoot, resetContentRoot } from './contentRoot';
+import { setContentRoot, resetContentRoot, isDispatched } from './contentRoot';
 import { afterEach } from 'vitest';
 
 describe('viewedDocumentForTarget — the R3-268 declaration path space', () => {
@@ -273,5 +273,24 @@ describe('link-space parity (LINK_SPACE_FIXTURE, R3-277b)', () => {
     expect(hrefTargetKey('/handbook/onboarding.mdx', '/app/content/home.mdx')).toBe(
       '/app/content/handbook/onboarding.mdx'
     );
+  });
+});
+
+describe('isDispatched — the R3-184 S2 `$fs:` clamp discriminator', () => {
+  // The clamp caller (GroveWiki's LinkSpaceContext) keys the SDK's
+  // `bundleChrooted` flag on this: a DISPATCHED corpus renders inside a
+  // host-minted chroot, so `$fs:` resolves within the corpus and a federated
+  // mount materialised beside it is not nameable from a corpus document; the
+  // fork's `$fs:` stays mount-absolute, as shipped. The flag derivation is
+  // one line over THIS module's state — pinned here so the caller cannot drift.
+  it('fork (own repo): false — the corpus is the engine repo, not a chroot', () => {
+    expect(isDispatched()).toBe(false);
+  });
+
+  it('dispatch (a corpus mount): true', () => {
+    setContentRoot('/mnt/0a1b2c3d');
+    expect(isDispatched()).toBe(true);
+    resetContentRoot();
+    expect(isDispatched()).toBe(false);
   });
 });
