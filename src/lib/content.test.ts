@@ -195,6 +195,25 @@ describe('viewedDocumentForTarget — the R3-268 declaration path space', () => 
 // answer "which PATH?" as well as "which entry?" — `[the handbook](handbook)` names
 // something real and must not render as a broken link.
 describe('hrefTargetKey — resolution without the entry-file requirement', () => {
+  it('R3-184 S2 — the $fs: clamp, ON THE RENDER PATH (the join: isDispatched → resolveLinkTarget)', () => {
+    // The clamp that is in force lives in hrefTargetKey's linkSpaceOpts: the
+    // decision (isDispatched) and the emission (resolveLinkTarget) join in ONE
+    // call, and THIS is the join — ways_of_working §4's rule that a decision and
+    // an emitter can both be tested while the line joining them is not.
+    // Fork (own repo): $fs: stays mount-absolute, as shipped (R3-273).
+    expect(hrefTargetKey('$fs:/mnt/aaa/x.mdx', HOME)).toBe('/mnt/aaa/x.mdx');
+    // Dispatched (a corpus mount): the shared resolver clamps $fs: onto the
+    // bundle root (R3-319's bundleChrooted), so the app-level mount point is
+    // not nameable — the resolved target is a CORPUS path, and only a real
+    // corpus entry there resolves downstream.
+    setContentRoot('/mnt/chroot1');
+    expect(hrefTargetKey('$fs:/mnt/aaa/x.mdx', '/mnt/chroot1/h.mdx')).toBe('/mnt/chroot1/mnt/aaa/x.mdx');
+    // And the same corpus path by its ordinary spelling resolves identically —
+    // the clamp makes $fs:/p and /p the same address, which is the invariant.
+    expect(hrefTargetKey('/mnt/aaa/x.mdx', '/mnt/chroot1/h.mdx')).toBe('/mnt/chroot1/mnt/aaa/x.mdx');
+    resetContentRoot();
+  });
+
   it('resolves a folder href the entry-candidate list rejects', () => {
     expect(hrefKeyCandidates('handbook', HOME)).toEqual([]);
     expect(hrefTargetKey('handbook', HOME)).toBe('/app/content/handbook');
@@ -282,7 +301,10 @@ describe('isDispatched — the R3-184 S2 `$fs:` clamp discriminator', () => {
   // host-minted chroot, so `$fs:` resolves within the corpus and a federated
   // mount materialised beside it is not nameable from a corpus document; the
   // fork's `$fs:` stays mount-absolute, as shipped. The flag derivation is
-  // one line over THIS module's state — pinned here so the caller cannot drift.
+  // one line over THIS module's state. The JOIN — this decision reaching the
+  // shared resolver on the render path — is pinned by the `$fs:` clamp case in
+  // the hrefTargetKey describe above (the two tests are the pair: the decision
+  // here, the emission there, and the wire between them asserted once).
   it('fork (own repo): false — the corpus is the engine repo, not a chroot', () => {
     expect(isDispatched()).toBe(false);
   });

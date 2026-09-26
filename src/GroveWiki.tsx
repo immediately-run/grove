@@ -415,23 +415,26 @@ export default function GroveWiki({
   return (
     // R3-277b: declare the enclosing bundle for the platform's link-space consumers
     // (the shared resolver's bundle-anchored absolute + `$fs:` handling read this).
-    // R3-482: the field keeps the deprecated `corpusRoot` spelling until grove's SDK
-    // pin reaches a release whose WikiLink reads `bundleRoot` (sdk#171 / 0.68.1) —
-    // stating only the new spelling now would silently un-anchor every absolute link.
+    // R3-482: the SDK pin (^0.72.0, #75) reads `bundleRoot` new-then-old, so the new
+    // spelling is stated alone — the deprecated `corpusRoot` stays in the type for
+    // older consumers (mdx-plugins' forever-compat) but no longer here.
     <LinkSpaceContext.Provider
       value={{
-        corpusRoot: getContentRoot(),
-        // R3-184 S2 (PERSISTENCE_SPEC §8.3) — the `$fs:` clamp, called at last.
-        // R3-319 built the resolver-side chroot (`bundleChrooted` makes `$fs:/p`
-        // resolve exactly like `/p` under the bundle root) but NOTHING in
-        // production set it — the mechanism was built and unit-proven while the
-        // clamp was not in force on any real render. A DISPATCHED corpus is a
-        // host-minted chroot: its documents render inside a bundle-chroot'd view,
-        // so `$fs:` resolves within the corpus and a federated mount materialised
-        // beside it (`/mnt/{hash}` in the app's tree) is NOT nameable from a
-        // corpus document — the outer bundle cannot bypass the bundle layer by
-        // spelling the mount point. The fork (own repo, not a corpus mount) keeps
-        // the flag false: its `$fs:` stays mount-absolute, as shipped.
+        bundleRoot: getContentRoot(),
+        // R3-184 S2 (PERSISTENCE_SPEC §8.3) — the `$fs:` clamp, on this render path.
+        // The clamp that is IN FORCE lives in `lib/content.ts` (`linkSpaceOpts`):
+        // `hrefTargetKey` is where a corpus document's link targets actually
+        // resolve (grove's own WikiLink override routes there), and it passes
+        // `bundleChrooted: isDispatched()` to the shared resolver (R3-319's
+        // chroot), so a dispatched corpus document's `$fs:/mnt/{hash}/…` cannot
+        // name a federated mount materialised beside it — the app-level mount
+        // point is not a corpus path — and the fork's `$fs:` stays
+        // mount-absolute. THIS field carries the same flag for the SDK's generic
+        // component consumers (WikiLink/MDXComponents): the pinned SDK 0.72.0
+        // does not forward it, so it is decided-but-not-consumed until a
+        // forwarding release is published and pinned — the booked follow-up,
+        // stated here rather than blurred (§8.3's dated note:
+        // built-but-not-in-force is a materially different state from done).
         bundleChrooted: isDispatched(),
       }}
     >
