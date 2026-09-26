@@ -147,7 +147,7 @@ describe('linkKind — which hrefs may become a navigating <a>', () => {
 // dispatch declares CORPUS-relative (the host joins its chroot prefix — the corpus's
 // repo-side location is host knowledge this app cannot see).
 import { viewedDocumentForTarget } from './content';
-import { setContentRoot, resetContentRoot } from './contentRoot';
+import { setContentRoot, resetContentRoot, isDispatched } from './contentRoot';
 import { afterEach } from 'vitest';
 
 describe('viewedDocumentForTarget — the R3-268 declaration path space', () => {
@@ -195,6 +195,25 @@ describe('viewedDocumentForTarget — the R3-268 declaration path space', () => 
 // answer "which PATH?" as well as "which entry?" — `[the handbook](handbook)` names
 // something real and must not render as a broken link.
 describe('hrefTargetKey — resolution without the entry-file requirement', () => {
+  afterEach(resetContentRoot);
+  it('R3-184 S2 — the $fs: clamp, ON THE RENDER PATH (the join: isDispatched → resolveLinkTarget)', () => {
+    // The clamp that is in force lives in hrefTargetKey's linkSpaceOpts: the
+    // decision (isDispatched) and the emission (resolveLinkTarget) join in ONE
+    // call, and THIS is the join — ways_of_working §4's rule that a decision and
+    // an emitter can both be tested while the line joining them is not.
+    // Fork (own repo): $fs: stays mount-absolute, as shipped (R3-273).
+    expect(hrefTargetKey('$fs:/mnt/aaa/x.mdx', HOME)).toBe('/mnt/aaa/x.mdx');
+    // Dispatched (a corpus mount): the shared resolver clamps $fs: onto the
+    // bundle root (R3-319's bundleChrooted), so the app-level mount point is
+    // not nameable — the resolved target is a CORPUS path, and only a real
+    // corpus entry there resolves downstream.
+    setContentRoot('/mnt/chroot1');
+    expect(hrefTargetKey('$fs:/mnt/aaa/x.mdx', '/mnt/chroot1/h.mdx')).toBe('/mnt/chroot1/mnt/aaa/x.mdx');
+    // And the same corpus path by its ordinary spelling resolves identically —
+    // the clamp makes $fs:/p and /p the same address, which is the invariant.
+    expect(hrefTargetKey('/mnt/aaa/x.mdx', '/mnt/chroot1/h.mdx')).toBe('/mnt/chroot1/mnt/aaa/x.mdx');
+  });
+
   it('resolves a folder href the entry-candidate list rejects', () => {
     expect(hrefKeyCandidates('handbook', HOME)).toEqual([]);
     expect(hrefTargetKey('handbook', HOME)).toBe('/app/content/handbook');
@@ -273,5 +292,32 @@ describe('link-space parity (LINK_SPACE_FIXTURE, R3-277b)', () => {
     expect(hrefTargetKey('/handbook/onboarding.mdx', '/app/content/home.mdx')).toBe(
       '/app/content/handbook/onboarding.mdx'
     );
+  });
+});
+
+describe('isDispatched — the R3-184 S2 `$fs:` clamp discriminator', () => {
+  afterEach(resetContentRoot);
+  // The clamp caller (GroveWiki's LinkSpaceContext) keys the SDK's
+  // `bundleChrooted` flag on this: a DISPATCHED corpus renders inside a
+  // host-minted chroot, so `$fs:` resolves within the corpus and a federated
+  // mount materialised beside it is not nameable from a corpus document; the
+  // fork's `$fs:` stays mount-absolute, as shipped. The flag derivation is
+  // one line over THIS module's state. The JOIN — this decision reaching the
+  // shared resolver on the render path — is pinned by the `$fs:` clamp case in
+  // the hrefTargetKey describe above (the two tests are the pair: the decision
+  // here, the emission there, and the wire between them asserted once).
+  it('fork (own repo): false — the corpus is the engine repo, not a chroot', () => {
+    expect(isDispatched()).toBe(false);
+  });
+
+  it('dispatch (a corpus mount): true', () => {
+    setContentRoot('/mnt/0a1b2c3d');
+    expect(isDispatched()).toBe(true);
+  });
+
+  it('the afterEach resets the root — a later reader sees the fork state', () => {
+    // The reset itself is the convention's job (afterEach, above); asserting it
+    // keeps the leak-visible property testable rather than assumed.
+    expect(isDispatched()).toBe(false);
   });
 });

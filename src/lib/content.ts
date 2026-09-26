@@ -186,6 +186,25 @@ export function hrefKeyCandidates(href: string, fromKey: string): string[] {
  * The two callers ask different questions of the same resolution — "which entry?" and
  * "which path?" — so the resolution lives here once.
  */
+// R3-184 S2 (PERSISTENCE_SPEC §8.3) — the `$fs:` clamp ON the render path, the one
+// the spec's dated note names as the missing piece. This file's hrefTargetKey is
+// where a corpus document's link targets actually resolve (grove's own WikiLink
+// override routes here), so the clamp lives HERE: `bundleChrooted: isDispatched()`
+// makes the shared resolver treat `$fs:/p` exactly like `/p` under the bundle root
+// (R3-319), so a dispatched corpus document's `$fs:/mnt/{hash}/…` cannot name a
+// federated mount materialised beside it — the app-level mount point is not a
+// corpus path. The fork (own repo, not a corpus mount) keeps `$fs:`
+// mount-absolute, as shipped. The LinkSpaceContext field in GroveWiki carries the
+// same flag for the SDK's generic component consumers, the day a release that
+// forwards it is pinned.
+const linkSpaceOpts = (fromKey: string) => ({
+  currentFile: fromKey,
+  // The canonical spelling (mdx-plugins reads bundleRoot-else-corpusRoot; the
+  // deprecated corpusRoot opts field stays for older consumers, not for new code).
+  bundleRoot: getContentRoot(),
+  bundleChrooted: isDispatched(),
+});
+
 export function hrefTargetKey(href: string, fromKey: string): string | null {
   if (!href) return null;
   if (/^(https?:|mailto:|tel:|#)/i.test(href)) return null;
@@ -198,7 +217,7 @@ export function hrefTargetKey(href: string, fromKey: string): string | null {
   // targets resolve against the authoring file; `$fs:` targets resolve
   // mount-absolute (addressing, never reach — R3-273).
   if (!path.startsWith('/')) {
-    const rel = resolveLinkTarget(path, { currentFile: fromKey, corpusRoot: getContentRoot() });
+    const rel = resolveLinkTarget(path, linkSpaceOpts(fromKey));
     if (rel.state !== 'resolved') return null;
     // Confinement, not tidiness: an href in foreign content is untrusted, and the
     // result flows into `fs` reads. In the default space anything that lands outside
@@ -221,7 +240,7 @@ export function hrefTargetKey(href: string, fromKey: string): string | null {
     const legacy = normalizeAbsolute(legacyAnchor + path);
     if (legacy.startsWith(contentDir())) return legacy;
   }
-  const corpusAnchored = resolveLinkTarget(path, { currentFile: fromKey, corpusRoot: getContentRoot() });
+  const corpusAnchored = resolveLinkTarget(path, linkSpaceOpts(fromKey));
   if (corpusAnchored.state === 'resolved' && corpusAnchored.path.startsWith(contentDir())) {
     return corpusAnchored.path;
   }
