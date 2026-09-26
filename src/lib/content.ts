@@ -199,7 +199,9 @@ export function hrefKeyCandidates(href: string, fromKey: string): string[] {
 // forwards it is pinned.
 const linkSpaceOpts = (fromKey: string) => ({
   currentFile: fromKey,
-  corpusRoot: getContentRoot(),
+  // The canonical spelling (mdx-plugins reads bundleRoot-else-corpusRoot; the
+  // deprecated corpusRoot opts field stays for older consumers, not for new code).
+  bundleRoot: getContentRoot(),
   bundleChrooted: isDispatched(),
 });
 
