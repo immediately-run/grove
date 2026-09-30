@@ -17,6 +17,14 @@ flag the disagreement rather than designing around it.
 
 ---
 
+## How a reader gets here
+
+A wiki's author chooses the river in one of two ways. They can make it the wiki's only way
+to open, or offer it beside the normal page view as "Open as Story river". The river is a
+separate app on top of Grove, and the host opens it on the wiki's files. That choice happens
+outside your surfaces, but it explains two things you'll see: the river can't write to the
+wiki itself (Edit asks the host), and the same wiki may also exist as ordinary Grove pages.
+
 ## What you're designing, in one paragraph
 
 A reading surface where entries **accumulate** instead of replacing each other. The reader
@@ -28,7 +36,7 @@ link or a reload reproduces it exactly. Design the river page, the card, every s
 can be in, the motion for open / focus / close, and the chrome around the river, at
 desktop and mobile widths, in dark and light.
 
-## The five interactions (design each one as a sequence, not a still)
+## The six interactions (design each one as a sequence, not a still)
 
 | # | Reader does | What must be visible |
 |---|---|---|
@@ -37,6 +45,7 @@ desktop and mobile widths, in dark and light.
 | 3 | Clicks a link to an entry that is **already open** | No new card. The view scrolls to the existing card, which gets a brief **"here it is"** highlight, then settles. The order doesn't change. |
 | 4 | Closes a card | It leaves; the cards below close the gap; focus lands on the heading of the card that took its place. |
 | 5 | Presses Back | The previous river comes back exactly: the last-opened card is gone again. No special UI — but the transition must not look like a crash. |
+| 6 | Clicks **Edit** on a card | The control shows it is asking; the host opens the workbench editor on that entry (not yours to draw — show it as a labelled placeholder region). The river stays exactly where it was, and the edited card is marked. If the host declines, the note appears in the card header and the river is otherwise untouched. |
 
 Interaction 3 is the one most likely to feel broken if under-designed: the reader clicked a
 link and "nothing opened". The highlight has to read as a deliberate answer ("it's this
@@ -53,8 +62,14 @@ A card is one Grove entry, reading exactly as in brief 01, inside a river-owned 
     **Absent** on the only card in the river (the river is never empty).
   - **Copy link to this entry** — Lucide `link`. Copies a link that opens a river of just
     this card. Needs a quiet confirmation state ("Link copied.").
-  - **Edit** — the existing Grove edit affordance (brief 02), shown only when the entry is
-    writable. Don't redesign it; place it.
+  - **Edit** — Lucide `pencil`, the TiddlyWiki-style call to action on every card. It
+    **asks the workbench to open this entry in its main editor pane**; the editor itself is
+    the host's, beside or around the app, and is not yours to draw. The request can be
+    declined, so the control needs four looks: **ready**; **asking** (a brief busy state
+    while the host responds); **declined** (a short inline note in the card header, e.g.
+    "Editing isn't available here.", never a dialog); and **absent** when the host says the
+    reader can't edit this wiki. When the reader simply closes the editor, the card shows
+    nothing.
   - Optional: a mono micro-label with the entry's path or section (Space Mono,
     `--ink-3`), if it helps the reader tell cards apart in a long river. Your call — show
     with and without.
@@ -82,7 +97,11 @@ whole card look clickable.
 7. **Could not open** — a key in a shared link no longer exists. Don't draw a broken card:
    the river shows a single dismissible notice at the top ("1 entry in this link no longer
    exists.") and opens the rest.
-8. **Read-only** — no edit affordance; nothing else changes.
+8. **Read-only** — the host says this reader can't edit: no Edit control; nothing else
+   changes.
+9. **Edit requested** — the header while the workbench editor is opening this entry, and
+   after: which card is being edited should be visible at a glance (a quiet marker on the
+   header), so the reader can find their place when they come back from the editor.
 
 ## The page around the river
 
@@ -136,9 +155,13 @@ mockup from it so the river looks like a real reading session:
   the card states.
 - **Sentence case, headlines end on a period, no emoji.** Icons are Lucide at 16–24px in
   `currentColor`: `x`, `link`, `pencil`, `chevron-*` as needed.
-- **Don't draw host chrome.** The immediately.run host frame, sign-in, consent prompts and
-  its seam or header UI are the host's. The river is inside the app's frame. Imitating host
-  chrome is treated as spoofing.
+- **Don't draw host chrome.** The immediately.run host frame, sign-in, consent prompts, its
+  seam or header UI, **the workbench editor** that Edit opens, and **the first-use prompt**
+  that asks a reader to allow the river to open a wiki are all the host's. The river is inside
+  the app's frame. Imitating host chrome is treated as spoofing.
+- **The body vocabulary is Grove's safe set.** The river renders entries with Grove's safe
+  renderer, so a card shows Grove's built-in components (brief 03) and nothing a wiki ships
+  as its own code. Don't design wiki-specific widgets into cards.
 - **One theme across the river.** Cards don't carry their own themes; the river takes the
   home entry's. Don't design per-card theming.
 - **Accessibility:** each card is an `article` labelled by its title heading;
@@ -147,15 +170,16 @@ mockup from it so the river looks like a real reading session:
 
 ## Out of scope (don't design these)
 
-Drag-to-reorder cards, editing inside a card, close-all / close-others, a
+Drag-to-reorder cards, editing inside a card (Edit hands off to the workbench), close-all /
+close-others, a
 permalink-versus-permaview toggle, and any server or sync indicator. The river exists only
 in the URL.
 
 ## Deliverables
 
 1. The river page at **desktop and mobile**, dark and light, with the sample session above.
-2. The **card** in all eight states.
-3. **Sequences** (storyboards or prototype) for the five interactions, plus reduced-motion
+2. The **card** in all nine states, plus the Edit control's four looks.
+3. **Sequences** (storyboards or prototype) for the six interactions, plus reduced-motion
    variants of 1, 3 and 4.
 4. The **rail** (desktop) following focus, and the **sidebar** with the open-entry marker
    explored.
