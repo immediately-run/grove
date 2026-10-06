@@ -1,6 +1,6 @@
 {
   "name": "@immediately-run/grove",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "main": "src/main.tsx",
   "immediately.run": {
@@ -14,6 +14,12 @@
     "invokes": [
       {
         "task": "edit-file",
+        "version": "^1"
+      }
+    ],
+    "opens": [
+      {
+        "app": "self",
         "version": "^1"
       }
     ],
