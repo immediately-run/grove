@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { MountImage } from '@immediately-run/sdk';
+import { MountImage, useMounts } from '@immediately-run/sdk';
 import type { SandboxMount } from '@immediately-run/sdk';
 import { keyToFsPath } from '../lib/content';
-import { resolvePath } from '../lib/assetPath';
+import { resolvePath, federatedAliasFor } from '../lib/assetPath';
 import { useEntryKey } from '../hooks/useEntryKey';
 
 // MDX `img` override: display a mount-relative image by reading its bytes off the
@@ -25,6 +25,7 @@ interface Props {
 
 export default function AssetImage({ src = '', alt = '', className }: Props) {
   const entryKey = useEntryKey();
+  const mounts = useMounts();
 
   const relPath = useMemo(() => {
     // The entry's absolute fs path (/app/content/...) is the base for relative assets.
@@ -32,10 +33,20 @@ export default function AssetImage({ src = '', alt = '', className }: Props) {
     return resolvePath(base, src).replace(/^\/+/, '');
   }, [entryKey, src]);
 
+  // R3-1017 (PERSISTENCE §8.3/§8.5): a corpus-absolute src may name a DECLARED
+  // federation alias — a `requests.mounts[].at` the host minted a mount for.
+  // Read it from that mount; absent an alias the corpus's own path stands
+  // (the pre-R3-1017 behavior, and the non-holder's honest degradation below it).
+  const federated = useMemo(
+    () => (src.startsWith('/') ? federatedAliasFor(mounts, src) : null),
+    [mounts, src],
+  );
+  const targetMount = federated?.mount ?? ROOT_MOUNT;
+  const targetRelPath = federated ? federated.relPath : relPath;
   return (
     <MountImage
-      mount={ROOT_MOUNT}
-      relPath={relPath}
+      mount={targetMount}
+      relPath={targetRelPath}
       alt={alt}
       className={className || 'grove-img__el'}
       placeholder={

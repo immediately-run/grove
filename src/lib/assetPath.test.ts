@@ -1,7 +1,7 @@
 // The pure resolver (R3-313): entry-relative resolution against the OWNING entry,
 // the absolute-`/` escape, traversal, and the degrade-to-empty contract.
 import { describe, it, expect } from 'vitest';
-import { resolvePath, entryAssetRelPath } from './assetPath';
+import { resolvePath, entryAssetRelPath, federatedAliasFor } from './assetPath';
 
 describe('resolvePath', () => {
   it('resolves relative to the base file directory', () => {
@@ -32,5 +32,27 @@ describe('entryAssetRelPath — the MountImage feed', () => {
     // The mount key space is the metadata key space; resolution is prefix-faithful…
     expect(entryAssetRelPath('/mnt/abc123def456/wiki/a.mdx', 'pic.png')).toBe('mnt/abc123def456/wiki/pic.png');
     // …which is exactly why the COMPONENT test asserts this string never reaches the DOM.
+  });
+
+  it('federatedAliasFor (R3-1017): a declared alias reads the federated mount, corpus-absolute only', () => {
+    const fed = { path: '/mnt/spacehash', type: 'federated', mode: 'ro', bundle: { at: '/b/' } } as never;
+    const plain = { path: '/mnt/corpus', type: 'content', mode: 'ro' } as never;
+    // the alias hit: the remainder is mount-relative
+    expect(federatedAliasFor([plain, fed], '/b/federation-test.png')).toEqual({ mount: fed, relPath: 'federation-test.png' });
+    // no alias → null (the corpus's own path stands)
+    expect(federatedAliasFor([plain], '/b/federation-test.png')).toBeNull();
+    // a partial-prefix look-alike never matches ('/b2/…' is not '/b/')
+    expect(federatedAliasFor([fed], '/b2/x.png')).toBeNull();
+    // longest alias wins
+    const nested = { path: '/mnt/nested', type: 'federated', bundle: { at: '/b/deep/' } } as never;
+    expect(federatedAliasFor([fed, nested], '/b/deep/x.png')).toEqual({ mount: nested, relPath: 'x.png' });
+    // relative paths are not aliases
+    expect(federatedAliasFor([fed], 'b/x.png')).toBeNull();
+    // the host's canonical at has NO trailing slash (normalizeAt); match it too
+    const fedBare = { path: '/mnt/spacehash', type: 'federated', mode: 'ro', bundle: { at: '/b' } } as never;
+    expect(federatedAliasFor([fedBare], '/b/federation-test.png')).toEqual({ mount: fedBare, relPath: 'federation-test.png' });
+    // a root alias (the whole-bundle rebind) never matches — §8.0, defense in depth
+    const rootAlias = { path: '/mnt/root', type: 'federated', bundle: { at: '/' } } as never;
+    expect(federatedAliasFor([rootAlias], '/b/federation-test.png')).toBeNull();
   });
 });
