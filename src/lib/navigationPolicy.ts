@@ -14,7 +14,7 @@ import { navigate } from '@immediately-run/sdk';
  *  and the entry the link was rendered inside (`from`). Resolution happens at the
  *  call site — the policy receives the ANSWER, never a string to re-derive. The
  *  `href` is finalized at click time from the clicked anchor (R3-1029); the
- *  call-site value is the fallback for synthetic, anchor-less events. */
+ *  call-site value is the fallback when the click carries no usable anchor href. */
 export interface FollowLinkTarget {
   key: string;
   fragment?: string;
@@ -48,9 +48,10 @@ export const NavigationPolicyContext = createContext<FollowLink>(defaultFollowLi
  * the SDK's `InternalLink` would have navigated and the host's `urlchange`
  * handler can parse). The call site's corpus-relative `keyToHref()` value — the
  * one this handler's own `preventDefault()` opts out of `InternalLink`'s
- * construction for — is the FALLBACK, used only when the event carries no anchor
- * (a synthetic call). A bare relative path is what the host drops as unparseable,
- * which is the bug this replaces.
+ * construction for — is the FALLBACK, used only when the click carries no usable
+ * anchor href (a synthetic call, or an anchor whose href is empty/non-string).
+ * A bare relative path is what the host drops as unparseable, which is the bug
+ * this replaces.
  */
 export function followLinkOnClick(
   follow: FollowLink,

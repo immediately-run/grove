@@ -52,10 +52,10 @@ describe('navigationPolicy', () => {
     const follow = vi.fn();
     followLinkOnClick(follow, { key: 'k', href: '/wiki/b.mdx' })(click({ currentTarget: { href: ANCHOR_HREF } }));
     const href = follow.mock.calls[0][0].href;
+    // the host's urlchange handler parses the url with new URL() and drops a
+    // bare relative path as unparseable — the raw call-site value is exactly
+    // that input; the anchor's rendered outer URL is the shape that survives
     expect(() => new URL(href)).not.toThrow();
-    // the raw call-site value — what the policy used to receive — is what the
-    // host drops: the guard this case pins against reverting
-    expect(() => new URL('/wiki/b.mdx')).toThrow();
   });
 
   it('R3-1029: a synthetic, anchor-less event falls back to the passed href', () => {

@@ -64,7 +64,7 @@ vi.mock('fs', async (importOriginal) => {
 };
 
 const NAV = {
-  mode: 'github',
+  mode: 'edit',
   namespace: 'immediately-run',
   provider: 'github',
   repository: 'corpus',
@@ -120,8 +120,13 @@ const FIXTURES: Record<string, { props?: Record<string, unknown>; sandboxPath?: 
 
 // ── Harness ──────────────────────────────────────────────────────────────────
 
-/** The outer href the Harness stubs — the app's outer origin every policy href must sit in. */
-const OUTER = 'https://immediately.run/x';
+/** The outer href the Harness stubs — the PRODUCTION shape (R3-1029's Tests
+ *  section): constructOuterUrl rebuilds the URL from the hostname and the NAV
+ *  segments (mode/provider/namespace/repository/ref), so the mode must be
+ *  'edit' for rendered hrefs to carry the real grammar
+ *  /edit/github/<ns>/<repo>/main/files/… — the prefix the pathname guard below
+ *  asserts every policy href starts at. */
+const OUTER = 'https://host.test/edit/github/immediately-run/corpus/main';
 
 function Harness({ children, record, sandboxPath }: { children: ReactNode; record: (t: FollowLinkTarget) => void; sandboxPath?: string }) {
   return (
@@ -246,7 +251,7 @@ describe('G-CUST-3 — every entry link rides the navigation policy', () => {
       // killed every plain click in a hosted grove >=0.2.0 wiki.
       expect(t.href, `${name}: the policy href is the clicked anchor's rendered href`).toBe(href);
       const parsed = new URL(t.href);
-      expect(parsed.origin, `${name}: ${t.href} sits in the app's outer origin`).toBe(new URL(OUTER).origin);
+      expect(parsed.pathname.startsWith(new URL(OUTER).pathname), `${name}: ${t.href} sits in the production-shaped outer prefix`).toBe(true);
       expect(typeof t.key, 'the target carries the resolved key').toBe('string');
       expect(t.key.length).toBeGreaterThan(0);
       // §4.3's shape: fragment is absent or a bare id, never '#'-prefixed
