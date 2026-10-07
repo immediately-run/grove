@@ -3,6 +3,12 @@
 // the policy with the browser default prevented; a modified click falls through
 // to the real href; a throwing policy fails LOUDLY (logged, never silently
 // retried by the default — R-CUST-5).
+//
+// R3-1029: the target's href is finalized at click time from the clicked
+// ANCHOR (the absolute outer URL the anchor renders) — the corpus-relative
+// call-site value is the fallback only, because the host's urlchange handler
+// parses the url with new URL() and DROPS a bare relative path as unparseable
+// (the defect that killed every plain click in a hosted grove >=0.2.0 wiki).
 import { describe, it, expect, vi } from 'vitest';
 
 const navigate = vi.fn();
@@ -17,13 +23,45 @@ const click = (over: Partial<Parameters<ReturnType<typeof followLinkOnClick>>[0]
   shiftKey: false,
   altKey: false,
   preventDefault: vi.fn(),
+  currentTarget: undefined,
   ...over,
 });
+
+const ANCHOR_HREF = 'https://immediately.run/edit/github/o/r/main/files/wiki/b.mdx';
 
 describe('navigationPolicy', () => {
   it('defaultFollowLink calls the SDK navigate with the resolved href', () => {
     defaultFollowLink({ key: '/app/content/a.mdx', href: '/content/a' });
     expect(navigate).toHaveBeenCalledWith('/content/a');
+  });
+
+  it('R3-1029: a plain click reaches the policy with the ANCHOR\'S rendered href, not the raw passed one', () => {
+    const follow = vi.fn();
+    const e = click({ currentTarget: { href: ANCHOR_HREF } });
+    followLinkOnClick(follow, { key: '/app/content/wiki/b.mdx', fragment: 'sec-4', href: '/wiki/b.mdx#sec-4', from: '/app/content/wiki/a.mdx' })(e);
+    expect(follow).toHaveBeenCalledWith({
+      key: '/app/content/wiki/b.mdx',
+      fragment: 'sec-4',
+      href: ANCHOR_HREF,
+      from: '/app/content/wiki/a.mdx',
+    });
+    expect(e.preventDefault).toHaveBeenCalled();
+  });
+
+  it('R3-1029: the anchor href the policy receives survives the host\'s exact guard — new URL() parses it', () => {
+    const follow = vi.fn();
+    followLinkOnClick(follow, { key: 'k', href: '/wiki/b.mdx' })(click({ currentTarget: { href: ANCHOR_HREF } }));
+    const href = follow.mock.calls[0][0].href;
+    expect(() => new URL(href)).not.toThrow();
+    // the raw call-site value — what the policy used to receive — is what the
+    // host drops: the guard this case pins against reverting
+    expect(() => new URL('/wiki/b.mdx')).toThrow();
+  });
+
+  it('R3-1029: a synthetic, anchor-less event falls back to the passed href', () => {
+    const follow = vi.fn();
+    followLinkOnClick(follow, { key: 'k', fragment: 'sec-4', href: '/h#sec-4', from: 'here' })(click());
+    expect(follow).toHaveBeenCalledWith({ key: 'k', fragment: 'sec-4', href: '/h#sec-4', from: 'here' });
   });
 
   it('a plain click (primary button, no modifier) reaches the policy and prevents the default', () => {

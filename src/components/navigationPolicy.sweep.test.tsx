@@ -120,11 +120,14 @@ const FIXTURES: Record<string, { props?: Record<string, unknown>; sandboxPath?: 
 
 // ── Harness ──────────────────────────────────────────────────────────────────
 
+/** The outer href the Harness stubs — the app's outer origin every policy href must sit in. */
+const OUTER = 'https://immediately.run/x';
+
 function Harness({ children, record, sandboxPath }: { children: ReactNode; record: (t: FollowLinkTarget) => void; sandboxPath?: string }) {
   return (
     <TinkerableContext.Provider
       value={{
-        outerHref: 'https://immediately.run/x',
+        outerHref: OUTER,
         navigationState: { ...NAV, sandboxPath: sandboxPath ?? NAV.sandboxPath },
         routingSpec: { routes: [] } as never,
         filesMetadata: META,
@@ -235,11 +238,15 @@ describe('G-CUST-3 — every entry link rides the navigation policy', () => {
     for (const { href, calls, prevented } of perHref) {
       expect(calls.length, `${name}: the plain click on ${href} reaches the policy`).toBeGreaterThan(0);
       const t = calls[0];
-      expect(typeof t.href, 'the target carries the concrete href').toBe('string');
-      expect(t.href.length).toBeGreaterThan(0);
-      // the DOM anchor carries the SDK's outer-URL resolution of the href the
-      // component passed; the policy receives the component-level one
-      expect(href === t.href || href.endsWith(t.href), `${name}: the DOM href ${href} resolves the policy's ${t.href}`).toBe(true);
+      // R3-1029: the href the policy receives is the clicked anchor's RENDERED
+      // href (the SDK's outer-URL resolution — an absolute URL), never the
+      // corpus-relative value the call site passed. The host's urlchange handler
+      // parses the url with new URL() and DROPS a bare relative path as
+      // unparseable — its exact guard, mirrored here — which is the defect that
+      // killed every plain click in a hosted grove >=0.2.0 wiki.
+      expect(t.href, `${name}: the policy href is the clicked anchor's rendered href`).toBe(href);
+      const parsed = new URL(t.href);
+      expect(parsed.origin, `${name}: ${t.href} sits in the app's outer origin`).toBe(new URL(OUTER).origin);
       expect(typeof t.key, 'the target carries the resolved key').toBe('string');
       expect(t.key.length).toBeGreaterThan(0);
       // §4.3's shape: fragment is absent or a bare id, never '#'-prefixed
