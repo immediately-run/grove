@@ -14,6 +14,8 @@
 // prefix is host knowledge the viewer reads THROUGH but never publishes) is testable
 // here in isolation.
 
+import type { SandboxMount } from '@immediately-run/sdk';
+
 /** Resolve `relativePath` against the directory of `basePath` (both fs paths). */
 export function resolvePath(basePath: string, relativePath: string): string {
   if (relativePath.startsWith('/')) return relativePath;
@@ -40,4 +42,29 @@ export function resolvePath(basePath: string, relativePath: string): string {
 export function entryAssetRelPath(entryPath: string, src: string | undefined | null): string {
   if (typeof src !== 'string' || !src.trim()) return '';
   return resolvePath(entryPath, src.trim()).replace(/^\/+/, '');
+}
+
+/**
+ * The federation alias read (R3-1017; PERSISTENCE_SPEC §8.3/§8.5): a bundle's
+ * `requests.mounts[].at` declares an in-corpus alias (e.g. `/b/`) for a federated
+ * mount the HOST mints (its descriptor carries `bundle.at`); content addresses the
+ * mount by the alias. This maps an alias-prefixed, corpus-absolute asset path to
+ * the mount that holds it, longest-alias-first. No alias matches, no change —
+ * the path stays the corpus's own. Pure; the SDK's SandboxMount is a plain value.
+ */
+export function federatedAliasFor(
+  mounts: readonly SandboxMount[],
+  corpusAbsolutePath: string,
+): { mount: SandboxMount; relPath: string } | null {
+  let best: { mount: SandboxMount; at: string } | null = null;
+  for (const m of mounts) {
+    const at = m.bundle?.at;
+    if (typeof at !== 'string' || !at.startsWith('/')) continue;
+    const norm = at.endsWith('/') ? at : at + '/';
+    if (corpusAbsolutePath === norm.slice(0, -1) || corpusAbsolutePath.startsWith(norm)) {
+      if (!best || norm.length > best.at.length) best = { mount: m, at: norm };
+    }
+  }
+  if (!best) return null;
+  return { mount: best.mount, relPath: corpusAbsolutePath.slice(best.at.length - 1).replace(/^\/+/, '') };
 }
