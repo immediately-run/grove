@@ -10,9 +10,11 @@ import { createContext } from 'react';
 import { navigate } from '@immediately-run/sdk';
 
 /** A resolved link target: the corpus key, any `#fragment`, the concrete href the
- *  anchor already renders (modifier-/middle-click still open it in a new tab), and
- *  the entry the link was rendered inside (`from`). Resolution happens at the call
- *  site — the policy receives the ANSWER, never a string to re-derive. */
+ *  anchor already renders (modifier-/middle-click still open it in a new tab),
+ *  and the entry the link was rendered inside (`from`). Resolution happens at the
+ *  call site — the policy receives the ANSWER, never a string to re-derive. The
+ *  `href` is finalized at click time from the clicked anchor (R3-1029); the
+ *  call-site value is the fallback when the click carries no usable anchor href. */
 export interface FollowLinkTarget {
   key: string;
   fragment?: string;
@@ -40,18 +42,39 @@ export const NavigationPolicyContext = createContext<FollowLink>(defaultFollowLi
  * falls through to the anchor's real `href` (new tab/window semantics are the
  * browser's, and an anchor that lost them is a bug). A policy that throws is caught,
  * logged with the target, and NOT silently fallen back from (R-CUST-5: fail loudly).
+ *
+ * R3-1029: the target's `href` is read from the CLICKED ANCHOR at click time
+ * (`currentTarget.href` — the absolute outer URL the anchor renders, exactly what
+ * the SDK's `InternalLink` would have navigated and the host's `urlchange`
+ * handler can parse). The call site's corpus-relative `keyToHref()` value — the
+ * one this handler's own `preventDefault()` opts out of `InternalLink`'s
+ * construction for — is the FALLBACK, used only when the click carries no usable
+ * anchor href (a synthetic call, or an anchor whose href is empty/non-string).
+ * A bare relative path is what the host drops as unparseable, which is the bug
+ * this replaces.
  */
 export function followLinkOnClick(
   follow: FollowLink,
   target: FollowLinkTarget,
-): (e: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; preventDefault: () => void }) => void {
+): (e: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  preventDefault: () => void;
+  currentTarget?: { href?: string | null };
+}) => void {
   return (e) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
+    const anchorHref = e.currentTarget?.href;
+    const resolved: FollowLinkTarget =
+      typeof anchorHref === 'string' && anchorHref ? { ...target, href: anchorHref } : target;
     try {
-      follow(target);
+      follow(resolved);
     } catch (err) {
-      console.error(`[grove] the navigation policy threw for ${target.key}${target.fragment ?? ''}`, err);
+      console.error(`[grove] the navigation policy threw for ${resolved.key}${resolved.fragment ?? ''}`, err);
     }
   };
 }
