@@ -41,25 +41,12 @@ export default function AssetImage({ src = '', alt = '', className }: Props) {
     () => (src.startsWith('/') ? federatedAliasFor(mounts, src) : null),
     [mounts, src],
   );
-  if (federated) {
-    return (
-      <MountImage
-        mount={federated.mount}
-        relPath={federated.relPath}
-        alt={alt}
-        className={className || 'grove-img__el'}
-        placeholder={
-          <span className="grove-img__box" style={{ display: 'block', minHeight: 80 }} />
-        }
-        fallback={<span className="grove-img__cap">missing asset: {src}</span>}
-      />
-    );
-  }
-
+  const targetMount = federated?.mount ?? ROOT_MOUNT;
+  const targetRelPath = federated ? federated.relPath : relPath;
   return (
     <MountImage
-      mount={ROOT_MOUNT}
-      relPath={relPath}
+      mount={targetMount}
+      relPath={targetRelPath}
       alt={alt}
       className={className || 'grove-img__el'}
       placeholder={

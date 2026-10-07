@@ -48,5 +48,11 @@ describe('entryAssetRelPath — the MountImage feed', () => {
     expect(federatedAliasFor([fed, nested], '/b/deep/x.png')).toEqual({ mount: nested, relPath: 'x.png' });
     // relative paths are not aliases
     expect(federatedAliasFor([fed], 'b/x.png')).toBeNull();
+    // the host's canonical at has NO trailing slash (normalizeAt); match it too
+    const fedBare = { path: '/mnt/spacehash', type: 'federated', mode: 'ro', bundle: { at: '/b' } } as never;
+    expect(federatedAliasFor([fedBare], '/b/federation-test.png')).toEqual({ mount: fedBare, relPath: 'federation-test.png' });
+    // a root alias (the whole-bundle rebind) never matches — §8.0, defense in depth
+    const rootAlias = { path: '/mnt/root', type: 'federated', bundle: { at: '/' } } as never;
+    expect(federatedAliasFor([rootAlias], '/b/federation-test.png')).toBeNull();
   });
 });

@@ -59,7 +59,11 @@ export function federatedAliasFor(
   let best: { mount: SandboxMount; at: string } | null = null;
   for (const m of mounts) {
     const at = m.bundle?.at;
+    // §8.0 defense in depth: a root or empty alias (a whole-bundle rebind) never
+    // matches, whatever an announcer put on the descriptor — the host's
+    // validateBindings refuses them first; the reader refuses them again here.
     if (typeof at !== 'string' || !at.startsWith('/')) continue;
+    if (at.replace(/\/+$/, '') === '') continue;
     const norm = at.endsWith('/') ? at : at + '/';
     if (corpusAbsolutePath === norm.slice(0, -1) || corpusAbsolutePath.startsWith(norm)) {
       if (!best || norm.length > best.at.length) best = { mount: m, at: norm };
