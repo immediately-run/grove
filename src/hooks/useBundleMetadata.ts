@@ -23,10 +23,12 @@ import {
 } from '../lib/corpusScan';
 
 export interface BundleIndex {
-  /** `idle` — a fork, nothing to scan · `listing` — hold the render, no key is known yet ·
-   *  `reading` — every key is known, rows are filling in · `complete` — every row is read. */
+  /** `idle` — a fork, nothing to scan · `listing` — the walk is running; the map is
+   *  partial (priority reads publish into it mid-walk, R3-1090) · `reading` — every key
+   *  is known, rows are filling in · `complete` — every row is read. */
   status: 'idle' | CorpusScanStatus;
-  /** Null until the listing is done (and always for a fork). */
+  /** Null only for a fork (and before the scan starts). During the listing it is the
+   *  live, partial map. */
   metadata: CorpusMetadata | null;
   /** The running scan, for the entry gate. Null for a fork and before the scan starts. */
   scan: CorpusScan | null;
@@ -53,8 +55,9 @@ export function useBundleMetadata(root: string | null): BundleIndex {
   const snap = useSyncExternalStore(scan ? scan.subscribe : noSubscribe, scan ? scan.snapshot : listingSnapshot);
 
   if (!root) return { status: 'idle', metadata: null, scan: null };
-  // A bundle that resolves to nothing is still a result: `complete` with an empty map
-  // renders the 404 index, which tells the reader the folder has no entries.
-  if (snap.status === 'listing') return { status: 'listing', metadata: null, scan };
+  // R3-1090: the PARTIAL map is handed on during the listing too — the scan publishes
+  // a priority-read row mid-walk (a wanted key settles → publish), and the entry gate
+  // is what waits, not the whole wiki. The map is `{}` until the first publish; every
+  // consumer re-derives on identity, as before.
   return { status: snap.status, metadata: snap.metadata, scan };
 }

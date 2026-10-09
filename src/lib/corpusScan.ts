@@ -163,6 +163,12 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   // failure of a file it needs as "this file has no frontmatter".
   const failures = new Map<string, string>();
   const wanted = new Set<string>();
+  // Keys whose read began OUTSIDE the queue — a prioritize() that arrives while the
+  // listing is still running cannot wait for it (R3-1090: on a cold mount of a
+  // 1,600-file corpus the walk alone ran ~13 s, and the reader's entry painted only
+  // after it, 25.5 s in — the design's entry-first intent defeated by the queue being
+  // empty until the listing completes). The listing skips keys already started.
+  const started = new Set<string>();
   const listeners = new Set<() => void>();
   let listed: Set<string> | null = null;
   let queue: string[] = [];
@@ -208,19 +214,27 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       }
     }
   };
+  // The read-completion chain, shared by the pool and by priority reads started
+  // ahead of the listing.
+  const onRead = (path: string) => (): void => {
+    active--;
+    if (disposed) return;
+    read.add(path);
+    if (wanted.delete(path)) publish();
+    else schedule();
+    pump();
+  };
+  const startRead = (path: string): void => {
+    started.add(path);
+    active++;
+    // `readOne` settles every failure itself, so this chain has no rejection to lose.
+    void readOne(path).then(onRead(path));
+  };
   const pump = (): void => {
     while (!disposed && active < concurrency && queue.length) {
       const path = queue.shift()!;
-      active++;
-      // `readOne` settles every failure itself, so this chain has no rejection to lose.
-      void readOne(path).then(() => {
-        active--;
-        if (disposed) return;
-        read.add(path);
-        if (wanted.delete(path)) publish();
-        else schedule();
-        pump();
-      });
+      if (started.has(path)) continue; // a priority read already has it in flight
+      startRead(path);
     }
     if (!disposed && status === 'reading' && active === 0 && queue.length === 0) finish();
   };
@@ -229,10 +243,13 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
     .then((paths) => {
       if (disposed) return;
       listed = new Set(paths);
-      for (const path of paths) rows[path] = {};
-      const first = [...wanted].filter((k) => listed!.has(k));
+      // Never clobber a row a priority read already filled (review round 1, both
+      // passes): `rows[path] = {}` here would empty it while isSettled stays true,
+      // and `started` keeps the key out of the queue, so the wipe would be final.
+      for (const path of paths) if (!(path in rows)) rows[path] = {};
+      const first = [...wanted].filter((k) => listed!.has(k) && !started.has(k));
       const firstSet = new Set(first);
-      queue = [...first, ...paths.filter((p) => !firstSet.has(p))];
+      queue = [...first, ...paths.filter((p) => !firstSet.has(p) && !started.has(p))];
       status = 'reading';
       publish();
       pump();
@@ -260,6 +277,10 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       const front: string[] = [];
       let readButUnpublished = false;
       for (const key of keys) {
+        // A key that cannot be an entry (a folder URL's routeKey, R3-1090 round 3)
+        // must never be READ: its readFile rejects EISDIR, which is not ENOENT, and
+        // the failure would surface to the reader as "Could not read … Reload".
+        if (!ENTRY_RE.test(key)) continue;
         if (read.has(key)) readButUnpublished = true;
         if (settled.has(key) || read.has(key) || wanted.has(key)) continue;
         wanted.add(key);
@@ -267,6 +288,12 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
         if (at !== -1) {
           queue.splice(at, 1);
           front.push(key);
+        } else if (listed === null && !started.has(key)) {
+          // The walk has not finished (or has not reached it): read the key NOW,
+          // outside the queue, or the entry's first paint waits for the whole
+          // listing (R3-1090). A key the corpus does not hold reads ENOENT and
+          // settles as absent — the same state the listing would have given it.
+          startRead(key);
         }
       }
       queue.unshift(...front);

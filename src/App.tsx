@@ -15,8 +15,10 @@
 // component that rendered before the root was settled would show the VIEWER's corpus, and
 // then not correct itself; so would one that rendered with no index in scope, because the
 // metadata hooks fall back to the host's store. So this file holds until the root is
-// settled and the bundle is LISTED — every key known, rows filling in — and from then on
-// always provides the bundle's index. Which rows an entry needs READ before it paints is
+// settled and the SCAN EXISTS (R3-1090: no longer until the bundle is LISTED — the entry's
+// critical set is prioritized from the boot path and publishes mid-walk, and the entry
+// gate, not this file, waits for it; the `!bundle.scan` hold below is what still protects
+// the viewer's-corpus invariant). Which rows an entry needs READ before it paints is
 // GroveWiki's call (MDX_FROM_MOUNT_SPEC D8).
 //
 // Hence the split: this file resolves, `GroveWiki` renders.
@@ -31,7 +33,8 @@ import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useBundleMetadata } from './hooks/useBundleMetadata';
 import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
-import { viewedDocumentForTarget } from './lib/content';
+import { viewedDocumentForTarget, sandboxPathToKey, homeKey } from './lib/content';
+import { layoutKeysOnPath } from './lib/layout';
 import GroveWiki from './GroveWiki';
 import BootMessage from './components/BootMessage';
 import { CorpusScanContext } from './lib/corpusScanContext';
@@ -76,6 +79,19 @@ export default function App() {
   }, [boot.status, outerHref]);
   // Only a dispatched viewer scans; a fork's index is already in the context.
   const bundle = useBundleMetadata(boot.status === 'ready' ? getContentRoot() : null);
+  // R3-1090 — the requested entry's reads cannot wait for the listing (cold, the
+  // walk alone ran ~13 s and the title painted only after the tree). The boot path
+  // prioritizes the entry's critical set the moment the scan exists — before the
+  // gate below lifts — so its reads are settled (or settling) when the wiki mounts.
+  // The frame: key and the EXISTENCE of the layout candidates are metadata questions;
+  // EntryFrame re-prioritizes once the entry's row answers them.
+  const scan = bundle.scan;
+  const sandboxPath = host?.navigationState?.sandboxPath;
+  useEffect(() => {
+    if (!scan) return;
+    const entryKey = (sandboxPath && sandboxPathToKey(sandboxPath)) || homeKey();
+    scan.prioritize([homeKey(), entryKey, ...layoutKeysOnPath(entryKey)]);
+  }, [scan, sandboxPath]);
   // BOTH packagings, deliberately (R3-174). A corpus's own component vocabulary must not
   // depend on how it was composed — `PLATFORM_LAYERING_SPEC` §1.1's mode-invariance rule —
   // so a fork reads its marker too; that is one cheap open of a file already in `/app`.
@@ -94,10 +110,17 @@ export default function App() {
   // for `<RoadmapBoard>` until registration landed — the very error content components
   // exist to remove — and a nested provider patched in afterwards would do the same.
   //
-  // The frontmatter index is NOT held for (D8). Once the bundle is listed every key is
-  // known; the rows the requested entry needs are GroveWiki's to wait for, and the rest
-  // fill in around a painted page.
-  if (boot.status === 'waiting' || bundle.status === 'listing' || contentComponents.status === 'loading') {
+  // The frontmatter index is NOT held for (D8) — and since R3-1090 neither is the
+  // LISTING: the boot path above already prioritized the requested entry's critical
+  // set, the scan publishes those rows mid-walk, and the entry gate (GroveWiki's) waits
+  // for exactly them. Holding the whole wiki for the listing was what painted the title
+  // after the sidebar tree on a cold load. Nav/sidebar/search fill in as rows arrive;
+  // the 404 path stays quiet because indexLoaded is keys.length > 0.
+  // …but a dispatched boot with no scan YET (the effect that creates it runs after
+  // the first paint) must still hold: rendering then would flash the VIEWER's corpus
+  // through the fallback gate (every key "settled"), which is the invariant the old
+  // listing hold protected.
+  if (boot.status === 'waiting' || contentComponents.status === 'loading' || (boot.status === 'ready' && !bundle.scan)) {
     return <BootMessage />;
   }
 

@@ -103,7 +103,9 @@ describe('the entry gate (D8)', () => {
     expect(bootLine(container)).toBe('Opening…');
     expect(container.textContent).not.toContain('The body text.');
     expect(container.querySelector('.grove-root')).toBeTruthy(); // the shell is mounted
-    expect(scan.prioritize).toHaveBeenCalledWith([HOME, ENTRY, LAYOUT]);
+    // R3-1090: every layout candidate on the folder path is asked for, existing or
+    // not — mid-listing the map is partial and cannot answer existence.
+    expect(scan.prioritize).toHaveBeenCalledWith([HOME, ENTRY, LAYOUT, '/app/content/wiki/_layout.mdx']);
     await act(async () => root.unmount());
   });
 

@@ -268,6 +268,77 @@ describe('createCorpusScan — the progressive index (MDX_FROM_MOUNT_SPEC D8)', 
     scan.dispose();
   });
 
+  // R3-1090 — the cold-load defect: on a 1,600-file corpus the LISTING ran ~13 s and
+  // the reader's entry painted only after it (title at 27.2 s, tree at 25.5 s), because
+  // a prioritized key could not be read until the walk completed. The wanted key's read
+  // now starts at prioritize() time, listing or no listing. The fixture holds the
+  // listing OPEN (a readdir that answers when told), so pre-fix code — which could only
+  // collect the wanted key — fails this case by never settling it.
+  it('a key prioritized DURING the listing is read at once, and its row survives the listing', async () => {
+    const files: Record<string, string> = { '/mnt/c/entry.mdx': entry('The entry') };
+    for (let i = 0; i < 1600; i++) files[`/mnt/c/e${String(i).padStart(4, '0')}.mdx`] = entry(`E${i}`);
+    const base = fakeFs(files);
+    let openListing: () => void = () => {};
+    const listingHeld = new Promise<void>((res) => {
+      openListing = res;
+    });
+    const fs: ScanFs = {
+      readdir: async (dir, opts) => {
+        await listingHeld;
+        return base.readdir(dir, opts);
+      },
+      readFile: (p, e) => base.readFile(p, e),
+    };
+    const scan = createCorpusScan('/mnt/c', fs, { flushMs: 0 });
+    scan.prioritize(['/mnt/c/entry.mdx']);
+    // Settles while the listing is still open — pre-fix, this waitFor times out.
+    await vi.waitFor(() => expect(scan.isSettled('/mnt/c/entry.mdx')).toBe(true));
+    expect(scan.snapshot().status).toBe('listing');
+    // And the row is not clobbered to {} when the listing lands (review round 1).
+    openListing();
+    await vi.waitFor(() => expect(scan.snapshot().status).not.toBe('listing'));
+    expect(scan.snapshot().metadata['/mnt/c/entry.mdx'].title).toBe('The entry');
+    expect(scan.isSettled('/mnt/c/entry.mdx')).toBe(true);
+    scan.dispose();
+  });
+
+  it('prioritize never reads a key that cannot be an entry (a folder routeKey)', async () => {
+    // R3-1090 round 3: a folder URL's routeKey has no .mdx; reading it rejects EISDIR,
+    // which is not ENOENT — unguarded, it would be recorded as a read FAILURE and the
+    // entry gate would show "Could not read … Reload to try again" for the whole
+    // listing window.
+    const h = heldFs({ '/mnt/c/home.mdx': entry('Home') });
+    const scan = createCorpusScan('/mnt/c', h.fs, { flushMs: 0 });
+    scan.prioritize(['/mnt/c/guides']);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(h.calls).not.toContain('/mnt/c/guides');
+    expect(scan.readFailure('/mnt/c/guides')).toBeNull();
+    scan.dispose();
+  });
+
+  it('fault injection: without the priority read the entry waits for the walk (the pre-fix shape)', async () => {
+    // The same corpus, NO prioritize: the entry (e0000-adjacent by sort would cheat —
+    // pick the last-sorted key) settles only when the pool reaches it, long after the
+    // listing. This is the behavior the fix removes; if prioritize ever stops starting
+    // reads early, the case above fails and this one keeps passing.
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 100; i++) files[`/mnt/c/e${String(i).padStart(4, '0')}.mdx`] = entry(`E${i}`);
+    files['/mnt/c/zz-entry.mdx'] = entry('Last');
+    const base = fakeFs(files);
+    // One read per tick, so the pool cannot drain the corpus before the
+    // 'reading' observation (an instant fs completes 100 files inside the wait).
+    const fs: ScanFs = {
+      readdir: base.readdir,
+      readFile: (p, e) => new Promise((res) => setTimeout(() => res(base.readFile(p, e)), 0)),
+    };
+    const scan = createCorpusScan('/mnt/c', fs, { concurrency: 1, flushMs: 0 });
+    // Not prioritized: the key is NOT settled right after the listing publishes.
+    await vi.waitFor(() => expect(scan.snapshot().status).toBe('reading'));
+    expect(scan.isSettled('/mnt/c/zz-entry.mdx')).toBe(false);
+    await scan.done;
+    expect(scan.isSettled('/mnt/c/zz-entry.mdx')).toBe(true);
+  });
+
   it('a prioritized key publishes as soon as it settles, without waiting for the flush timer', async () => {
     const h = heldFs(tree);
     const scan = createCorpusScan('/mnt/c', h.fs, { concurrency: 1, flushMs: 60_000 });
