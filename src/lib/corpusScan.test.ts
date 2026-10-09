@@ -271,25 +271,34 @@ describe('createCorpusScan — the progressive index (MDX_FROM_MOUNT_SPEC D8)', 
   // R3-1090 — the cold-load defect: on a 1,600-file corpus the LISTING ran ~13 s and
   // the reader's entry painted only after it (title at 27.2 s, tree at 25.5 s), because
   // a prioritized key could not be read until the walk completed. The wanted key's read
-  // now starts at prioritize() time, listing or no listing.
-  it('a key prioritized DURING the listing is read at once, not after the walk', async () => {
-    const files: Record<string, string> = {};
+  // now starts at prioritize() time, listing or no listing. The fixture holds the
+  // listing OPEN (a readdir that answers when told), so pre-fix code — which could only
+  // collect the wanted key — fails this case by never settling it.
+  it('a key prioritized DURING the listing is read at once, and its row survives the listing', async () => {
+    const files: Record<string, string> = { '/mnt/c/entry.mdx': entry('The entry') };
     for (let i = 0; i < 1600; i++) files[`/mnt/c/e${String(i).padStart(4, '0')}.mdx`] = entry(`E${i}`);
-    files['/mnt/c/entry.mdx'] = entry('The entry');
     const base = fakeFs(files);
-    const reads: string[] = [];
+    let openListing: () => void = () => {};
+    const listingHeld = new Promise<void>((res) => {
+      openListing = res;
+    });
     const fs: ScanFs = {
-      readdir: base.readdir,
-      // Reads resolve one per tick — the slow-RPC shape the walk hides behind.
-      readFile: (path, enc) => new Promise((res) => setTimeout(() => res(base.readFile(path, enc)), 0)),
+      readdir: async (dir, opts) => {
+        await listingHeld;
+        return base.readdir(dir, opts);
+      },
+      readFile: (p, e) => base.readFile(p, e),
     };
-    const scan = createCorpusScan('/mnt/c', { readdir: fs.readdir, readFile: (p, e) => { reads.push(p); return fs.readFile(p, e); } }, { flushMs: 0 });
+    const scan = createCorpusScan('/mnt/c', fs, { flushMs: 0 });
     scan.prioritize(['/mnt/c/entry.mdx']);
+    // Settles while the listing is still open — pre-fix, this waitFor times out.
     await vi.waitFor(() => expect(scan.isSettled('/mnt/c/entry.mdx')).toBe(true));
-    // Settled while the listing was still running, as one of the first reads — never
-    // after the walk.
-    expect(reads.indexOf('/mnt/c/entry.mdx')).toBeLessThan(8);
+    expect(scan.snapshot().status).toBe('listing');
+    // And the row is not clobbered to {} when the listing lands (review round 1).
+    openListing();
+    await vi.waitFor(() => expect(scan.snapshot().status).not.toBe('listing'));
     expect(scan.snapshot().metadata['/mnt/c/entry.mdx'].title).toBe('The entry');
+    expect(scan.isSettled('/mnt/c/entry.mdx')).toBe(true);
     scan.dispose();
   });
 

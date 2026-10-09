@@ -31,7 +31,8 @@ import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useBundleMetadata } from './hooks/useBundleMetadata';
 import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
-import { viewedDocumentForTarget } from './lib/content';
+import { viewedDocumentForTarget, sandboxPathToKey, homeKey } from './lib/content';
+import { layoutKeysOnPath } from './lib/layout';
 import GroveWiki from './GroveWiki';
 import BootMessage from './components/BootMessage';
 import { CorpusScanContext } from './lib/corpusScanContext';
@@ -76,6 +77,19 @@ export default function App() {
   }, [boot.status, outerHref]);
   // Only a dispatched viewer scans; a fork's index is already in the context.
   const bundle = useBundleMetadata(boot.status === 'ready' ? getContentRoot() : null);
+  // R3-1090 — the requested entry's reads cannot wait for the listing (cold, the
+  // walk alone ran ~13 s and the title painted only after the tree). The boot path
+  // prioritizes the entry's critical set the moment the scan exists — before the
+  // gate below lifts — so its reads are settled (or settling) when the wiki mounts.
+  // The frame: key and the EXISTENCE of the layout candidates are metadata questions;
+  // EntryFrame re-prioritizes once the entry's row answers them.
+  const scan = bundle.scan;
+  const sandboxPath = host?.navigationState?.sandboxPath;
+  useEffect(() => {
+    if (!scan) return;
+    const entryKey = (sandboxPath && sandboxPathToKey(sandboxPath)) || homeKey();
+    scan.prioritize([homeKey(), entryKey, ...layoutKeysOnPath(entryKey)]);
+  }, [scan, sandboxPath]);
   // BOTH packagings, deliberately (R3-174). A corpus's own component vocabulary must not
   // depend on how it was composed — `PLATFORM_LAYERING_SPEC` §1.1's mode-invariance rule —
   // so a fork reads its marker too; that is one cheap open of a file already in `/app`.

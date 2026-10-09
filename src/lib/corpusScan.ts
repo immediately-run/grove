@@ -243,7 +243,10 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
     .then((paths) => {
       if (disposed) return;
       listed = new Set(paths);
-      for (const path of paths) rows[path] = {};
+      // Never clobber a row a priority read already filled (review round 1, both
+      // passes): `rows[path] = {}` here would empty it while isSettled stays true,
+      // and `started` keeps the key out of the queue, so the wipe would be final.
+      for (const path of paths) if (!(path in rows)) rows[path] = {};
       const first = [...wanted].filter((k) => listed!.has(k) && !started.has(k));
       const firstSet = new Set(first);
       queue = [...first, ...paths.filter((p) => !firstSet.has(p) && !started.has(p))];
