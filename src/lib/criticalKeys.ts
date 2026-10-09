@@ -12,10 +12,17 @@ import { explicitFrameKey, layoutKeysOnPath } from './layout';
 import type { CorpusScanGate } from './corpusScan';
 
 /**
- * The keys to read before `entryKey` paints, given the index as it stands. `metadata` holds
- * every LISTED key (read or not), so a layout that does not exist is never asked for. The
- * set grows once the entry's own row is read and turns out to name a `frame:` — the caller
- * recomputes on every index update, so it converges.
+ * The keys to read before `entryKey` paints, given the index as it stands. Every
+ * `_layout.mdx` candidate on the entry's folder path is in the set UNCONDITIONALLY
+ * (R3-1090 review: since the wiki renders during the listing, `metadata` is a PARTIAL
+ * map mid-walk, and an existence test against it would drop a layout that exists but
+ * has not been listed yet — the entry would paint bare and re-wrap when the layout's
+ * row published). An absent candidate costs nothing: the gate's `isSettled` answers
+ * true for it once the listing is done, and mid-listing it settles as absent via the
+ * boot-prioritized ENOENT read.
+ *
+ * The set grows once the entry's own row is read and turns out to name a `frame:` — the
+ * caller recomputes on every index update, so it converges.
  *
  * A file whose read FAILED has left `metadata`, but it exists; it stays in the set so the
  * gate sees its failure and fails closed, rather than painting the entry without that
@@ -27,10 +34,7 @@ export function criticalKeys(
   readFailure: CorpusScanGate['readFailure'] = () => null,
 ): string[] {
   const exists = (key: string) => key in metadata || readFailure(key) !== null;
-  const keys = [homeKey(), entryKey];
-  for (const lk of layoutKeysOnPath(entryKey)) {
-    if (exists(lk)) keys.push(lk);
-  }
+  const keys = [homeKey(), entryKey, ...layoutKeysOnPath(entryKey)];
   const frame = explicitFrameKey(metadata[entryKey] as Record<string, unknown> | undefined);
   if (frame !== null && exists(frame)) keys.push(frame);
   return [...new Set(keys)];

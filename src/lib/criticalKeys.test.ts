@@ -30,16 +30,21 @@ describe('criticalKeys', () => {
       '/app/content/_layout.mdx',
       '/app/content/people/_layout.mdx',
     ]);
-    // Every layout named is one the listing found — none is invented.
-    for (const k of keys) expect(index).toHaveProperty([k]);
   });
 
-  it('asks only for layouts that exist', () => {
+  // R3-1090 round 3: candidates are named UNCONDITIONALLY — mid-listing the map is
+  // partial, and an existence test against it drops a layout that exists but is not
+  // listed yet (the entry would paint bare and re-wrap). Absence is the gate's
+  // question (isSettled answers true for an unlisted key once the listing is done),
+  // never this function's.
+  it('names every layout candidate on the folder path, existing or not', () => {
     const index = { '/app/content/home.mdx': {}, '/app/content/a/b/x.mdx': {}, '/app/content/a/_layout.mdx': {} };
     expect(criticalKeys('/app/content/a/b/x.mdx', index)).toEqual([
       '/app/content/home.mdx',
       '/app/content/a/b/x.mdx',
+      '/app/content/_layout.mdx',
       '/app/content/a/_layout.mdx',
+      '/app/content/a/b/_layout.mdx',
     ]);
   });
 
@@ -53,9 +58,9 @@ describe('criticalKeys', () => {
     index['/app/content/x.mdx'] = { frame: 'frames/wide' };
     expect(criticalKeys('/app/content/x.mdx', index)).toContain('/app/content/frames/wide.mdx');
     index['/app/content/x.mdx'] = { frame: 'frames/absent' };
-    expect(criticalKeys('/app/content/x.mdx', index)).toEqual(['/app/content/home.mdx', '/app/content/x.mdx']);
+    expect(criticalKeys('/app/content/x.mdx', index)).toEqual(['/app/content/home.mdx', '/app/content/x.mdx', '/app/content/_layout.mdx']);
     index['/app/content/x.mdx'] = { frame: 'none' };
-    expect(criticalKeys('/app/content/x.mdx', index)).toEqual(['/app/content/home.mdx', '/app/content/x.mdx']);
+    expect(criticalKeys('/app/content/x.mdx', index)).toEqual(['/app/content/home.mdx', '/app/content/x.mdx', '/app/content/_layout.mdx']);
   });
 
   it('a folder route: the entry is the folder index the router resolves, wrapped by that folder\'s layout', () => {
@@ -72,11 +77,15 @@ describe('criticalKeys', () => {
     expect(criticalKeys(entry!, index)).toEqual([
       '/app/content/home.mdx',
       '/app/content/guides/index.mdx',
+      '/app/content/_layout.mdx',
       '/app/content/guides/_layout.mdx',
     ]);
   });
 
   it('home is named once when it is the entry', () => {
-    expect(criticalKeys('/app/content/home.mdx', { '/app/content/home.mdx': {} })).toEqual(['/app/content/home.mdx']);
+    expect(criticalKeys('/app/content/home.mdx', { '/app/content/home.mdx': {} })).toEqual([
+      '/app/content/home.mdx',
+      '/app/content/_layout.mdx',
+    ]);
   });
 });

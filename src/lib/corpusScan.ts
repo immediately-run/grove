@@ -277,6 +277,10 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       const front: string[] = [];
       let readButUnpublished = false;
       for (const key of keys) {
+        // A key that cannot be an entry (a folder URL's routeKey, R3-1090 round 3)
+        // must never be READ: its readFile rejects EISDIR, which is not ENOENT, and
+        // the failure would surface to the reader as "Could not read … Reload".
+        if (!ENTRY_RE.test(key)) continue;
         if (read.has(key)) readButUnpublished = true;
         if (settled.has(key) || read.has(key) || wanted.has(key)) continue;
         wanted.add(key);

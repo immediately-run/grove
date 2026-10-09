@@ -187,7 +187,7 @@ describe('GroveEntry (R3-872)', () => {
   it('the entry h1 paints while the rest of the scan is still unsettled (R3-1090)', async () => {
     // The gate answers settled for the entry's critical set ONLY — every other
     // corpus key is still unread. The title must not wait for them.
-    const CRITICAL = new Set([ENTRY, HOME, LAYOUT]);
+    const CRITICAL = new Set([ENTRY, HOME, LAYOUT, '/app/content/wiki/_layout.mdx']);
     const prioritized: string[][] = [];
     const gate: CorpusScanGate = {
       isSettled: (key) => CRITICAL.has(key),

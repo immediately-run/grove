@@ -15,8 +15,10 @@
 // component that rendered before the root was settled would show the VIEWER's corpus, and
 // then not correct itself; so would one that rendered with no index in scope, because the
 // metadata hooks fall back to the host's store. So this file holds until the root is
-// settled and the bundle is LISTED — every key known, rows filling in — and from then on
-// always provides the bundle's index. Which rows an entry needs READ before it paints is
+// settled and the SCAN EXISTS (R3-1090: no longer until the bundle is LISTED — the entry's
+// critical set is prioritized from the boot path and publishes mid-walk, and the entry
+// gate, not this file, waits for it; the `!bundle.scan` hold below is what still protects
+// the viewer's-corpus invariant). Which rows an entry needs READ before it paints is
 // GroveWiki's call (MDX_FROM_MOUNT_SPEC D8).
 //
 // Hence the split: this file resolves, `GroveWiki` renders.

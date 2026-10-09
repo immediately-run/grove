@@ -302,6 +302,20 @@ describe('createCorpusScan — the progressive index (MDX_FROM_MOUNT_SPEC D8)', 
     scan.dispose();
   });
 
+  it('prioritize never reads a key that cannot be an entry (a folder routeKey)', async () => {
+    // R3-1090 round 3: a folder URL's routeKey has no .mdx; reading it rejects EISDIR,
+    // which is not ENOENT — unguarded, it would be recorded as a read FAILURE and the
+    // entry gate would show "Could not read … Reload to try again" for the whole
+    // listing window.
+    const h = heldFs({ '/mnt/c/home.mdx': entry('Home') });
+    const scan = createCorpusScan('/mnt/c', h.fs, { flushMs: 0 });
+    scan.prioritize(['/mnt/c/guides']);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(h.calls).not.toContain('/mnt/c/guides');
+    expect(scan.readFailure('/mnt/c/guides')).toBeNull();
+    scan.dispose();
+  });
+
   it('fault injection: without the priority read the entry waits for the walk (the pre-fix shape)', async () => {
     // The same corpus, NO prioritize: the entry (e0000-adjacent by sort would cheat —
     // pick the last-sorted key) settles only when the pool reaches it, long after the
