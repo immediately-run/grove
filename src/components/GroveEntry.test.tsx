@@ -184,6 +184,47 @@ describe('GroveEntry (R3-872)', () => {
     await act(async () => root.unmount());
   });
 
+  it('the entry h1 paints while the rest of the scan is still unsettled (R3-1090)', async () => {
+    // The gate answers settled for the entry's critical set ONLY — every other
+    // corpus key is still unread. The title must not wait for them.
+    const CRITICAL = new Set([ENTRY, HOME, LAYOUT]);
+    const prioritized: string[][] = [];
+    const gate: CorpusScanGate = {
+      isSettled: (key) => CRITICAL.has(key),
+      prioritize: (keys) => {
+        prioritized.push([...keys]);
+      },
+      readFailure: () => null,
+    };
+    const { GroveShellContext } = await import('../lib/shell');
+    const shell = {
+      siteTitle: 'Fixture', navItems: [], entryKey: ENTRY, vw: 'desktop', navMode: 'top',
+      writable: false, openEditor: () => {}, editBusy: false, editRefused: false, editHint: '',
+      directory: { status: 'none' }, missing: false, suggestion: undefined, mins: 0,
+      safe: true, includePath: '/app/content/wiki/a.mdx', layout: 'doc', showRails: false,
+    };
+    const { container, root } = mount();
+    await act(async () => {
+      root.render(
+        <TinkerableContext.Provider
+          value={{ outerHref: 'https://immediately.run/x', navigationState: NAV, routingSpec: { routes: [] } as never, filesMetadata: META } as never}
+        >
+          <CorpusScanContext value={gate}>
+            <GroveShellContext.Provider value={shell as never}>
+              <GroveEntry entryKey={ENTRY} frame="chain" />
+            </GroveShellContext.Provider>
+          </CorpusScanContext>
+        </TinkerableContext.Provider>,
+      );
+    });
+    for (let i = 0; i < 6; i++) await act(async () => {});
+    expect(container.querySelector('.grove-entry-header h1')?.textContent).toContain('Reference entry');
+    expect(prioritized.length).toBeGreaterThan(0); // the gate was asked to read the critical set first
+    expect(prioritized[0]).toContain(ENTRY);
+    expect(gate.isSettled('/app/content/wiki/unread.mdx')).toBe(false); // the corpus is NOT done
+    await act(async () => root.unmount());
+  });
+
   it('the stock page renders through GroveEntry with the same DOM landmarks (content/home.mdx)', async () => {
     const { container, root } = mount();
     await renderInto(root, <GroveWiki />);
