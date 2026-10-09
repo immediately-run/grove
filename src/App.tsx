@@ -108,10 +108,17 @@ export default function App() {
   // for `<RoadmapBoard>` until registration landed — the very error content components
   // exist to remove — and a nested provider patched in afterwards would do the same.
   //
-  // The frontmatter index is NOT held for (D8). Once the bundle is listed every key is
-  // known; the rows the requested entry needs are GroveWiki's to wait for, and the rest
-  // fill in around a painted page.
-  if (boot.status === 'waiting' || bundle.status === 'listing' || contentComponents.status === 'loading') {
+  // The frontmatter index is NOT held for (D8) — and since R3-1090 neither is the
+  // LISTING: the boot path above already prioritized the requested entry's critical
+  // set, the scan publishes those rows mid-walk, and the entry gate (GroveWiki's) waits
+  // for exactly them. Holding the whole wiki for the listing was what painted the title
+  // after the sidebar tree on a cold load. Nav/sidebar/search fill in as rows arrive;
+  // the 404 path stays quiet because indexLoaded is keys.length > 0.
+  // …but a dispatched boot with no scan YET (the effect that creates it runs after
+  // the first paint) must still hold: rendering then would flash the VIEWER's corpus
+  // through the fallback gate (every key "settled"), which is the invariant the old
+  // listing hold protected.
+  if (boot.status === 'waiting' || contentComponents.status === 'loading' || (boot.status === 'ready' && !bundle.scan)) {
     return <BootMessage />;
   }
 
