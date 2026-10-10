@@ -50,6 +50,14 @@ export {
   sandboxPathToKey,
 } from './lib/content';
 export { getContentRoot, isDispatched } from './lib/contentRoot';
+
+// The dispatch boot seam (R3-1116, APP_CUSTOMIZATION_SPEC §6.2): a shell composing
+// GroveEntry under dispatch must point the content root at the delegated chroot BEFORE
+// the first entry renders — the same resolution App's gate runs, exported so the shell
+// runs it rather than forking it. `resetContentRoot` stays unexported (test-only).
+export { setContentRoot, getCorpusMountId, isContentReadOnly } from './lib/contentRoot';
+export { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
+export type { OpenWikiBoot } from './hooks/useOpenWikiBoot';
 export { layoutChainForKey } from './lib/layout';
 export { queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
 
