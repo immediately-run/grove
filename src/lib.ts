@@ -53,6 +53,14 @@ export { getContentRoot, isDispatched } from './lib/contentRoot';
 export { layoutChainForKey } from './lib/layout';
 export { queryPaths, readingTime, stripFrontmatter } from './lib/wiki';
 
+// The dispatch boot seam (R3-1115, APP_CUSTOMIZATION_SPEC §6.2): a library-composing
+// shell that accepts a delegated bundle points the engine at the chroot through these —
+// `setContentRoot` directly, or `useOpenWikiBoot` for the open-wiki task's resolution
+// (fork / waiting / ready / failed) with the root set before the first entry renders.
+export { setContentRoot } from './lib/contentRoot';
+export { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
+export type { OpenWikiBoot } from './hooks/useOpenWikiBoot';
+
 // The entry composition seam (R3-872, APP_CUSTOMIZATION_SPEC §4.1): render one entry
 // from a key — header + body + metadata + tags — framed by its layout chain or bare,
 // publishing the entry context either way.
