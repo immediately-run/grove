@@ -73,8 +73,10 @@
     "followLinkOnClick",
     "fragmentOf",
     "getContentRoot",
+    "getCorpusMountId",
     "homeKey",
     "isContentEntry",
+    "isContentReadOnly",
     "isDispatched",
     "keyToFsPath",
     "keyToHref",
@@ -86,10 +88,12 @@
     "readingTime",
     "resolveFragmentTarget",
     "sandboxPathToKey",
+    "setContentRoot",
     "stripFrontmatter",
     "useEntryKey",
     "useFollowLink",
     "useHeadings",
+    "useOpenWikiBoot",
     "useShell"
   ]
 }
