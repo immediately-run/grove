@@ -33,10 +33,11 @@ export function homeKey(): string {
   return homeKeyUnder(getContentRoot());
 }
 
-/** The home entry of the corpus rooted at `root` (with or without its trailing slash) —
- *  for a reader handed a root rather than reading the mounted one (R3-1289). */
+/** The home entry of the corpus rooted at `root` — for a reader handed a root rather than
+ *  reading the mounted one (R3-1289). `root` ends with `/`, as every root here already does
+ *  (`getContentRoot()`, `setContentRoot`'s normalization; `loadDeclared`'s `base`). */
 export function homeKeyUnder(root: string): string {
-  return `${root.endsWith('/') ? root : `${root}/`}home.mdx`;
+  return `${root}home.mdx`;
 }
 
 /** Is this a content-entry metadata key? */
