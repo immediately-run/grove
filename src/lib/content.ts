@@ -30,7 +30,14 @@ export function contentDir(): string {
 
 /** The site root entry — the home page of whichever corpus is mounted. */
 export function homeKey(): string {
-  return `${getContentRoot()}home.mdx`;
+  return homeKeyUnder(getContentRoot());
+}
+
+/** The home entry of the corpus rooted at `root` — for a reader handed a root rather than
+ *  reading the mounted one (R3-1289). `root` ends with `/`, as every root here already does
+ *  (`getContentRoot()`, `setContentRoot`'s normalization; `loadDeclared`'s `base`). */
+export function homeKeyUnder(root: string): string {
+  return `${root}home.mdx`;
 }
 
 /** Is this a content-entry metadata key? */
