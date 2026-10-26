@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_MDX_COMPONENTS } from '@immediately-run/sdk';
 import {
   ComponentExtensionError,
   ManifestOverrideError,
@@ -122,6 +123,17 @@ describe('extendComponents — a shell adds names the engine does not declare', 
       expect(String(e)).toMatch(/already in the map: ShellBadge/);
     }
   });
+
+  // Derived from the REAL SDK defaults: none is in the manifest or GROVE_MDX, so the base a
+  // shell composes never holds them, and only this check stops a silent replacement.
+  it.each(Object.keys(DEFAULT_MDX_COMPONENTS).filter((n) => /^[A-Z]/.test(n)))(
+    'refuses %s, an SDK default the platform layers under the shell map',
+    (name) => {
+      expect(manifestNames()).not.toContain(name);
+      expect(() => extendComponents(base, { [name]: Badge })).toThrow(ComponentExtensionError);
+      expect(() => extendComponents(base, { [name]: Badge })).toThrow(new RegExp(`an SDK default: ${name}`));
+    },
+  );
 
   it('refuses a name that is not PascalCase', () => {
     expect(() => extendComponents(base, { shellBadge: Badge })).toThrow(/not PascalCase: shellBadge/);

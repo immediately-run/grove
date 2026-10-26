@@ -19,8 +19,8 @@ throw at module load, naming what went wrong and what the available surface is.
 ## The dependency
 
 ```json
-"@immediately-run/grove": "0.1.3",
-"@immediately-run/sdk": "^0.67.0"
+"@immediately-run/grove": "0.2.9",
+"@immediately-run/sdk": "^0.80.0"
 ```
 
 The published package is the shape to copy, and the SDK line is not optional decoration.
