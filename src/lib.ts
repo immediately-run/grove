@@ -29,14 +29,16 @@ export { GROVE_MDX, SAFE_MDX } from './mdxComponents';
 export {
   VIEWER_MANIFEST,
   ManifestOverrideError,
+  ComponentExtensionError,
   composeComponents,
+  extendComponents,
   manifestNames,
   overridableNames,
 } from './lib/compose';
 export type { ViewerManifest, ManifestComponent } from './lib/compose';
 
 // Shell state, so an overriding chrome component can read what the stock one reads.
-export { GroveShellContext, OutletContext, useShell } from './lib/shell';
+export { GroveShellContext, OutletContext, useShell, ShellVocabularyContext, useShellVocabulary } from './lib/shell';
 export type { GroveShell, NavItem } from './lib/shell';
 
 // Corpus helpers a shell needs to address entries the way the engine does.

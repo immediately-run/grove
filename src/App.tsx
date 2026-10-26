@@ -28,7 +28,8 @@ import * as sdk from '@immediately-run/sdk';
 import { sendMessage } from '@immediately-run/sdk/sandboxUtils';
 import { MetadataSource } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
-import { MDXProvider } from '@immediately-run/sdk/MDXProvider';
+import { MDXProvider, useMDXComponents } from '@immediately-run/sdk/MDXProvider';
+import { ShellVocabularyContext } from './lib/shell';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
 import { useBundleMetadata } from './hooks/useBundleMetadata';
 import { useContentComponents } from './hooks/useContentComponents';
@@ -53,9 +54,19 @@ import { CorpusScanContext } from './lib/corpusScanContext';
 (sdk as { setViewedDocumentResolver?: (r: (href: string) => string | null | undefined) => void })
   .setViewedDocumentResolver?.(viewedDocumentForTarget);
 
+/** `useMDXComponents`' argument: no overrides, so it answers the provider's map as is. */
+const NO_OVERRIDES = {};
+
 export default function App() {
   const host = use(TinkerableContext);
   const boot = useOpenWikiBoot();
+  // R3-1290 — the SHELL's MDX vocabulary, read HERE, above the corpus provider App nests
+  // below: the map `boot({ mdxComponents })` established (stock `GROVE_MDX`, or a
+  // library-mode shell's composed map). The safe renderers render with this, never with
+  // the nearest provider, which may hold a corpus's declared components. With no provider
+  // above App the map is empty, and null keeps the safe path on stock `SAFE_MDX`.
+  const providerMap = useMDXComponents(NO_OVERRIDES) as Record<string, unknown>;
+  const shellVocabulary = Object.keys(providerMap).length > 0 ? providerMap : null;
   // R3-268 deep links: declare the INITIALLY rendered document once at boot. A
   // fresh page load performs no navigation, so without this the host records no
   // viewed document for a deep link and the explorer shows no highlight (nor
@@ -130,7 +141,11 @@ export default function App() {
   // hackability). §2's "single-map merge, never provider nesting" was written against
   // patching a provider in AFTER a partial render; nesting it INSIDE the gate above is
   // that same merge, composed before anything paints.
-  const wiki = <GroveWiki rejectedComponents={contentComponents.rejected} />;
+  const wiki = (
+    <ShellVocabularyContext value={shellVocabulary}>
+      <GroveWiki rejectedComponents={contentComponents.rejected} />
+    </ShellVocabularyContext>
+  );
   const withComponents =
     contentComponents.status === 'ready' && Object.keys(contentComponents.components).length > 0 ? (
       <MDXProvider components={contentComponents.components}>{wiki}</MDXProvider>

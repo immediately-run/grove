@@ -10,6 +10,21 @@ import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { DirectoryListing } from '../hooks/useDirectoryListing';
 
+/**
+ * The SHELL's MDX vocabulary (R3-1290): the map the viewer registered with
+ * `boot({ mdxComponents })`, captured by App ABOVE the corpus's own provider. The safe
+ * renderers read this, never the nearest MDX provider, because the nearest one may hold a
+ * corpus's declared components — author JavaScript the interpreter must never render.
+ * `null` outside App (a test rendering a component alone), where the safe path falls back
+ * to stock `SAFE_MDX`.
+ */
+export const ShellVocabularyContext = createContext<Record<string, unknown> | null>(null);
+
+/** The shell vocabulary, or null when no App provided one. */
+export function useShellVocabulary(): Record<string, unknown> | null {
+  return useContext(ShellVocabularyContext);
+}
+
 export interface NavItem {
   key: string;
   href: string;

@@ -1,5 +1,4 @@
-import { DEFAULT_MDX_COMPONENTS } from '@immediately-run/sdk';
-import { SAFE_INTRINSICS } from './lib/safeIntrinsics';
+import { safeVocabulary } from './lib/safeVocabulary';
 import AssetImage from './components/AssetImage';
 import Callout from './components/Callout';
 import Lede from './components/Lede';
@@ -83,11 +82,8 @@ export const GROVE_MDX = {
 // structural tags (`src/lib/safeIntrinsics.tsx`), which the compiled path gets for free from
 // JSX and the safe path must be handed explicitly.
 //
-// Precedence is deliberate: intrinsics go on the BOTTOM. `GROVE_MDX` overrides `a` and `img`
+// The layering itself lives in `lib/safeVocabulary.ts` (R3-1290), which a library-mode
+// shell's vocabulary goes through too. Precedence is deliberate: intrinsics go on the BOTTOM. `GROVE_MDX` overrides `a` and `img`
 // with <WikiLink>/<AssetImage>, and those must win — SAFE_INTRINSICS does not register `a`
 // or `img` at all, but ordering it last would be a trap for whoever adds them.
-export const SAFE_MDX = {
-  ...SAFE_INTRINSICS,
-  ...(DEFAULT_MDX_COMPONENTS as Record<string, unknown>),
-  ...GROVE_MDX,
-};
+export const SAFE_MDX = safeVocabulary(GROVE_MDX);
