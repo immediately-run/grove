@@ -19,7 +19,8 @@
 // added deliberately, and the decision is not to: inside an executor there is nothing to
 // confine, since the module reaches `globalThis.fetch` whatever the resolver permits
 // (`MDX_FROM_MOUNT_SPEC` §4 already concedes this). A corpus that wants no code execution
-// declares `render: safe`, where no import exists at all.
+// declares `render: safe`, where no import exists at all — and this loader evaluates
+// nothing for it (R3-1289: the gate in `loadDeclared` reads the home entry first).
 //
 // **No live re-registration in v1, deliberately.** §7 1b asks for a reactive, name-keyed
 // registry so a hot edit cannot leave a stale reference behind. The map here IS keyed by
@@ -31,10 +32,10 @@
 import { useEffect, useState } from 'react';
 import fs from 'fs';
 import { parseCorpusComponents, type RejectedComponent } from '../lib/corpusComponents';
-
-declare const module: {
-  getModuleEvaluationContext: (name: string) => Promise<{ exports: Record<string, unknown> }>;
-};
+import { homeKeyUnder } from '../lib/content';
+import { evaluateModule } from '../lib/moduleEvaluation';
+import { parseFrontmatter } from '../lib/frontmatter';
+import { resolveSafeRender } from '../lib/renderMode';
 
 /** The marker file a corpus uses to declare itself content (and now its vocabulary). */
 const MARKER = 'immediately.run.json';
@@ -53,6 +54,19 @@ export interface ContentComponents {
 
 const NOTHING: ContentComponents = { status: 'idle', components: {}, rejected: [] };
 
+/** Why the corpus at `base` may evaluate none of its declared components, or null when it
+ *  may. Read from the home entry's frontmatter, decided by `resolveSafeRender` — the one
+ *  home of the safe-vs-compiled rule. */
+async function safeGateReason(base: string): Promise<string | null> {
+  let homeMeta: Record<string, unknown>;
+  try {
+    homeMeta = parseFrontmatter(String(await fs.promises.readFile(homeKeyUnder(base), 'utf8'))).data;
+  } catch {
+    return 'the home entry could not be read';
+  }
+  return resolveSafeRender(homeMeta, null) ? 'this wiki renders safely (render: safe on its home entry)' : null;
+}
+
 async function loadDeclared(root: string): Promise<Omit<ContentComponents, 'status'>> {
   const base = root.endsWith('/') ? root : `${root}/`;
   let marker: unknown;
@@ -66,17 +80,29 @@ async function loadDeclared(root: string): Promise<Omit<ContentComponents, 'stat
   const { components: declared, rejected } = parseCorpusComponents(marker, base);
   const components: Record<string, unknown> = {};
   const failures = [...rejected];
+  if (declared.length === 0) return { components, rejected: failures };
+  // R3-1289 — the safe gate. A corpus whose HOME declares `render: safe` runs no author
+  // code (MDX_FROM_MOUNT_SPEC §4.1), so nothing it declares is evaluated: evaluation IS
+  // the execution, whatever the renderer later does with the map. Wiki-wide only — a
+  // per-entry `render: safe` page in a compiled wiki (R3-252) keeps its siblings'
+  // components. Fails CLOSED: a home that cannot be read is treated as safe here, so a
+  // read error is never the path to running code in a corpus that may have asked for none.
+  const skip = await safeGateReason(base);
+  if (skip) {
+    for (const { name } of declared) failures.push({ name, reason: `not loaded: ${skip}` });
+    return { components, rejected: failures };
+  }
   // Sequential, not parallel: the list is short (a corpus declares a vocabulary, not a
   // dependency closure) and the bundler already dedups and queues resolution, so
   // concurrency here buys nothing and makes a failure harder to attribute.
   for (const { name, path } of declared) {
     try {
-      const evaluated = await module.getModuleEvaluationContext(path);
+      const exports = await evaluateModule(path);
       // `default` is the convention every other module-from-a-path surface uses
       // (`<Include exportedSymbol="default">`); a named export matching the declared
       // name is accepted too, so a file exporting `export function RoadmapBoard()` and
       // nothing else works without a redundant default re-export.
-      const component = evaluated.exports.default ?? evaluated.exports[name];
+      const component = exports.default ?? exports[name];
       if (typeof component !== 'function') {
         failures.push({ name, reason: `${path} exports no component (default or ${name})` });
         continue;
