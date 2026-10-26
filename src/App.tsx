@@ -29,7 +29,9 @@ import { sendMessage } from '@immediately-run/sdk/sandboxUtils';
 import { MetadataSource } from '@immediately-run/sdk';
 import { TinkerableContext } from '@immediately-run/sdk/TinkerableContext';
 import { MDXProvider } from '@immediately-run/sdk/MDXProvider';
+import { ShellVocabularyContext } from './lib/shell';
 import { useOpenWikiBoot } from './hooks/useOpenWikiBoot';
+import { useShellVocabularyCapture } from './hooks/useShellVocabularyCapture';
 import { useBundleMetadata } from './hooks/useBundleMetadata';
 import { useContentComponents } from './hooks/useContentComponents';
 import { getContentRoot } from './lib/contentRoot';
@@ -56,6 +58,10 @@ import { CorpusScanContext } from './lib/corpusScanContext';
 export default function App() {
   const host = use(TinkerableContext);
   const boot = useOpenWikiBoot();
+  // R3-1290 — the SHELL's MDX vocabulary, captured HERE, above the corpus provider App nests
+  // below (`hooks/useShellVocabularyCapture`). The safe renderers render with this, never
+  // with the nearest provider, which may hold a corpus's declared components.
+  const shellVocabulary = useShellVocabularyCapture();
   // R3-268 deep links: declare the INITIALLY rendered document once at boot. A
   // fresh page load performs no navigation, so without this the host records no
   // viewed document for a deep link and the explorer shows no highlight (nor
@@ -130,7 +136,11 @@ export default function App() {
   // hackability). §2's "single-map merge, never provider nesting" was written against
   // patching a provider in AFTER a partial render; nesting it INSIDE the gate above is
   // that same merge, composed before anything paints.
-  const wiki = <GroveWiki rejectedComponents={contentComponents.rejected} />;
+  const wiki = (
+    <ShellVocabularyContext value={shellVocabulary}>
+      <GroveWiki rejectedComponents={contentComponents.rejected} />
+    </ShellVocabularyContext>
+  );
   const withComponents =
     contentComponents.status === 'ready' && Object.keys(contentComponents.components).length > 0 ? (
       <MDXProvider components={contentComponents.components}>{wiki}</MDXProvider>

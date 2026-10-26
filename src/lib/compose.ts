@@ -11,6 +11,7 @@
 //
 // This file exports no components, so it is exempt from the Fast-Refresh rule.
 
+import { DEFAULT_MDX_COMPONENTS } from '@immediately-run/sdk';
 import manifest from '../../viewer.manifest.json';
 
 /** One component's declared contract. Mirrors `viewer-manifest.schema.json`. */
@@ -96,4 +97,71 @@ export function composeComponents<T extends Record<string, unknown>>(
     );
   }
   return { ...base, ...overrides };
+}
+
+/** Thrown when a shell's additions collide with a name it may not add. Carries the offending
+ *  names, like `ManifestOverrideError`. */
+export class ComponentExtensionError extends Error {
+  /** The offending names, so a caller can act on them rather than re-parse the message. */
+  readonly names: string[];
+
+  constructor(message: string, names: string[]) {
+    super(message);
+    this.name = 'ComponentExtensionError';
+    this.names = names;
+  }
+}
+
+/** An MDX component name: PascalCase, as MDX resolves a capitalized tag from the map. */
+const COMPONENT_NAME = /^[A-Z][A-Za-z0-9]*$/;
+
+/**
+ * Add a shell's OWN components to a composed map (R3-1290) — names the engine does not
+ * declare, which `composeComponents` refuses by design. An addition is a different promise
+ * from an override, so it is a different call: a shell composes overrides first, then
+ * extends — `extendComponents(composeComponents(GROVE_MDX, overrides), additions)` — and a
+ * typo'd override can never become a silent addition, nor an addition a silent override.
+ *
+ * Four rejections, collected before throwing (as `composeComponents` does):
+ *   - **a manifest name** — overriding the engine's vocabulary is `composeComponents`' job;
+ *   - **an SDK default** (`Admonition`, `WikiLink`, …) — the platform's own components,
+ *     which `boot()` and `safeVocabulary` layer UNDER the shell's map, so they are never in
+ *     `base` and an addition of one would replace the platform's silently;
+ *   - **already in `base`** — the addition would replace a component silently;
+ *   - **not PascalCase** — MDX resolves only capitalized tags from the map, so a lower-case
+ *     name would never render and would only shadow an HTML element.
+ *
+ * The result serves both render paths: the compiled one through `boot({ mdxComponents })`,
+ * and `render: safe` content through the shell vocabulary the safe renderers read.
+ */
+export function extendComponents<T extends Record<string, unknown>>(
+  base: T,
+  additions: Record<string, unknown>,
+): T & Record<string, unknown> {
+  const declared: string[] = [];
+  const platform: string[] = [];
+  const present: string[] = [];
+  const malformed: string[] = [];
+  for (const name of Object.keys(additions)) {
+    if (!COMPONENT_NAME.test(name)) malformed.push(name);
+    else if (VIEWER_MANIFEST.components[name]) declared.push(name);
+    else if (Object.prototype.hasOwnProperty.call(DEFAULT_MDX_COMPONENTS, name)) platform.push(name);
+    else if (Object.prototype.hasOwnProperty.call(base, name)) present.push(name);
+  }
+  if (declared.length || platform.length || present.length || malformed.length) {
+    const parts: string[] = [];
+    if (declared.length) {
+      parts.push(`in the manifest: ${declared.join(', ')} — override those with composeComponents`);
+    }
+    if (platform.length) parts.push(`an SDK default: ${platform.join(', ')} — the platform's own component`);
+    if (present.length) parts.push(`already in the map: ${present.join(', ')} — an addition never replaces`);
+    if (malformed.length) {
+      parts.push(`not PascalCase: ${malformed.join(', ')} — MDX resolves only capitalized tags`);
+    }
+    throw new ComponentExtensionError(
+      `${VIEWER_MANIFEST.viewer.name}: cannot add ${parts.join('; ')}.`,
+      [...declared, ...platform, ...present, ...malformed],
+    );
+  }
+  return { ...base, ...additions };
 }

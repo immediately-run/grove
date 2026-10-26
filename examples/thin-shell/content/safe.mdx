@@ -1,0 +1,12 @@
+---
+title: A safe entry.
+nav: Safe
+order: 30
+render: safe
+tags: [example]
+description: An entry rendered as data, with a component the shell — not the corpus — supplies.
+---
+
+This entry declares `render: safe`, so it renders through the interpreter and runs no author
+code. It still uses a component: <ShellBadge>from the shell</ShellBadge>. The shell added it
+with `extendComponents`, so it belongs to the viewer, and the interpreter may render it.

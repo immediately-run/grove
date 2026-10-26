@@ -16,3 +16,12 @@
   text-transform: uppercase;
   color: var(--muted, #8b8b9a);
 }
+
+/* The shell's own component (R3-1290), rendered in safe entries too. */
+.shell-badge {
+  border: 1px solid var(--line, currentColor);
+  border-radius: var(--r-sm, 4px);
+  padding: 0 0.35em;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+}

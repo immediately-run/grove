@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_MDX_COMPONENTS } from '@immediately-run/sdk';
 import {
+  ComponentExtensionError,
   ManifestOverrideError,
   VIEWER_MANIFEST,
   composeComponents,
+  extendComponents,
   manifestNames,
   overridableNames,
 } from './compose';
@@ -87,6 +90,62 @@ describe('the manifest itself', () => {
     for (const [name, c] of Object.entries(VIEWER_MANIFEST.components)) {
       expect(['engine', 'chrome', 'corpus'], name).toContain(c.tier);
       expect(typeof c.overridable, name).toBe('boolean');
+    }
+  });
+});
+
+// R3-1290 — a shell's OWN components, which the manifest does not name. Every name below is
+// checked against the REAL viewer.manifest.json, so a manifest change moves these cases.
+describe('extendComponents — a shell adds names the engine does not declare', () => {
+  const Badge = () => null;
+
+  it('adds a new PascalCase name, keeping the base', () => {
+    const out = extendComponents(base, { ShellBadge: Badge });
+    expect(out.ShellBadge).toBe(Badge);
+    expect(out.Callout).toBe(Stock);
+    expect(manifestNames()).not.toContain('ShellBadge');
+  });
+
+  it('refuses a manifest name — overriding is composeComponents\' job — naming it', () => {
+    expect(manifestNames()).toContain('Callout');
+    expect(() => extendComponents({}, { Callout: Badge })).toThrow(ComponentExtensionError);
+    expect(() => extendComponents({}, { Callout: Badge })).toThrow(/in the manifest: Callout/);
+  });
+
+  it('refuses a name already in the base — an addition never replaces', () => {
+    const withBadge = { ...base, ShellBadge: Stock };
+    try {
+      extendComponents(withBadge, { ShellBadge: Badge });
+      throw new Error('expected a throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ComponentExtensionError);
+      expect((e as ComponentExtensionError).names).toEqual(['ShellBadge']);
+      expect(String(e)).toMatch(/already in the map: ShellBadge/);
+    }
+  });
+
+  // Derived from the REAL SDK defaults: none is in the manifest or GROVE_MDX, so the base a
+  // shell composes never holds them, and only this check stops a silent replacement.
+  it.each(Object.keys(DEFAULT_MDX_COMPONENTS).filter((n) => /^[A-Z]/.test(n)))(
+    'refuses %s, an SDK default the platform layers under the shell map',
+    (name) => {
+      expect(manifestNames()).not.toContain(name);
+      expect(() => extendComponents(base, { [name]: Badge })).toThrow(ComponentExtensionError);
+      expect(() => extendComponents(base, { [name]: Badge })).toThrow(new RegExp(`an SDK default: ${name}`));
+    },
+  );
+
+  it('refuses a name that is not PascalCase', () => {
+    expect(() => extendComponents(base, { shellBadge: Badge })).toThrow(/not PascalCase: shellBadge/);
+    expect(() => extendComponents(base, { 'Shell-Badge': Badge })).toThrow(/not PascalCase/);
+  });
+
+  it('reports every offender in one throw', () => {
+    try {
+      extendComponents(base, { Callout: Badge, Toc: Badge, lower: Badge });
+      throw new Error('expected a throw');
+    } catch (e) {
+      expect((e as ComponentExtensionError).names.sort()).toEqual(['Callout', 'Toc', 'lower']);
     }
   });
 });
