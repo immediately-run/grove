@@ -69,7 +69,7 @@ the same files a human would read first. The exact prompt used here:
 > `content/teams/engineering.mdx` (team lead, Slack channel, on-call). Keep it small
 > and idiomatic. When done, summarize the files you changed.
 
-![Typing the build prompt into the Agents conversation](./images/agent-01-prompt.png)
+![Typing the build prompt into the Agents conversation](./images/agent-01-prompt.webp)
 
 A good prompt for an agent looks a lot like a good ticket: name the file paths,
 name the conventions to match, and name a concrete demo so you can *see* the result.
@@ -96,7 +96,7 @@ first pass:
 - ✓ **wrote `src/mdxComponents.ts`** (registered `KeyValue` in the MDX map)
 - ✓ **wrote `content/teams/engineering.mdx`** (the demo block)
 
-![The agent's read → write tool loop in the conversation](./images/agent-02-toolloop.png)
+![The agent's read → write tool loop in the conversation](./images/agent-02-toolloop.webp)
 
 The component it produced is clean, import-free, and idiomatic — no edits needed:
 
@@ -148,7 +148,7 @@ Navigate Grove to the page you seeded the demo into (the **Engineering** entry).
 preview hot-reloads and `<KeyValue>` renders the rows — the component, registration,
 and usage all work:
 
-![Grove rendering the KeyValue rows, with the agent grepping the large CSS file](./images/agent-03-rendered-and-css-stall.png)
+![Grove rendering the KeyValue rows, with the agent grepping the large CSS file](./images/agent-03-rendered-and-css-stall.webp)
 
 Notice two things in that screenshot. On the right, `<KeyValue>` renders the real
 data (Grace Hopper, #eng-platform, the on-call rotation). On the left, the agent is
