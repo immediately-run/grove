@@ -321,3 +321,44 @@ describe('isDispatched — the R3-184 S2 `$fs:` clamp discriminator', () => {
     expect(isDispatched()).toBe(false);
   });
 });
+
+import { bundleEntryPath, isBundleEscape } from './content';
+
+describe('isBundleEscape — a relative link that leaves the bundle (R3-1322, REPO_CONTENT_DISPATCH_SPEC §9)', () => {
+  afterEach(resetContentRoot);
+
+  it('the item cases, with a bundle-relative entry', () => {
+    expect(isBundleEscape('../spec/a.md', 'B-10.mdx')).toBe(true);
+    expect(isBundleEscape('B-11.mdx', 'B-10.mdx')).toBe(false);
+    expect(isBundleEscape('https://example.com/spec/a.md', 'B-10.mdx')).toBe(false);
+    expect(isBundleEscape('#x', 'B-10.mdx')).toBe(false);
+  });
+
+  it('a dispatched entry key (absolute, under the corpus root) is mapped to its bundle path first', () => {
+    setContentRoot('/mnt/0a1b2c3d/');
+    const key = '/mnt/0a1b2c3d/B-10.mdx';
+    expect(bundleEntryPath(key)).toBe('B-10.mdx');
+    expect(isBundleEscape('../spec/BATON_SPEC/06-prerequisites-blocks-advice.md#sec-6-1', key)).toBe(true);
+    // A nested entry stays inside until its `..` passes the bundle root.
+    expect(isBundleEscape('../B-11.mdx', '/mnt/0a1b2c3d/sub/B-12.mdx')).toBe(false);
+    expect(isBundleEscape('../../spec/a.md', '/mnt/0a1b2c3d/sub/B-12.mdx')).toBe(true);
+    // Root-absolute clamps inside the bundle; `$fs:` is not bundle-relative.
+    expect(isBundleEscape('/../spec/a.md', key)).toBe(false);
+    expect(isBundleEscape('$fs:/spec/a.md', key)).toBe(false);
+  });
+
+  it('an absolute key outside the corpus has no bundle path, so nothing escapes from it', () => {
+    setContentRoot('/mnt/0a1b2c3d/');
+    expect(bundleEntryPath('/app/src/App.tsx')).toBeNull();
+    expect(isBundleEscape('../spec/a.md', '/app/src/App.tsx')).toBe(false);
+  });
+
+  it('confinement is unchanged: hrefTargetKey still resolves the escaping href to null', () => {
+    setContentRoot('/mnt/0a1b2c3d/');
+    const key = '/mnt/0a1b2c3d/B-10.mdx';
+    const href = '../spec/BATON_SPEC/06-prerequisites-blocks-advice.md#sec-6-1';
+    expect(isBundleEscape(href, key)).toBe(true);
+    expect(hrefTargetKey(href, key)).toBeNull();
+    expect(hrefKeyCandidates(href, key)).toEqual([]);
+  });
+});

@@ -1,5 +1,6 @@
 import { isContentEntryPath } from '@immediately-run/mdx-plugins';
 import { FS_PREFIX, normalizeAbsolute, resolveLinkTarget } from '@immediately-run/sdk/linkSpace';
+import { bundleRelativeTarget } from '@immediately-run/sdk/bundleLinkPath';
 
 // Path conventions for Grove content.
 //
@@ -252,6 +253,35 @@ export function hrefTargetKey(href: string, fromKey: string): string | null {
     return corpusAnchored.path;
   }
   return null;
+}
+
+/**
+ * The bundle-relative path of the entry `fromKey` (`B-10.mdx` for
+ * `<content root>B-10.mdx`) — the `fromEntry` the SDK's bundle-link functions take. A key
+ * already written bundle-relative (no leading `/`) is returned as is; an absolute key
+ * outside the corpus has no bundle path and gives `null`. The corpus root IS the bundle
+ * root: a dispatched viewer is mounted at the bundle's marker directory.
+ */
+export function bundleEntryPath(fromKey: string): string | null {
+  if (!fromKey.startsWith('/')) return fromKey;
+  const root = contentDir();
+  return fromKey.startsWith(root) ? fromKey.slice(root.length) : null;
+}
+
+/**
+ * True when `href`, written in the entry `fromKey`, leaves the bundle — a cross-bundle
+ * link the host follows (REPO_CONTENT_DISPATCH_SPEC §9, R3-1322). The decision is the
+ * SDK's `bundleRelativeTarget` (R3-1324), not a second normaliser here: Grove and the
+ * host must agree on which links leave.
+ *
+ * This does not relax confinement. {@link hrefTargetKey} still returns `null` for the
+ * same href and nothing reads the target; the caller only hands the href to the host.
+ */
+export function isBundleEscape(href: string, fromKey: string): boolean {
+  const entry = bundleEntryPath(fromKey);
+  if (entry === null) return false;
+  const target = bundleRelativeTarget(href, entry);
+  return target !== null && target !== 'inside';
 }
 
 /**
