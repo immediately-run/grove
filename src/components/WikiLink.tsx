@@ -1,7 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from 'react';
-import { Link, useMetadataQuery } from '@immediately-run/sdk';
-import { hrefKeyCandidates, hrefTargetKey, isContentEntry, keyToHref, linkKind, splitFragment } from '../lib/content';
+import { Link, followBundleLink, useMetadataQuery } from '@immediately-run/sdk';
+import { isBrowserGestureClick } from '@immediately-run/sdk/anchorClick';
+import {
+  bundleEntryPath,
+  hrefKeyCandidates,
+  hrefTargetKey,
+  isBundleEscape,
+  isContentEntry,
+  keyToHref,
+  linkKind,
+  splitFragment,
+} from '../lib/content';
+import { isRepoLoadDispatch } from '../lib/contentRoot';
 import { isFolderKey } from '../lib/directory';
 import { queryPaths } from '../lib/wiki';
 import { useEntryKey } from '../hooks/useEntryKey';
@@ -61,6 +72,32 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
   // An unresolvable in-app href renders broken rather than falling through to an anchor
   // that would navigate the sandboxed frame away and kill the app (R3-252).
   if (!targetKey) {
+    // R3-1322 (REPO_CONTENT_DISPATCH_SPEC §9): a relative link that leaves the bundle is
+    // a cross-bundle link, and only the host knows where the bundle lives. Under dispatch
+    // it renders as the authored href (copyable, and what a forge resolves) and a plain
+    // click hands it to the host; a modified click stays the browser's. Nothing reads
+    // the target here — `hrefTargetKey` still confines it to null. Only a REPO-LOAD
+    // dispatch has a host bundle to leave to: the host refuses a bundle-link from any frame
+    // but the stage, so a task callee and the fork keep the broken rendering below.
+    const bundleEntry = isRepoLoadDispatch() && isBundleEscape(href, currentKey) ? bundleEntryPath(currentKey) : null;
+    if (bundleEntry !== null) {
+      return (
+        <a
+          className="grove-wikilink"
+          data-state="ok"
+          data-bundle-link=""
+          href={href}
+          onClick={(e) => {
+            if (isBrowserGestureClick(e)) return;
+            e.preventDefault();
+            followBundleLink(href, bundleEntry);
+          }}
+          {...rest}
+        >
+          {children}
+        </a>
+      );
+    }
     const kind = linkKind(href);
     // A FOLDER is a destination too, since directory listings landed: `[the
     // handbook](handbook)` names something real, and the extension test that decides

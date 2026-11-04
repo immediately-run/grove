@@ -25,6 +25,13 @@ export const APP_CONTENT_ROOT = '/app/content/';
 let root: string = APP_CONTENT_ROOT;
 let readOnly = false;
 let mountId: string | null = null;
+let dispatchKind: DispatchKind | null = null;
+
+/** How a dispatched corpus arrived: `repo-load` — the URL named a content repo and the host
+ *  published it as the marked `content` mount on the STAGE (R3-172); `task` — an `open-wiki`
+ *  caller delegated a directory to this instance as a task callee (R3-169). `openWiki.ts`
+ *  decides it with the root; it is kept here because it is the same boot-time fact. */
+export type DispatchKind = 'task' | 'repo-load';
 
 /** Where this instance's corpus lives, with a trailing slash. Read at CALL time. */
 export function getContentRoot(): string {
@@ -36,11 +43,25 @@ export function getContentRoot(): string {
  * with the delegated directory, or not at all (the fork, which keeps the default).
  * Normalizes the trailing slash so every `startsWith`/`slice` in the helpers holds.
  */
-export function setContentRoot(dir: string, opts: { readOnly?: boolean; mountId?: string | null } = {}): void {
+export function setContentRoot(
+  dir: string,
+  opts: { readOnly?: boolean; mountId?: string | null; via?: DispatchKind | null } = {},
+): void {
   if (!dir) return;
   root = dir.endsWith('/') ? dir : `${dir}/`;
   readOnly = opts.readOnly ?? false;
   mountId = opts.mountId ?? null;
+  dispatchKind = opts.via ?? null;
+}
+
+/**
+ * True only for a REPO-LOAD dispatch — the stage viewer of a content repo. R3-1322: the
+ * host follows a `bundle-link` only from the stage frame of a repo-load dispatch
+ * (site-main `planBundleLink`); a task callee is dispatched too ({@link isDispatched}) but
+ * every bundle-link it sent would be dropped. An unstated kind is NOT repo-load.
+ */
+export function isRepoLoadDispatch(): boolean {
+  return isDispatched() && dispatchKind === 'repo-load';
 }
 
 /**
@@ -73,4 +94,5 @@ export function resetContentRoot(): void {
   root = APP_CONTENT_ROOT;
   readOnly = false;
   mountId = null;
+  dispatchKind = null;
 }

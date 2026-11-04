@@ -1,5 +1,6 @@
 import { isContentEntryPath } from '@immediately-run/mdx-plugins';
 import { FS_PREFIX, normalizeAbsolute, resolveLinkTarget } from '@immediately-run/sdk/linkSpace';
+import { bundleRelativeTarget } from '@immediately-run/sdk/bundleLinkPath';
 
 // Path conventions for Grove content.
 //
@@ -252,6 +253,43 @@ export function hrefTargetKey(href: string, fromKey: string): string | null {
     return corpusAnchored.path;
   }
   return null;
+}
+
+/**
+ * The bundle-relative path of the entry `fromKey` (`B-10.mdx` for
+ * `<content root>B-10.mdx`) — the `fromEntry` the SDK's bundle-link functions take. A key
+ * already written bundle-relative (no leading `/`) is returned as is; an absolute key
+ * outside the corpus has no bundle path and gives `null`. The path is relative to the
+ * CORPUS root, which is the bundle root only when the whole bundle is mounted. Limit: in a
+ * declared-view bundle tab the host chroots the corpus at the view's subtree, so the path
+ * Grove sends is relative to the view, not the bundle, and its `..` count is short by the
+ * view's depth. Grove cannot see the view's offset; the host resolving a view-relative
+ * path against the bundle directory is a host-side follow-up, not something fixed here.
+ */
+export function bundleEntryPath(fromKey: string): string | null {
+  if (!fromKey.startsWith('/')) return fromKey;
+  const root = contentDir();
+  return fromKey.startsWith(root) ? fromKey.slice(root.length) : null;
+}
+
+/**
+ * True when `href`, written in the entry `fromKey`, leaves the bundle — when the SDK's
+ * `bundleRelativeTarget` returns a `{ path }` for it (never for `'refused'`, `'inside'` or
+ * `null`): a cross-bundle link the host follows (REPO_CONTENT_DISPATCH_SPEC §9, R3-1322). The decision is the
+ * SDK's `bundleRelativeTarget` (R3-1324), not a second normaliser here: Grove and the
+ * host must agree on which links leave.
+ *
+ * This does not relax confinement. {@link hrefTargetKey} still returns `null` for the
+ * same href and nothing reads the target; the caller only hands the href to the host.
+ */
+export function isBundleEscape(href: string, fromKey: string): boolean {
+  const entry = bundleEntryPath(fromKey);
+  if (entry === null) return false;
+  // Only a PATH is an escape. The SDK's `'refused'` (a query or second `#` on an escaping
+  // link, a backslash, an encoded dot segment, …) is a link the host will not follow, so it
+  // must keep the broken rendering rather than become a live-looking link that does nothing.
+  const target = bundleRelativeTarget(href, entry);
+  return typeof target === 'object' && target !== null && typeof target.path === 'string';
 }
 
 /**
