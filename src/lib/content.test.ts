@@ -147,7 +147,7 @@ describe('linkKind — which hrefs may become a navigating <a>', () => {
 // dispatch declares CORPUS-relative (the host joins its chroot prefix — the corpus's
 // repo-side location is host knowledge this app cannot see).
 import { viewedDocumentForTarget } from './content';
-import { setContentRoot, resetContentRoot, isDispatched } from './contentRoot';
+import { setContentRoot, resetContentRoot, isDispatched, isRepoLoadDispatch } from './contentRoot';
 import { afterEach } from 'vitest';
 
 describe('viewedDocumentForTarget — the R3-268 declaration path space', () => {
@@ -360,5 +360,49 @@ describe('isBundleEscape — a relative link that leaves the bundle (R3-1322, RE
     expect(isBundleEscape(href, key)).toBe(true);
     expect(hrefTargetKey(href, key)).toBeNull();
     expect(hrefKeyCandidates(href, key)).toEqual([]);
+  });
+});
+
+describe('isBundleEscape — the SDK\'s `refused` is not an escape (review 1-A-0 / 1-B-0)', () => {
+  afterEach(resetContentRoot);
+
+  // Each of these leaves the bundle but is one the SDK will not hand to the host. Counting
+  // it as an escape rendered a live-looking link whose click did nothing; it must fall
+  // through to the broken rendering instead.
+  it.each([['../spec/a.md?x=1'], ['..\\spec\\a.md'], ['../spec/%2e%2e/a.md'], ['../spec/a.md#a#b']])(
+    '%s → false',
+    (href) => {
+      expect(isBundleEscape(href, 'B-10.mdx')).toBe(false);
+      setContentRoot('/mnt/0a1b2c3d/', { via: 'repo-load' });
+      expect(isBundleEscape(href, '/mnt/0a1b2c3d/B-10.mdx')).toBe(false);
+    },
+  );
+});
+
+describe('isRepoLoadDispatch — only the stage viewer of a repo load hands links to the host (review 1-A-2)', () => {
+  afterEach(resetContentRoot);
+
+  it('the fork is neither dispatched nor a repo load', () => {
+    expect(isDispatched()).toBe(false);
+    expect(isRepoLoadDispatch()).toBe(false);
+  });
+
+  it('a repo-load root is a repo-load dispatch', () => {
+    setContentRoot('/mnt/0a1b2c3d/', { via: 'repo-load' });
+    expect(isRepoLoadDispatch()).toBe(true);
+  });
+
+  it('a task-callee root is dispatched but NOT a repo load', () => {
+    setContentRoot('/task/s1/dir', { via: 'task' });
+    expect(isDispatched()).toBe(true);
+    expect(isRepoLoadDispatch()).toBe(false);
+  });
+
+  it('an unstated kind is not a repo load, and reset clears the kind', () => {
+    setContentRoot('/mnt/0a1b2c3d/');
+    expect(isRepoLoadDispatch()).toBe(false);
+    setContentRoot('/mnt/0a1b2c3d/', { via: 'repo-load' });
+    resetContentRoot();
+    expect(isRepoLoadDispatch()).toBe(false);
   });
 });

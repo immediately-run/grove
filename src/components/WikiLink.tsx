@@ -12,7 +12,7 @@ import {
   linkKind,
   splitFragment,
 } from '../lib/content';
-import { isDispatched } from '../lib/contentRoot';
+import { isRepoLoadDispatch } from '../lib/contentRoot';
 import { isFolderKey } from '../lib/directory';
 import { queryPaths } from '../lib/wiki';
 import { useEntryKey } from '../hooks/useEntryKey';
@@ -76,9 +76,10 @@ export default function WikiLink({ href = '', children, ...rest }: Props) {
     // a cross-bundle link, and only the host knows where the bundle lives. Under dispatch
     // it renders as the authored href (copyable, and what a forge resolves) and a plain
     // click hands it to the host; a modified click stays the browser's. Nothing reads
-    // the target here — `hrefTargetKey` still confines it to null. The fork has no host
-    // bundle to leave to, so it keeps the broken rendering below.
-    const bundleEntry = isDispatched() && isBundleEscape(href, currentKey) ? bundleEntryPath(currentKey) : null;
+    // the target here — `hrefTargetKey` still confines it to null. Only a REPO-LOAD
+    // dispatch has a host bundle to leave to: the host refuses a bundle-link from any frame
+    // but the stage, so a task callee and the fork keep the broken rendering below.
+    const bundleEntry = isRepoLoadDispatch() && isBundleEscape(href, currentKey) ? bundleEntryPath(currentKey) : null;
     if (bundleEntry !== null) {
       return (
         <a

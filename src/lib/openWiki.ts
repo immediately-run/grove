@@ -11,6 +11,7 @@
 
 import type { SandboxMount } from '@immediately-run/sdk/mounts';
 import type { TaskInput } from '@immediately-run/sdk/tasks';
+import type { DispatchKind } from './contentRoot';
 
 /** The contract this module provides, and the param carrying the corpus. */
 export const OPEN_WIKI_TASK = 'open-wiki';
@@ -29,7 +30,7 @@ export type OpenWikiResolution =
       ok: true;
       root: string;
       readOnly: boolean;
-      via: 'task' | 'repo-load';
+      via: DispatchKind;
       /** The corpus mount's id — what an onward delegation names (R3-266). Falls back to
        *  the mount PATH, which is exactly what the host publishes as the id for a task
        *  chroot (`mintDelegations` uses the mount point as the descriptor id). */

@@ -5,7 +5,8 @@
 // browser's; the fork never calls the SDK.
 //
 // The input is a REAL baton ticket: `__fixtures__/baton-tickets/B-10.mdx` is baton's
-// `tickets/B-10.mdx` (baton@ab8a150) with its Spec line linked the way baton#176 links it.
+// `tickets/B-10.mdx` copied verbatim at immediately-run/baton@47824e3e401343ec290bd04771c034a8c539d213
+// (main, after baton#176 linked the Spec lines).
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -34,6 +35,7 @@ const SPEC_6_1 = LINKS[0];
 
 const DISPATCHED_ROOT = '/mnt/0a1b2c3d/';
 const FORK_ROOT = '/app/content/';
+const TASK_ROOT = '/task/s1/dir/';
 
 function host(children: ReactNode, root: string) {
   const entryKey = `${root}B-10.mdx`;
@@ -94,7 +96,7 @@ describe('WikiLink — a link that leaves the bundle (R3-1322)', () => {
   });
 
   it('dispatched: renders the authored href; a plain click calls followBundleLink once with (href, fromEntry) and prevents the default', async () => {
-    setContentRoot(DISPATCHED_ROOT);
+    setContentRoot(DISPATCHED_ROOT, { via: 'repo-load' });
     const el = await render(host(<WikiLink href={SPEC_6_1.href}>{SPEC_6_1.text}</WikiLink>, DISPATCHED_ROOT));
     const a = el.querySelector('a') as HTMLAnchorElement;
     expect(a).not.toBeNull();
@@ -109,7 +111,7 @@ describe('WikiLink — a link that leaves the bundle (R3-1322)', () => {
   });
 
   it('dispatched: every spec link in the ticket renders as a followable link, none broken', async () => {
-    setContentRoot(DISPATCHED_ROOT);
+    setContentRoot(DISPATCHED_ROOT, { via: 'repo-load' });
     const el = await render(
       host(
         <>
@@ -130,7 +132,7 @@ describe('WikiLink — a link that leaves the bundle (R3-1322)', () => {
     ['shift', { shiftKey: true }],
     ['middle button', { button: 1 }],
   ])('dispatched: a %s click is the browser\'s — not intercepted, SDK not called', async (_name, init) => {
-    setContentRoot(DISPATCHED_ROOT);
+    setContentRoot(DISPATCHED_ROOT, { via: 'repo-load' });
     const el = await render(host(<WikiLink href={SPEC_6_1.href}>{SPEC_6_1.text}</WikiLink>, DISPATCHED_ROOT));
     const { prevented } = click(el.querySelector('a') as HTMLAnchorElement, init);
     expect(prevented).toBe(false);
@@ -138,11 +140,34 @@ describe('WikiLink — a link that leaves the bundle (R3-1322)', () => {
   });
 
   it('dispatched: a link that stays inside the bundle is routed as before, not handed to the host', async () => {
-    setContentRoot(DISPATCHED_ROOT);
+    setContentRoot(DISPATCHED_ROOT, { via: 'repo-load' });
     const el = await render(host(<WikiLink href="B-11.mdx">B-11</WikiLink>, DISPATCHED_ROOT));
     const a = el.querySelector('a') as HTMLAnchorElement;
     expect(a.hasAttribute('data-bundle-link')).toBe(false);
     click(a);
+    expect(followBundleLink).not.toHaveBeenCalled();
+  });
+
+  it.each([['../spec/a.md?x=1'], ['..\\spec\\a.md'], ['../spec/%2e%2e/a.md'], ['../spec/a.md#a#b']])(
+    'dispatched: %s, which the SDK refuses, renders broken and calls nothing (review 1-A-0 / 1-B-0)',
+    async (href) => {
+      setContentRoot(DISPATCHED_ROOT, { via: 'repo-load' });
+      const el = await render(host(<WikiLink href={href}>x</WikiLink>, DISPATCHED_ROOT));
+      expect(el.querySelector('a')).toBeNull();
+      const span = el.querySelector('.grove-wikilink') as HTMLElement;
+      expect(span.getAttribute('data-state')).toBe('broken');
+      click(span);
+      expect(followBundleLink).not.toHaveBeenCalled();
+    },
+  );
+
+  it('task callee (open-wiki): an escaping link renders broken and calls nothing — the host follows bundle-links only from the stage (review 1-A-2)', async () => {
+    setContentRoot(TASK_ROOT, { via: 'task' });
+    const el = await render(host(<WikiLink href={SPEC_6_1.href}>{SPEC_6_1.text}</WikiLink>, TASK_ROOT));
+    expect(el.querySelector('a')).toBeNull();
+    const span = el.querySelector('.grove-wikilink') as HTMLElement;
+    expect(span.getAttribute('data-state')).toBe('broken');
+    click(span);
     expect(followBundleLink).not.toHaveBeenCalled();
   });
 
