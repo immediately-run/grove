@@ -5,6 +5,7 @@
   "main": "src/main.tsx",
   "immediately.run": {
     "$schema": "https://immediately.run/immediately-run-config.schema.json",
+    "libraryArtifacts": true,
     "provides": [
       {
         "task": "open-wiki",
