@@ -1,10 +1,11 @@
 {
   "name": "@immediately-run/grove",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "type": "module",
   "main": "src/main.tsx",
   "immediately.run": {
     "$schema": "https://immediately.run/immediately-run-config.schema.json",
+    "libraryArtifacts": true,
     "provides": [
       {
         "task": "open-wiki",
