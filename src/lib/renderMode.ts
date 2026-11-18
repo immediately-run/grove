@@ -18,9 +18,14 @@
  *  path's half of this hole is a separate SEC item). */
 export const FRONTMATTER_REJECTED = 'frontmatterRejected';
 
-/** True when the entry renders through the non-executable interpreter path. A rejected
- *  frontmatter block on the home entry or the entry itself counts as `render: safe`:
- *  fail closed. */
+/** True when the entry renders through the non-executable interpreter path.
+ *
+ *  ONE-DIRECTIONAL (owner, 2026-11-18): the home entry's `render: safe` makes the whole wiki
+ *  safe and no entry can turn it back to compiled; an entry may only opt ITSELF into safe
+ *  within an otherwise compiled wiki. Hence an OR, and only the value `safe` counts. A
+ *  rejected frontmatter block counts as `render: safe` for what it governs — the wiki for
+ *  the home entry, that entry for any other — which moves in the safe direction only
+ *  (fail closed). `renderMode.test.ts` pins all of it. */
 export function resolveSafeRender(
   homeMeta: Record<string, unknown> | null | undefined,
   entryMeta: Record<string, unknown> | null | undefined,
