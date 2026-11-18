@@ -2,8 +2,9 @@
 //
 // The host's metadata scan drops a block it cannot parse and only logs it, so a broken
 // block renders as a page with no title, nav or layout role, and nothing in this repo
-// said so: `content/_layouts/{hero,section,shell}.mdx` carried an unquoted `nav: top`
-// mid-line (a YAML error) until grove e017647, while every check here passed. The parser
+// said so: `content/_layouts/{hero,section,shell}.mdx` each carried an unquoted `key: value`
+// mid-line (`nav: top`, `cover: lands`, `frame: none` — a YAML error) until grove e017647,
+// while every check here passed. The parser
 // below is the one the host calls (R3-1347/R3-1348), via Grove's own re-export.
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

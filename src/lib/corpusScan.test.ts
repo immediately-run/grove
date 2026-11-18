@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createCorpusScan, scanCorpus, listCorpusFiles, type ScanFs } from './corpusScan';
 import { parseFrontmatter } from './frontmatter';
+import { FRONTMATTER_REJECTED, resolveSafeRender } from './renderMode';
+import { countTags } from './tagCloud';
+import { rowLabel } from './directory';
 
 /** An in-memory tree, shaped like the fs slice the scan injects. */
 function fakeFs(files: Record<string, string>, opts: { unreadable?: string[] } = {}): ScanFs {
@@ -71,6 +74,34 @@ describe('listCorpusFiles', () => {
       { unreadable: ['/mnt/c/private/'] },
     );
     expect(await listCorpusFiles('/mnt/c', fs)).toEqual(['/mnt/c/home.mdx']);
+  });
+});
+
+describe('scanCorpus — typed and rejected frontmatter (R3-1350)', () => {
+  it('a rejected block marks its row, and the render-mode decision fails closed', async () => {
+    const fs = fakeFs({
+      '/mnt/c/home.mdx': '---\nrender: safe\ndescription: x (nav: top)\n---\n\nBody.\n',
+      '/mnt/c/page.mdx': '---\ntitle: Fine\n---\n\nBody.\n',
+    });
+    const meta = await scanCorpus('/mnt/c', fs);
+    const home = meta['/mnt/c/home.mdx'] as Record<string, unknown>;
+    expect(home[FRONTMATTER_REJECTED]).toMatchObject({ kind: 'yaml', line: 3 });
+    expect(home.render).toBeUndefined();
+    // Home rejected → every entry renders safely; a clean home + a rejected entry → that entry.
+    expect(resolveSafeRender(home, meta['/mnt/c/page.mdx'] as Record<string, unknown>)).toBe(true);
+    expect(resolveSafeRender({ title: 'Home' }, home)).toBe(true);
+    expect(resolveSafeRender({ title: 'Home' }, { title: 'Fine' })).toBe(false);
+  });
+
+  it('typed titles and tags reach the readers as text, through the real scan', async () => {
+    // YAML 1.2: `title: 1984` is a number and `tags: [2026, notes, true]` holds a number and a
+    // boolean. The readers used to call string methods on them (and throw) or drop them.
+    const fs = fakeFs({ '/mnt/c/year.mdx': '---\ntitle: 1984\ntags: [2026, notes, true, ui/nav]\n---\n\nBody.\n' });
+    const meta = await scanCorpus('/mnt/c', fs);
+    expect(countTags(meta as never, '/mnt/c/')).toEqual(
+      expect.arrayContaining([expect.objectContaining({ tag: '2026' }), expect.objectContaining({ tag: 'true' })]),
+    );
+    expect(rowLabel({ kind: 'entry', name: 'year.mdx', meta: meta['/mnt/c/year.mdx'] } as never)).toBe('1984');
   });
 });
 

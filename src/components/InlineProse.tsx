@@ -12,6 +12,7 @@
 
 import { Fragment } from 'react';
 import { parseInlineProse, type InlineProseNode } from '@immediately-run/mdx-plugins';
+import { displayText } from '../lib/displayText';
 
 function renderNodes(nodes: InlineProseNode[]): React.ReactNode[] {
   return nodes.map((n, i) => {
@@ -26,12 +27,15 @@ export default function InlineProse({
   text,
   trimPeriod = false,
 }: {
-  text: string;
+  /** A frontmatter value: typed since mdx-plugins 0.8.0 (`title: 1984` is a number), so
+   *  it is turned into display text here, once, for every caller (R3-1350). */
+  text: unknown;
   /** Trim one trailing period, as the list components always have. */
   trimPeriod?: boolean;
 }) {
+  const str = displayText(text) ?? '';
   // Trim before parsing: the corpus ends titles on a period, and the period
   // sits OUTSIDE any code span, so a raw-string slice is the whole job.
-  const src = trimPeriod && text.endsWith('.') ? text.slice(0, -1) : text;
+  const src = trimPeriod && str.endsWith('.') ? str.slice(0, -1) : str;
   return <Fragment>{renderNodes(parseInlineProse(src))}</Fragment>;
 }

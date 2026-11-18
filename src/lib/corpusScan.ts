@@ -22,6 +22,7 @@
 import type { Frontmatter } from './frontmatter';
 import { parseFrontmatter } from './frontmatter';
 import { collectHeadings } from '@immediately-run/sdk';
+import { FRONTMATTER_REJECTED } from './renderMode';
 
 /** The metadata map shape the SDK hooks read (`FilesMetadata`). */
 export type CorpusMetadata = Record<string, Frontmatter>;
@@ -86,7 +87,11 @@ export async function listCorpusFiles(root: string, fs: ScanFs, maxDepth = 12): 
  *  field (readers degrade to body reads). */
 function rowFor(raw: string): Frontmatter {
   const parsed = parseFrontmatter(raw);
-  const row = parsed.data;
+  // A rejected block has no keys; the row says so instead of reading as "no frontmatter",
+  // so the render-mode decision fails closed (renderMode.ts, R3-1350 review 1-A-1).
+  const row: Frontmatter = parsed.error
+    ? { [FRONTMATTER_REJECTED]: { kind: parsed.error.kind, message: parsed.error.message, line: parsed.error.line ?? null } }
+    : parsed.data;
   const headings = collectHeadings(parsed.body);
   if (headings.length && !Object.prototype.hasOwnProperty.call(row, 'headings')) {
     return { ...row, headings } as Frontmatter & { headings?: unknown };

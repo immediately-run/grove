@@ -12,6 +12,7 @@
 
 import { isContentEntry } from './content';
 import { plainProse } from '@immediately-run/mdx-plugins';
+import { displayText } from './displayText';
 
 /** A nav item derived from `ui/nav` frontmatter. */
 export type NavRecord = {
@@ -25,7 +26,7 @@ export function navQuery(fm: Record<string, any>): NavRecord[] {
   return Object.keys(fm)
     .filter((p) => isContentEntry(p) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
     .sort((a, b) => (fm[a].order ?? 999) - (fm[b].order ?? 999))
-    .map((p) => ({ path: p, label: plainLabel(fm[p]?.nav || fm[p]?.title || '') }));
+    .map((p) => ({ path: p, label: plainLabel(displayText(fm[p]?.nav) || displayText(fm[p]?.title) || '') }));
 }
 
 /** A field bound for an attribute, a label, a prompt or an index — the plain
@@ -108,8 +109,9 @@ export function familyTreeQuery(fm: Record<string, any>): FamilyNodeRecord[] {
   Object.entries(fm).forEach(([p, m]: [string, any]) => {
     if (!isContentEntry(p)) return;
     const group = m?.house || m?.team || m?.parent || m?.manager;
-    if (group && (m?.name || m?.title)) {
-      out.push({ path: p, label: (m.name || m.title).replace(/\.$/, ''), group: String(group) });
+    const label = displayText(m?.name) || displayText(m?.title);
+    if (group && label) {
+      out.push({ path: p, label: label.replace(/\.$/, ''), group: String(group) });
     }
   });
   return out;

@@ -58,13 +58,19 @@ const NOTHING: ContentComponents = { status: 'idle', components: {}, rejected: [
  *  may. Read from the home entry's frontmatter, decided by `resolveSafeRender` — the one
  *  home of the safe-vs-compiled rule. */
 async function safeGateReason(base: string): Promise<string | null> {
-  let homeMeta: Record<string, unknown>;
+  let parsed: ReturnType<typeof parseFrontmatter>;
   try {
-    homeMeta = parseFrontmatter(String(await fs.promises.readFile(homeKeyUnder(base), 'utf8'))).data;
+    parsed = parseFrontmatter(String(await fs.promises.readFile(homeKeyUnder(base), 'utf8')));
   } catch {
     return 'the home entry could not be read';
   }
-  return resolveSafeRender(homeMeta, null) ? 'this wiki renders safely (render: safe on its home entry)' : null;
+  // The parser never throws; a block it rejects yields no keys, so a `render: safe` in it
+  // would be invisible. Fail closed, as an unreadable home does (R3-1350 review 1-A-1).
+  if (parsed.error) {
+    const at = parsed.error.line === undefined ? '' : ` (line ${parsed.error.line})`;
+    return `the home entry's frontmatter does not parse${at}: ${parsed.error.message}`;
+  }
+  return resolveSafeRender(parsed.data, null) ? 'this wiki renders safely (render: safe on its home entry)' : null;
 }
 
 async function loadDeclared(root: string): Promise<Omit<ContentComponents, 'status'>> {

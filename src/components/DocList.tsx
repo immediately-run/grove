@@ -8,6 +8,7 @@ import EntryImage from './EntryImage';
 import { useEntryKey } from '../hooks/useEntryKey';
 import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
+import { visibleTags } from '../lib/displayText';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -26,7 +27,7 @@ interface Props {
 }
 
 function tagsOf(meta: any): string[] {
-  return Array.isArray(meta?.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
+  return visibleTags(meta);
 }
 
 // One entry as a feed row — reads its own frontmatter so the hook count is stable.
