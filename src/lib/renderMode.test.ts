@@ -32,7 +32,19 @@ describe('resolveSafeRender — safe only ever wins', () => {
     expect(resolveSafeRender(rejected, null)).toBe(true);
     expect(resolveSafeRender(rejected, { render: 'compiled' })).toBe(true);
     expect(resolveSafeRender({ title: 'Home' }, rejected)).toBe(true);
-    // A rejected ENTRY never makes another entry safe: it governs only itself.
-    expect(resolveSafeRender({ title: 'Home' }, { title: 'Other' })).toBe(false);
+  });
+
+  it('a rejected ENTRY governs only itself: it never makes the wiki, or another entry, safe', () => {
+    // The rejected block reaches the resolver only as `entry` when it is the entry being
+    // rendered; rendering another entry passes that entry's own frontmatter, and the home
+    // argument is the HOME entry's frontmatter, never the rejected entry's (review 3-r3-2).
+    // So the case to pin is a rejected block in the ENTRY slot leaving a compiled wiki's
+    // other entries compiled — checked by rendering them in turn against the same home.
+    const home = { title: 'Home' };
+    const pages: Record<string, Record<string, unknown>> = { a: rejected, b: { title: 'Other' }, c: {} };
+    const safe = Object.fromEntries(Object.entries(pages).map(([k, fm]) => [k, resolveSafeRender(home, fm)]));
+    expect(safe).toEqual({ a: true, b: false, c: false });
+    // And the home stays as it was: resolving `a` did not mark it.
+    expect(FRONTMATTER_REJECTED in home).toBe(false);
   });
 });

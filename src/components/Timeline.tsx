@@ -8,7 +8,7 @@ import { useEntryKey } from '../hooks/useEntryKey';
 import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
 import EntryImage from './EntryImage';
-import { visibleTags } from '../lib/displayText';
+import { displayText, visibleTags } from '../lib/displayText';
 
 // One dated entry on the axis: mono date · node · card.
 function Row({ path }: { path: string }) {
@@ -19,7 +19,7 @@ function Row({ path }: { path: string }) {
   const tags = visibleTags(m);
   return (
     <Link href={keyToHref(path)} className="gtl-row" onClick={followLinkOnClick(follow, { key: path, href: keyToHref(path), from })}>
-      <div className="gtl-date">{m.date}</div>
+      <div className="gtl-date">{displayText(m.date)}</div>
       <div className="gtl-node" />
       <div className="gtl-card">
         <EntryImage entryPath={path} src={m.cover} alt="" className="gtl-cover" degrade={null} />

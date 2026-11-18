@@ -8,7 +8,7 @@ import EntryImage from './EntryImage';
 import { useEntryKey } from '../hooks/useEntryKey';
 import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
-import { textList, visibleTags } from '../lib/displayText';
+import { displayText, textList, visibleTags } from '../lib/displayText';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -47,7 +47,7 @@ function Row({ path }: { path: string }) {
           ))}
         </div>
       </div>
-      <div className="gdl-row__meta">{meta.date}</div>
+      <div className="gdl-row__meta">{displayText(meta.date)}</div>
     </Link>
   );
 }

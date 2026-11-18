@@ -129,10 +129,14 @@ describe('typed values through every query the shell builds (R3-1350 review 2-r2
     expect(navQuery(meta).map((n) => n.label)).toContain('7');
   });
 
-  it('no reader filters ui/ tags by hand: visibleTags is the one place (source guard)', () => {
+  it('no source file outside displayText.ts calls startsWith with a ui/ literal (source guard)', () => {
     // Review 2-r2-1: round one routed SOME tag readers through the helper and left others
-    // calling t.startsWith('ui/') on a value that may be a number. Any new tag reader must
-    // go through displayText.ts; this fails the day one does not.
+    // calling t.startsWith('ui/') on a value that may be a number. What this checks, and
+    // all it checks (review 3-r3-1): no non-test .ts/.tsx under src/ other than
+    // displayText.ts contains `startsWith(` followed by a quoted `ui/`. A reader that
+    // filters ui/ tags any other way (a regex, `slice`, a constant prefix) passes it; the
+    // typed-values tests here and in components/typedFrontmatter.render.test.tsx are what
+    // cover those readers' behaviour.
     const src = fileURLToPath(new URL('../', import.meta.url));
     const walk = (d: string): string[] =>
       readdirSync(d).flatMap((n) => {

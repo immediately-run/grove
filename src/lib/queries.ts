@@ -116,10 +116,10 @@ export function familyTreeQuery(fm: Record<string, any>): FamilyNodeRecord[] {
   const out: FamilyNodeRecord[] = [];
   Object.entries(fm).forEach(([p, m]: [string, any]) => {
     if (!isContentEntry(p)) return;
-    const group = m?.house || m?.team || m?.parent || m?.manager;
+    const group = displayText(m?.house) || displayText(m?.team) || displayText(m?.parent) || displayText(m?.manager);
     const label = displayText(m?.name) || displayText(m?.title);
     if (group && label) {
-      out.push({ path: p, label: label.replace(/\.$/, ''), group: String(group) });
+      out.push({ path: p, label: label.replace(/\.$/, ''), group });
     }
   });
   return out;
