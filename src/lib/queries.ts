@@ -12,7 +12,7 @@
 
 import { isContentEntry } from './content';
 import { plainProse } from '@immediately-run/mdx-plugins';
-import { displayText } from './displayText';
+import { displayText, textList, visibleTags } from './displayText';
 
 /** A nav item derived from `ui/nav` frontmatter. */
 export type NavRecord = {
@@ -24,15 +24,18 @@ export type NavRecord = {
 /** Entries tagged `ui/nav`, ordered by `order` (missing = 999). */
 export function navQuery(fm: Record<string, any>): NavRecord[] {
   return Object.keys(fm)
-    .filter((p) => isContentEntry(p) && Array.isArray(fm[p]?.tags) && fm[p].tags.includes('ui/nav'))
+    .filter((p) => isContentEntry(p) && textList(fm[p]?.tags).includes('ui/nav'))
     .sort((a, b) => (fm[a].order ?? 999) - (fm[b].order ?? 999))
     .map((p) => ({ path: p, label: plainLabel(displayText(fm[p]?.nav) || displayText(fm[p]?.title) || '') }));
 }
 
 /** A field bound for an attribute, a label, a prompt or an index — the plain
  *  form (R3-531): markers dropped, content kept, then the period trimmed. */
-export function plainLabel(s: string): string {
-  return plainProse(s).replace(/\.$/, '');
+export function plainLabel(s: unknown): string {
+  // A frontmatter value is typed since mdx-plugins 0.8.0 (`title: 1984` is a number);
+  // plainProse wants a string, so the value is turned into display text here, once, for
+  // every caller (R3-1350 review 2-r2-0).
+  return plainProse(displayText(s) ?? '').replace(/\.$/, '');
 }
 
 /** One searchable entry: the RAW title (the palette renders it as inline prose)
@@ -74,9 +77,9 @@ export function searchQuery(fm: Record<string, any>): SearchRecord[] {
     .filter(isContentEntry)
     .map((p) => ({
       path: p,
-      title: fm[p]?.title || '',
-      desc: fm[p]?.description || '',
-      tags: (fm[p]?.tags || []).filter((t: string) => !t.startsWith('ui/')),
+      title: displayText(fm[p]?.title) || '',
+      desc: displayText(fm[p]?.description) || '',
+      tags: visibleTags(fm[p]),
     }));
 }
 
@@ -93,7 +96,12 @@ export type SidebarRecord = {
 export function sidebarQuery(fm: Record<string, any>): SidebarRecord[] {
   return Object.keys(fm)
     .filter(isContentEntry)
-    .map((p) => ({ path: p, title: fm[p]?.title || '', tags: fm[p]?.tags || [], nav: fm[p]?.nav || '' }));
+    .map((p) => ({
+      path: p,
+      title: displayText(fm[p]?.title) || '',
+      tags: textList(fm[p]?.tags),
+      nav: displayText(fm[p]?.nav) || '',
+    }));
 }
 
 /** A node in the relational view: grouped by house/team/parent/manager. */

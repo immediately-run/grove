@@ -1,9 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, onTestFinished } from 'vitest';
 import { createCorpusScan, scanCorpus, listCorpusFiles, type ScanFs } from './corpusScan';
 import { parseFrontmatter } from './frontmatter';
 import { FRONTMATTER_REJECTED, resolveSafeRender } from './renderMode';
 import { countTags } from './tagCloud';
 import { rowLabel } from './directory';
+import { navQuery, plainLabel, searchQuery, sidebarQuery, toSearchEntries } from './queries';
+import { resetContentRoot, setContentRoot } from './contentRoot';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** An in-memory tree, shaped like the fs slice the scan injects. */
 function fakeFs(files: Record<string, string>, opts: { unreadable?: string[] } = {}): ScanFs {
@@ -102,6 +107,40 @@ describe('scanCorpus — typed and rejected frontmatter (R3-1350)', () => {
       expect.arrayContaining([expect.objectContaining({ tag: '2026' }), expect.objectContaining({ tag: 'true' })]),
     );
     expect(rowLabel({ kind: 'entry', name: 'year.mdx', meta: meta['/mnt/c/year.mdx'] } as never)).toBe('1984');
+  });
+});
+
+describe('typed values through every query the shell builds (R3-1350 review 2-r2)', () => {
+  it('search, sidebar, nav and the agent title take a numeric title and tags without throwing', async () => {
+    const fs = fakeFs({
+      '/mnt/c/year.mdx': '---\ntitle: 1984\ndescription: 42\nnav: 7\ntags: [2026, notes, ui/nav, ui/sidebar, true]\n---\n\nBody.\n',
+    });
+    const meta = (await scanCorpus('/mnt/c', fs)) as Parameters<typeof searchQuery>[0];
+    // The queries keep entries under the mounted corpus root, as a dispatched viewer sets it.
+    setContentRoot('/mnt/c/');
+    onTestFinished(() => resetContentRoot());
+    const rows = searchQuery(meta).filter((r) => r.path === '/mnt/c/year.mdx');
+    expect(rows).toEqual([{ path: '/mnt/c/year.mdx', title: '1984', desc: '42', tags: ['2026', 'notes', 'true'] }]);
+    expect(toSearchEntries(rows)[0]).toMatchObject({ title: '1984', plain: '1984', desc: '42' });
+    expect(sidebarQuery(meta).find((r) => r.path === '/mnt/c/year.mdx')).toMatchObject({ title: '1984', nav: '7' });
+    expect(plainLabel(meta['/mnt/c/year.mdx'].title)).toBe('1984');
+    expect(plainLabel(undefined)).toBe('');
+    // navQuery reads the ui/nav tag out of a mixed, typed list.
+    expect(navQuery(meta).map((n) => n.label)).toContain('7');
+  });
+
+  it('no reader filters ui/ tags by hand: visibleTags is the one place (source guard)', () => {
+    // Review 2-r2-1: round one routed SOME tag readers through the helper and left others
+    // calling t.startsWith('ui/') on a value that may be a number. Any new tag reader must
+    // go through displayText.ts; this fails the day one does not.
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const walk = (d: string): string[] =>
+      readdirSync(d).flatMap((n) => {
+        const f = join(d, n);
+        return statSync(f).isDirectory() ? walk(f) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [f] : [];
+      });
+    const offenders = walk(src).filter((f) => !f.endsWith('displayText.ts') && /startsWith\(\s*['"]ui\//.test(readFileSync(f, 'utf8')));
+    expect(offenders).toEqual([]);
   });
 });
 

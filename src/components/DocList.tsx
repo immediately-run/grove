@@ -8,7 +8,7 @@ import EntryImage from './EntryImage';
 import { useEntryKey } from '../hooks/useEntryKey';
 import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
-import { visibleTags } from '../lib/displayText';
+import { textList, visibleTags } from '../lib/displayText';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -108,7 +108,7 @@ export default function DocList({
         if (!isContentEntry(p)) return false;
         const m = fm[p] || {};
         if (m.view) return false;
-        if (tag && !(Array.isArray(m.tags) && m.tags.includes(tag))) return false;
+        if (tag && !textList(m.tags).includes(tag)) return false;
         return true;
       });
       keys.sort((a, b) => {
