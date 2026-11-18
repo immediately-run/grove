@@ -13,6 +13,7 @@
 
 import type { Frontmatter } from './frontmatter';
 import { contentDir, isContentEntry, keyToHref } from './content';
+import { displayText, visibleTags } from './displayText';
 
 /** One `readdir` result — the slice of `Dirent` this module needs. */
 export interface DirEntry {
@@ -62,7 +63,7 @@ function isHiddenName(name: string): boolean {
 
 /** Strip Grove's headline-ends-on-a-period house style for use as a table label. */
 export function rowLabel(row: DirRow): string {
-  const title = typeof row.meta?.title === 'string' ? row.meta.title.trim() : '';
+  const title = (displayText(row.meta?.title) ?? '').trim();
   if (title) return title.replace(/\.$/, '');
   return row.kind === 'entry' ? row.name.replace(/\.mdx?$/, '') : row.name;
 }
@@ -76,10 +77,9 @@ export function columnValue(row: DirRow, col: DirColumn): string | string[] | nu
   const m = row.meta;
   if (!m) return null;
   if (col === 'tags') {
-    const tags = Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : [];
     // `ui/…` tags are wiring (nav placement), not subject matter — the same filter
-    // <DocList> applies, so the two surfaces describe an entry the same way.
-    const visible = tags.filter((t) => !t.startsWith('ui/'));
+    // <DocList> applies (one function), so the two surfaces describe an entry the same way.
+    const visible = visibleTags(m);
     return visible.length ? visible : null;
   }
   const raw = col === 'updated' ? (m.updated ?? m.date) : m[col];

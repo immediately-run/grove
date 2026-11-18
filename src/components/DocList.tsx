@@ -8,6 +8,7 @@ import EntryImage from './EntryImage';
 import { useEntryKey } from '../hooks/useEntryKey';
 import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
+import { displayText, textList, visibleTags } from '../lib/displayText';
 
 interface Props {
   shape?: 'feed' | 'grid';
@@ -26,7 +27,7 @@ interface Props {
 }
 
 function tagsOf(meta: any): string[] {
-  return Array.isArray(meta?.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
+  return visibleTags(meta);
 }
 
 // One entry as a feed row — reads its own frontmatter so the hook count is stable.
@@ -46,7 +47,7 @@ function Row({ path }: { path: string }) {
           ))}
         </div>
       </div>
-      <div className="gdl-row__meta">{meta.date}</div>
+      <div className="gdl-row__meta">{displayText(meta.date)}</div>
     </Link>
   );
 }
@@ -107,7 +108,7 @@ export default function DocList({
         if (!isContentEntry(p)) return false;
         const m = fm[p] || {};
         if (m.view) return false;
-        if (tag && !(Array.isArray(m.tags) && m.tags.includes(tag))) return false;
+        if (tag && !textList(m.tags).includes(tag)) return false;
         return true;
       });
       keys.sort((a, b) => {

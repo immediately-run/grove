@@ -48,7 +48,7 @@
     "check:lock-version": "node scripts/check-lock-version.mjs --self-test && node scripts/check-lock-version.mjs"
   },
   "dependencies": {
-    "@immediately-run/mdx-plugins": "0.7.1",
+    "@immediately-run/mdx-plugins": "0.8.0",
     "@immediately-run/sdk": "^0.93.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"

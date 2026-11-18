@@ -4,6 +4,7 @@ import { EDIT_REFUSED_NOTICE } from '../lib/shell';
 import { crumb } from '../lib/wiki';
 import Icon from './Icon';
 import InlineProse from './InlineProse';
+import { displayText, visibleTags } from '../lib/displayText';
 
 // The entry's header block: breadcrumb, title (optional gradient), meta row
 // (date · reading time · tags) and the unobtrusive edit affordance. Rendered by
@@ -33,7 +34,8 @@ export default function EntryHeader({
   const { openEditor, busy: editBusy, refused: editRefused, hint: editHint } = affordance;
   const meta = useFileMetadata(entryKey) as any;
   if (!meta) return null;
-  const tags: string[] = Array.isArray(meta.tags) ? meta.tags.filter((t: string) => !t.startsWith('ui/')) : [];
+  const tags = visibleTags(meta);
+  const date = displayText(meta.date);
   const cr = crumb(entryKey);
   return (
     <header className="grove-entry-header">
@@ -43,7 +45,7 @@ export default function EntryHeader({
         <InlineProse text={meta.title || cr} />
       </h1>
       <div className="grove-meta">
-        {meta.date && <span>{meta.date}</span>}
+        {date ? <span>{date}</span> : null}
         {mins ? <span>→ {mins} min read</span> : null}
         {tags.length ? <span className="dot">·</span> : null}
         {tags.map((t) => (

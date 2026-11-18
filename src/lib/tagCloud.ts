@@ -1,3 +1,4 @@
+import { visibleTags } from './displayText';
 // TagCloud's counting and scaling, extracted from the component so the cases are
 // unit-testable (the component is a thin wiring shell). The chip's pixel range is
 // NOT here — it lives in GroveApp.css, and the component only hands each chip a
@@ -20,9 +21,8 @@ export function countTags(filesMetadata: Record<string, TaggedMeta | null>, cont
   const counts: Record<string, number> = {};
   Object.entries(filesMetadata).forEach(([p, m]) => {
     if (!p.startsWith(contentRoot)) return;
-    if (m && Array.isArray(m.tags)) {
-      (m.tags as string[]).forEach((t) => {
-        if (t.startsWith('ui/')) return;
+    if (m) {
+      visibleTags(m).forEach((t) => {
         counts[t] = (counts[t] || 0) + 1;
       });
     }

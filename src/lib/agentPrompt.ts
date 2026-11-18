@@ -7,6 +7,7 @@
 
 import { fenceUntrusted, type FilesMetadata } from '@immediately-run/sdk';
 import { isContentEntry } from './content';
+import { textList } from './displayText';
 
 export interface PromptParts {
   /** `renderAgentContext(...)` — the fenced deixis block. */
@@ -33,8 +34,7 @@ export function summarizeIndex(index: FilesMetadata, chroot: string): string {
   const paths = Object.keys(index).filter((k) => k.startsWith(root) && isContentEntry(k));
   const tags = new Map<string, number>();
   for (const p of paths) {
-    const t = index[p]?.tags;
-    if (Array.isArray(t)) for (const tag of t) if (typeof tag === 'string') tags.set(tag, (tags.get(tag) ?? 0) + 1);
+    for (const tag of textList(index[p]?.tags)) tags.set(tag, (tags.get(tag) ?? 0) + 1);
   }
   const top = [...tags.entries()].sort((a, b) => b[1] - a[1]).slice(0, 24).map(([t, n]) => `${t} (${n})`);
   const sample = paths.slice(0, 120).map((p) => p.slice(root.length));

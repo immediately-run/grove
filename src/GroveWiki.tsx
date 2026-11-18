@@ -26,6 +26,7 @@ import { navQuery, plainLabel } from './lib/queries';
 import type { NavRecord } from './lib/queries';
 import { layoutChainForKey, resolveNavMode, resolvePageLayout } from './lib/layout';
 import { resolveSafeRender } from './lib/renderMode';
+import { displayText } from './lib/displayText';
 import { folderIndexKey } from './lib/directory';
 import GroveEntry from './components/GroveEntry';
 import { resolvePalette, resolvePolarity, type Polarity } from './lib/themeSelection';
@@ -209,7 +210,7 @@ export default function GroveWiki({
   const meta = useFileMetadata(entryKey) as any;
 
   const layout = resolvePageLayout(meta);
-  const siteTitle: string = meta?.site || homeMeta?.site || 'Grove';
+  const siteTitle: string = displayText(meta?.site) || displayText(homeMeta?.site) || 'Grove';
   // Interpreter mode (TRUST_MODES §5 / R3-213): render this entry's body through the
   // non-executable safe renderer instead of the compiled `<Include>` path.
   //

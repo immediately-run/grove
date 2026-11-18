@@ -1,6 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, onTestFinished } from 'vitest';
 import { createCorpusScan, scanCorpus, listCorpusFiles, type ScanFs } from './corpusScan';
 import { parseFrontmatter } from './frontmatter';
+import { FRONTMATTER_REJECTED, resolveSafeRender } from './renderMode';
+import { countTags } from './tagCloud';
+import { rowLabel } from './directory';
+import { navQuery, plainLabel, searchQuery, sidebarQuery, toSearchEntries } from './queries';
+import { resetContentRoot, setContentRoot } from './contentRoot';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** An in-memory tree, shaped like the fs slice the scan injects. */
 function fakeFs(files: Record<string, string>, opts: { unreadable?: string[] } = {}): ScanFs {
@@ -71,6 +79,72 @@ describe('listCorpusFiles', () => {
       { unreadable: ['/mnt/c/private/'] },
     );
     expect(await listCorpusFiles('/mnt/c', fs)).toEqual(['/mnt/c/home.mdx']);
+  });
+});
+
+describe('scanCorpus — typed and rejected frontmatter (R3-1350)', () => {
+  it('a rejected block marks its row, and the render-mode decision fails closed', async () => {
+    const fs = fakeFs({
+      '/mnt/c/home.mdx': '---\nrender: safe\ndescription: x (nav: top)\n---\n\nBody.\n',
+      '/mnt/c/page.mdx': '---\ntitle: Fine\n---\n\nBody.\n',
+    });
+    const meta = await scanCorpus('/mnt/c', fs);
+    const home = meta['/mnt/c/home.mdx'] as Record<string, unknown>;
+    expect(home[FRONTMATTER_REJECTED]).toMatchObject({ kind: 'yaml', line: 3 });
+    expect(home.render).toBeUndefined();
+    // Home rejected → every entry renders safely; a clean home + a rejected entry → that entry.
+    expect(resolveSafeRender(home, meta['/mnt/c/page.mdx'] as Record<string, unknown>)).toBe(true);
+    expect(resolveSafeRender({ title: 'Home' }, home)).toBe(true);
+    expect(resolveSafeRender({ title: 'Home' }, { title: 'Fine' })).toBe(false);
+  });
+
+  it('typed titles and tags reach the readers as text, through the real scan', async () => {
+    // YAML 1.2: `title: 1984` is a number and `tags: [2026, notes, true]` holds a number and a
+    // boolean. The readers used to call string methods on them (and throw) or drop them.
+    const fs = fakeFs({ '/mnt/c/year.mdx': '---\ntitle: 1984\ntags: [2026, notes, true, ui/nav]\n---\n\nBody.\n' });
+    const meta = await scanCorpus('/mnt/c', fs);
+    expect(countTags(meta as never, '/mnt/c/')).toEqual(
+      expect.arrayContaining([expect.objectContaining({ tag: '2026' }), expect.objectContaining({ tag: 'true' })]),
+    );
+    expect(rowLabel({ kind: 'entry', name: 'year.mdx', meta: meta['/mnt/c/year.mdx'] } as never)).toBe('1984');
+  });
+});
+
+describe('typed values through every query the shell builds (R3-1350 review 2-r2)', () => {
+  it('search, sidebar, nav and the agent title take a numeric title and tags without throwing', async () => {
+    const fs = fakeFs({
+      '/mnt/c/year.mdx': '---\ntitle: 1984\ndescription: 42\nnav: 7\ntags: [2026, notes, ui/nav, ui/sidebar, true]\n---\n\nBody.\n',
+    });
+    const meta = (await scanCorpus('/mnt/c', fs)) as Parameters<typeof searchQuery>[0];
+    // The queries keep entries under the mounted corpus root, as a dispatched viewer sets it.
+    setContentRoot('/mnt/c/');
+    onTestFinished(() => resetContentRoot());
+    const rows = searchQuery(meta).filter((r) => r.path === '/mnt/c/year.mdx');
+    expect(rows).toEqual([{ path: '/mnt/c/year.mdx', title: '1984', desc: '42', tags: ['2026', 'notes', 'true'] }]);
+    expect(toSearchEntries(rows)[0]).toMatchObject({ title: '1984', plain: '1984', desc: '42' });
+    expect(sidebarQuery(meta).find((r) => r.path === '/mnt/c/year.mdx')).toMatchObject({ title: '1984', nav: '7' });
+    expect(plainLabel(meta['/mnt/c/year.mdx'].title)).toBe('1984');
+    expect(plainLabel(undefined)).toBe('');
+    // navQuery reads the ui/nav tag out of a mixed, typed list.
+    expect(navQuery(meta).map((n) => n.label)).toContain('7');
+  });
+
+  it('no source file outside displayText.ts calls startsWith with a ui/ literal (source guard)', () => {
+    // Review 2-r2-1: round one routed SOME tag readers through the helper and left others
+    // calling t.startsWith('ui/') on a value that may be a number. What this checks, and
+    // all it checks (review 3-r3-1): no non-test .ts/.tsx under src/ other than
+    // displayText.ts contains `startsWith(` followed by a quoted `ui/`. A reader that
+    // filters ui/ tags any other way (a regex, `slice`, a constant prefix) passes it; the
+    // typed-values tests here and in components/typedFrontmatter.render.test.tsx are what
+    // cover those readers' behaviour.
+    const src = fileURLToPath(new URL('../', import.meta.url));
+    const walk = (d: string): string[] =>
+      readdirSync(d).flatMap((n) => {
+        const f = join(d, n);
+        return statSync(f).isDirectory() ? walk(f) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [f] : [];
+      });
+    const offenders = walk(src).filter((f) => !f.endsWith('displayText.ts') && /startsWith\(\s*['"]ui\//.test(readFileSync(f, 'utf8')));
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -150,7 +224,9 @@ describe('parseFrontmatter — the grammar the authoring contract documents', ()
     const src = '---\ntitle: X\n\n# body';
     // `hadFrontmatter` distinguishes this from `---\n---` (a block WITH no keys) —
     // carried by the shared parser since R3-277a, where Grove's port had dropped it.
-    expect(parseFrontmatter(src)).toEqual({ data: {}, body: src, hadFrontmatter: false });
+    // 0.8.0 (R3-1347) adds `content` (the untrimmed remainder; here the whole input) and,
+    // only for a present-but-rejected block, `error` — so an unterminated one has none.
+    expect(parseFrontmatter(src)).toEqual({ data: {}, body: src, content: src, hadFrontmatter: false });
   });
 
   it('does not mistake a horizontal rule mid-document for frontmatter', () => {

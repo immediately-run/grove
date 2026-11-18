@@ -6,6 +6,7 @@ import { queryPaths } from '../lib/wiki';
 import { useEntryKey } from '../hooks/useEntryKey';
 import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
+import { displayText } from '../lib/displayText';
 
 interface Props {
   team?: string;
@@ -24,12 +25,12 @@ function Row({ path, compact }: { path: string; compact?: boolean }) {
   return (
     <tr>
       <td style={{ fontWeight: 600 }}>
-        <Link href={keyToHref(path)} onClick={followLinkOnClick(follow, { key: path, href: keyToHref(path), from })}>{m.name}</Link>
+        <Link href={keyToHref(path)} onClick={followLinkOnClick(follow, { key: path, href: keyToHref(path), from })}>{displayText(m.name)}</Link>
       </td>
-      <td>{m.role}</td>
-      {!compact && <td>{m.team}</td>}
-      <td className="mono">{m.phone}</td>
-      {!compact && <td className="mono">{m.email}</td>}
+      <td>{displayText(m.role)}</td>
+      {!compact && <td>{displayText(m.team)}</td>}
+      <td className="mono">{displayText(m.phone)}</td>
+      {!compact && <td className="mono">{displayText(m.email)}</td>}
     </tr>
   );
 }
@@ -40,7 +41,7 @@ export default function Directory({ team, compact }: Props) {
     (filesMetadata: Record<string, any>) =>
       Object.keys(filesMetadata)
         .filter((p) => p.startsWith(contentDir()) && isPerson(filesMetadata[p]))
-        .filter((p) => !team || filesMetadata[p].team === team)
+        .filter((p) => !team || displayText(filesMetadata[p].team) === team)
         .sort((a, b) => (filesMetadata[a].name < filesMetadata[b].name ? -1 : 1)),
     [team]
   );

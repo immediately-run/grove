@@ -21,6 +21,7 @@ vi.mock('fs', () => ({ default: { promises: { readFile: (...a: unknown[]) => rea
 vi.mock('../lib/moduleEvaluation', () => ({ evaluateModule: (p: string) => evaluate(p) }));
 
 import { useContentComponents, type ContentComponents } from './useContentComponents';
+import { FRONTMATTER_PARITY_FIXTURE } from '@immediately-run/mdx-plugins/frontmatter';
 
 function probe(root: string): { current: ContentComponents | null; unmount: () => void } {
   const out: { current: ContentComponents | null; unmount: () => void } = { current: null, unmount: () => {} };
@@ -95,6 +96,19 @@ describe('useContentComponents — the render: safe gate (R3-1289)', () => {
     const result = await load();
     expect(evaluate).not.toHaveBeenCalled();
     expect(result.rejected[0]?.reason).toBe('not loaded: the home entry could not be read');
+  });
+
+  it('a home entry whose frontmatter does not parse fails closed, even with render: safe in it (R3-1350)', async () => {
+    // Real bytes: grove's own _layouts/hero.mdx at 33391ef (the fixture's real-bytes case),
+    // with `render: safe` added — the stray `nav: top` mid-line makes the whole block a
+    // YAML error, so under mdx-plugins 0.8.0 its `render: safe` is invisible. The gate
+    // must read that as "cannot read the declaration", never as "no declaration".
+    const hero = FRONTMATTER_PARITY_FIXTURE.find((c) => c.name === 'real-grove-hero-unquoted')!.source;
+    corpus(hero.replace('---\n', '---\nrender: safe\n'));
+    const result = await load();
+    expect(evaluate).not.toHaveBeenCalled();
+    expect(result.components).toEqual({});
+    expect(result.rejected[0]?.reason).toMatch(/^not loaded: the home entry's frontmatter does not parse \(line \d+\): /);
   });
 
   it('no marker — the home entry is never read', async () => {

@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { useMetadataQuery } from '@immediately-run/sdk';
 import { contentDir } from '../lib/content';
 import { queryPaths } from '../lib/wiki';
+import { visibleTags } from '../lib/displayText';
 
 // `<TagList/>` — every content tag, sorted, as plain chips (the "related tags"
 // strip on a tag page). Reserved `ui/*` chrome tags are excluded.
@@ -11,9 +12,7 @@ export default function TagList() {
     const set = new Set<string>();
     Object.entries(fm).forEach(([p, m]: [string, any]) => {
       if (!p.startsWith(contentDir())) return;
-      (Array.isArray(m?.tags) ? m.tags : []).forEach((t: string) => {
-        if (!t.startsWith('ui/')) set.add(t);
-      });
+      visibleTags(m).forEach((t) => set.add(t));
     });
     return Array.from(set).sort();
   }, []);
