@@ -40,6 +40,7 @@ const fullShell = (shell: Partial<GroveShell>): GroveShell =>
     editBusy: false,
     editHint: '',
     siteTitle: 'Grove',
+    siteLogo: null,
     safe: false,
     navItems: [{ key: 'a', href: '/a', label: 'A' }],
     entryKey: '/a',

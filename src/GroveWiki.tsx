@@ -27,6 +27,7 @@ import type { NavRecord } from './lib/queries';
 import { layoutChainForKey, resolveNavMode, resolvePageLayout } from './lib/layout';
 import { resolveSafeRender } from './lib/renderMode';
 import { displayText } from './lib/displayText';
+import { resolveSiteLogo } from './lib/siteLogo';
 import { folderIndexKey } from './lib/directory';
 import GroveEntry from './components/GroveEntry';
 import { resolvePalette, resolvePolarity, type Polarity } from './lib/themeSelection';
@@ -211,6 +212,7 @@ export default function GroveWiki({
 
   const layout = resolvePageLayout(meta);
   const siteTitle: string = displayText(meta?.site) || displayText(homeMeta?.site) || 'Grove';
+  const siteLogo = resolveSiteLogo(entryKey, meta, homeKey(), homeMeta);
   // Interpreter mode (TRUST_MODES §5 / R3-213): render this entry's body through the
   // non-executable safe renderer instead of the compiled `<Include>` path.
   //
@@ -318,6 +320,7 @@ export default function GroveWiki({
     editRefused,
     editHint,
     siteTitle,
+    siteLogo,
     safe,
     navItems,
     entryKey,
@@ -452,6 +455,7 @@ export default function GroveWiki({
         {drawerOpen ? (
           <Drawer
             siteTitle={siteTitle}
+            siteLogo={siteLogo}
             nav={navItems.map((n) => ({ key: n.key, href: n.href, label: n.label, cur: n.key === entryKey }))}
             onClose={() => setDrawerOpen(false)}
           />

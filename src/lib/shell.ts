@@ -9,6 +9,7 @@
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type { DirectoryListing } from '../hooks/useDirectoryListing';
+import type { SiteLogo } from './siteLogo';
 
 /**
  * The SHELL's MDX vocabulary (R3-1290): the map the viewer registered with
@@ -64,6 +65,9 @@ export interface GroveShell {
    *  (R3-643 / site-main #576 wired the contribute flow to the content repo). */
   editHint: string;
   siteTitle: string;
+  /** The `logo:` image beside the title (home's, or the entry's own); `null` shows the
+   *  gradient tile. Resolved against the entry that declared it (`lib/siteLogo`). */
+  siteLogo: SiteLogo | null;
   /** Interpreter mode (TRUST_MODES §5): render this entry's body through the
    *  non-executable safe renderer (R3-213) instead of the compiled/executable `<Include>`
    *  path. Driven by `render: safe` on the HOME entry (wiki-wide) or on the entry itself

@@ -7,6 +7,7 @@ import { followLinkOnClick } from '../lib/navigationPolicy';
 import { useOverlayFocusDismiss } from '../hooks/useOverlayFocusDismiss';
 import { THEMES } from '../data/themes';
 import Icon from './Icon';
+import SiteMark from './SiteMark';
 
 // `<GroveNav/>` — the top navigation bar. Import-free in MDX, so a layout places
 // it with `<GroveNav/>`. Its interactive state (drawer / search / theme menu)
@@ -14,6 +15,7 @@ import Icon from './Icon';
 export default function GroveNav() {
   const {
     siteTitle,
+    siteLogo,
     navItems,
     entryKey,
     writable,
@@ -69,7 +71,7 @@ export default function GroveNav() {
         <Icon name="list" />
       </button>
       <Link href="/" className="grove-brand" onClick={followLinkOnClick(follow, { key: homeKey(), href: '/', from: entryKey })}>
-        <span className="tile" style={{ background: 'var(--grad)' }} />
+        <SiteMark logo={siteLogo} className="tile" />
         {siteTitle}
       </Link>
       <div className="grove-nav__links">
