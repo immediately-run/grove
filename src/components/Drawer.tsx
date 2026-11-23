@@ -4,6 +4,8 @@ import { useFollowLink } from '../hooks/useFollowLink';
 import { followLinkOnClick } from '../lib/navigationPolicy';
 import Sidebar from './Sidebar';
 import Icon from './Icon';
+import SiteMark from './SiteMark';
+import type { SiteLogo } from '../lib/siteLogo';
 
 interface NavItem {
   /** The corpus key (R3-872 — the navigation policy's target names it). */
@@ -19,10 +21,12 @@ interface NavItem {
 // overlay hook, whose stack makes nested overlays close one per Escape.
 export default function Drawer({
   siteTitle,
+  siteLogo = null,
   nav,
   onClose,
 }: {
   siteTitle: string;
+  siteLogo?: SiteLogo | null;
   nav: NavItem[];
   onClose: () => void;
 }) {
@@ -40,7 +44,7 @@ export default function Drawer({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="grove-drawer__h">
-          <span className="mk" />
+          <SiteMark logo={siteLogo} className="mk" />
           <span className="t">{siteTitle}</span>
           <button className="x" aria-label="Close menu" onClick={onClose}>
             <Icon name="x" />

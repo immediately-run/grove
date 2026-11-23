@@ -357,7 +357,16 @@
   height: 25px;
   border-radius: 24%;
   flex: 0 0 auto;
+  background: var(--grad);
   box-shadow: 0 2px 9px rgba(150, 110, 240, .25);
+}
+/* A corpus `logo:` in the tile's place: the same box, the image cropped to fill it. */
+.grove-brand img.tile,
+.grove-drawer__h img.mk {
+  display: block;
+  object-fit: cover;
+  background: none;
+  box-shadow: none;
 }
 .grove-nav__links {
   display: flex;

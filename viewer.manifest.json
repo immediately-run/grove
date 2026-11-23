@@ -279,7 +279,8 @@
       "nav",
       "order",
       "tags",
-      "cover"
+      "cover",
+      "logo"
     ],
     "passThrough": true
   },

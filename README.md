@@ -39,8 +39,10 @@ this repo's own Pages on every push to `main`, so anonymous loads are fast.
 
 Entries are `.mdx` files under `content/` with YAML frontmatter (`title`, `tags`,
 `date`, `nav`, `order`, plus the engine keys in the manifest: `site`, `theme`,
-`layout`, `view`, `frame`, `render`, `cover`, …). Interlink with wiki links;
-declare a picture per entry with `cover:`; group a folder with a
+`layout`, `view`, `frame`, `render`, `cover`, `logo`, …). Interlink with wiki links;
+declare a picture per entry with `cover:`; name the site with `site:` and give it a
+mark with `logo:` on the home entry (an image path beside it; the nav shows it in
+place of the gradient tile); group a folder with a
 `content/<dir>/_layout.mdx` starter. The built-in agent answers questions about
 the corpus over the host's chat slot — ask it where things are before editing.
 
