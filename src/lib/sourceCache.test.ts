@@ -63,4 +63,21 @@ describe('createSourceCache', () => {
     c.invalidate();
     expect(c.size()).toBe(0);
   });
+
+  // R3-1373: a live edit bumps the edited path's version only, and tells subscribers.
+  it('invalidate bumps that path’s version and notifies; other paths keep theirs', () => {
+    const c = createSourceCache(async () => 'v');
+    const heard: number[] = [];
+    const stop = c.subscribe(() => heard.push(c.version('a.mdx')));
+    expect(c.version('a.mdx')).toBe(0);
+    c.invalidate('a.mdx');
+    expect(c.version('a.mdx')).toBe(1);
+    expect(c.version('b.mdx')).toBe(0);
+    expect(heard).toEqual([1]);
+    c.invalidate();
+    expect(c.version('b.mdx')).toBe(1);
+    stop();
+    c.invalidate('a.mdx');
+    expect(heard).toHaveLength(2);
+  });
 });

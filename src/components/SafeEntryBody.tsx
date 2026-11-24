@@ -1,4 +1,4 @@
-import { Suspense, use } from 'react';
+import { Suspense, use, useSyncExternalStore } from 'react';
 import {
   SafeContent,
   RenderExportedComponentContext,
@@ -35,6 +35,10 @@ function stripFrontmatter(src: string): string {
 }
 
 function SafeBody({ entryKey }: { entryKey: string }) {
+  // R3-1373: a live edit invalidates this entry's read; subscribing to its version
+  // re-renders the body, and the read below is then a fresh one. Other entries'
+  // versions do not move, so their promises stay stable.
+  useSyncExternalStore(safeSources.subscribe, () => safeSources.version(entryKey));
   const raw = use(safeSources.read(entryKey));
   // Consume the entry's metadata so this re-renders if frontmatter changes (parity with
   // the compiled path's reactivity); the body itself is the stripped source.

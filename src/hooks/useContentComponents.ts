@@ -24,10 +24,11 @@
 //
 // **No live re-registration in v1, deliberately.** §7 1b asks for a reactive, name-keyed
 // registry so a hot edit cannot leave a stale reference behind. The map here IS keyed by
-// name, so re-evaluation overwrites cleanly — but nothing re-triggers it: the working-tree
-// change stream (`onFsChange`) is gated on elevated `editor:read`, which a dispatched
-// viewer does not hold, so there is no signal to subscribe to. An author edit needs a
-// reload. The shape is the one that extends; the trigger is what is missing.
+// name, so re-evaluation overwrites cleanly — but nothing re-triggers it yet. The signal
+// now exists: since R3-1372/R3-1373 the host relays the reader's edits into the corpus
+// mount as `fs.promises.watch` events (`lib/corpusWatch.ts`), and the metadata index and
+// the safe body re-read on them (`hooks/useBundleMetadata.ts`). Corpus COMPONENTS are not
+// re-evaluated on that signal: an edit to one still needs a reload.
 
 import { useEffect, useState } from 'react';
 import fs from 'fs';

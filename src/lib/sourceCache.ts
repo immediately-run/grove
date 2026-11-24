@@ -13,14 +13,24 @@ export type Reader = (path: string) => Promise<string>;
 
 export interface SourceCache {
   read: (path: string) => Promise<string>;
-  /** Drop a memoised read (a live edit, or an explicit refresh). */
+  /** Drop a memoised read (a live edit, or an explicit refresh). Bumps the path's
+   *  {@link SourceCache.version} (every path's, with no argument) and notifies. */
   invalidate: (path?: string) => void;
+  /** How many times `path` has been invalidated — a render reads it so that, after a live
+   *  edit, its `use(read(path))` is a fresh read while every other path's promise stays
+   *  stable (R3-1373). */
+  version: (path: string) => number;
+  /** Called after every `invalidate`. Returns the unsubscribe. */
+  subscribe: (listener: () => void) => () => void;
   /** Testing/diagnostics: how many paths are memoised right now. */
   size: () => number;
 }
 
 export function createSourceCache(reader: Reader): SourceCache {
   const cache = new Map<string, Promise<string>>();
+  const versions = new Map<string, number>();
+  let epoch = 0; // bumped by a whole-cache invalidate, so every path's version moves
+  const listeners = new Set<() => void>();
   return {
     read(path) {
       const hit = cache.get(path);
@@ -34,8 +44,21 @@ export function createSourceCache(reader: Reader): SourceCache {
       return p;
     },
     invalidate(path) {
-      if (path === undefined) cache.clear();
-      else cache.delete(path);
+      if (path === undefined) {
+        cache.clear();
+        epoch++;
+      } else {
+        cache.delete(path);
+        versions.set(path, (versions.get(path) ?? 0) + 1);
+      }
+      for (const listener of [...listeners]) listener();
+    },
+    version: (path) => epoch + (versions.get(path) ?? 0),
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
     size: () => cache.size,
   };

@@ -21,6 +21,8 @@ import {
   type CorpusScanStatus,
   type ScanFs,
 } from '../lib/corpusScan';
+import { watchCorpus, type WatchFs } from '../lib/corpusWatch';
+import { safeSources } from '../lib/safeSources';
 
 export interface BundleIndex {
   /** `idle` — a fork, nothing to scan · `listing` — the walk is running; the map is
@@ -45,10 +47,21 @@ export function useBundleMetadata(root: string | null): BundleIndex {
   useEffect(() => {
     if (!root) return;
     const scan = createCorpusScan(root, fs.promises as unknown as ScanFs);
+    // R3-1373: the reader's edits arrive as watch events on the corpus mount (the host
+    // relays the working tree into it). Each changed path is re-read into the index and
+    // dropped from the body cache, so the board, the sidebar and the open page follow
+    // the edit without a reload. One watch per scanned root, living exactly as long.
+    const stopWatch = watchCorpus(root, fs.promises as unknown as WatchFs, (paths) => {
+      scan.refresh(paths);
+      for (const path of paths) safeSources.invalidate(path);
+    });
     // The scan is an external resource this effect owns: created here, disposed below.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOwned({ root, scan });
-    return () => scan.dispose();
+    return () => {
+      stopWatch();
+      scan.dispose();
+    };
   }, [root]);
 
   const scan = owned && owned.root === root ? owned.scan : null;
