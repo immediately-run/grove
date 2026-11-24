@@ -516,3 +516,129 @@ describe('createCorpusScan — read failures', () => {
     warn.mockRestore();
   });
 });
+
+// R3-1373 — a live edit re-reads the changed key into the index.
+describe('createCorpusScan refresh (R3-1373)', () => {
+  /** A mutable tree whose absent paths reject the way the sandbox does (code ENOENT). */
+  function liveFs(files: Record<string, string>) {
+    const base = fakeFs(files);
+    const reads: string[] = [];
+    const fs: ScanFs = {
+      readdir: base.readdir,
+      async readFile(path) {
+        reads.push(path);
+        if (files[path] === undefined) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        return files[path];
+      },
+    };
+    return { fs, reads };
+  }
+  const flushed = { flushMs: 0 };
+  const tick = () => new Promise((r) => setTimeout(r, 5));
+
+  it('re-reads a changed entry; every other row keeps its identity', async () => {
+    const files = { '/mnt/c/DIB-26.md': entry('Accept random ids'), '/mnt/c/DIB-27.md': entry('Other') };
+    const { fs } = liveFs(files);
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    const before = scan.snapshot().metadata;
+    files['/mnt/c/DIB-26.md'] = entry('Accept random ids XYZZY');
+    scan.refresh(['/mnt/c/DIB-26.md']);
+    await tick();
+    const after = scan.snapshot().metadata;
+    expect(after['/mnt/c/DIB-26.md']).toMatchObject({ title: 'Accept random ids XYZZY' });
+    expect(after['/mnt/c/DIB-27.md']).toBe(before['/mnt/c/DIB-27.md']);
+    expect(scan.snapshot().status).toBe('complete');
+  });
+
+  it('a new entry joins the index, and a removed one leaves it', async () => {
+    const files: Record<string, string> = { '/mnt/c/home.mdx': entry('Home'), '/mnt/c/gone.md': entry('Gone') };
+    const { fs } = liveFs(files);
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    files['/mnt/c/new/fresh.md'] = entry('Fresh');
+    delete files['/mnt/c/gone.md'];
+    scan.refresh(['/mnt/c/new/fresh.md', '/mnt/c/gone.md']);
+    await tick();
+    const meta = scan.snapshot().metadata;
+    expect(meta['/mnt/c/new/fresh.md']).toMatchObject({ title: 'Fresh' });
+    expect('/mnt/c/gone.md' in meta).toBe(false);
+    expect(scan.isSettled('/mnt/c/new/fresh.md')).toBe(true);
+    expect(scan.readFailure('/mnt/c/gone.md')).toBeNull();
+  });
+
+  it('reads nothing for a non-entry, a skipped directory, or a path outside the root', async () => {
+    const { fs, reads } = liveFs({ '/mnt/c/home.mdx': entry('Home') });
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    reads.length = 0;
+    scan.refresh(['/mnt/c/logo.png', '/mnt/c/node_modules/x/readme.md', '/mnt/other/x.md', '/mnt/c/../c/x.md']);
+    await tick();
+    expect(reads).toEqual([]);
+  });
+
+  it('a refresh during the listing waits for it and reads the path once', async () => {
+    const files = { '/mnt/c/home.mdx': entry('Home'), '/mnt/c/a.md': entry('A') };
+    const { fs, reads } = liveFs(files);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: ScanFs = { ...fs, readdir: async (d, o) => (await gate, fs.readdir(d, o)) };
+    const scan = createCorpusScan('/mnt/c', slow, flushed);
+    scan.refresh(['/mnt/c/a.md']);
+    expect(reads).toEqual([]);
+    release();
+    await scan.done;
+    await tick();
+    expect(reads.filter((p) => p === '/mnt/c/a.md')).toHaveLength(1);
+  });
+
+  it('a refresh while that key is being read re-reads it, so the newest bytes win', async () => {
+    const files = { '/mnt/c/a.md': entry('v1') };
+    const { fs } = liveFs(files);
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    files['/mnt/c/a.md'] = entry('v2');
+    scan.refresh(['/mnt/c/a.md']);
+    files['/mnt/c/a.md'] = entry('v3');
+    scan.refresh(['/mnt/c/a.md']); // lands while the v2 read is in flight
+    await tick();
+    expect(scan.snapshot().metadata['/mnt/c/a.md']).toMatchObject({ title: 'v3' });
+  });
+
+  it('a key whose read failed, then was deleted, reports no failure after a refresh (1-A-1)', async () => {
+    const files: Record<string, string> = { '/mnt/c/a.md': entry('A') };
+    let flaky = true;
+    const fs: ScanFs = {
+      readdir: fakeFs(files).readdir,
+      async readFile(path) {
+        if (flaky) {
+          flaky = false;
+          throw new Error('Invalid RPC id');
+        }
+        if (files[path] === undefined) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        return files[path];
+      },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    await tick();
+    expect(scan.readFailure('/mnt/c/a.md')).toBe('Invalid RPC id');
+    delete files['/mnt/c/a.md'];
+    scan.refresh(['/mnt/c/a.md']);
+    await tick();
+    expect(scan.readFailure('/mnt/c/a.md')).toBeNull();
+    warn.mockRestore();
+  });
+
+  it('refresh after dispose does nothing', async () => {
+    const { fs, reads } = liveFs({ '/mnt/c/a.md': entry('A') });
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    scan.dispose();
+    reads.length = 0;
+    scan.refresh(['/mnt/c/a.md']);
+    await tick();
+    expect(reads).toEqual([]);
+  });
+});

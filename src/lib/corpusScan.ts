@@ -132,6 +132,10 @@ export interface CorpusScan extends CorpusScanGate {
   subscribe(listener: () => void): () => void;
   /** Resolves when the scan completes or is disposed. */
   readonly done: Promise<void>;
+  /** Re-read these absolute paths (R3-1373): a corpus file changed under the reader. A
+   *  path that is not an entry under `root` is ignored; a new entry joins the index, a
+   *  removed one leaves it. Arriving during the listing, it waits for the listing. */
+  refresh(paths: readonly string[]): void;
   /** Stop reading, cancel the pending publish, drop every listener. */
   dispose(): void;
 }
@@ -175,6 +179,13 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   // empty until the listing completes). The listing skips keys already started.
   const started = new Set<string>();
   const listeners = new Set<() => void>();
+  // R3-1373: reads in flight (pool, priority or refresh), and the keys a refresh asked for
+  // while one was — re-read once it lands, so the newest bytes always win.
+  const inFlight = new Set<string>();
+  const stale = new Set<string>();
+  // Refreshes that arrived during the listing; replayed when it finishes.
+  const deferred = new Set<string>();
+  const base = root.endsWith('/') ? root : `${root}/`;
   let listed: Set<string> | null = null;
   let queue: string[] = [];
   let status: CorpusScanStatus = 'listing';
@@ -210,8 +221,12 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   const readOne = async (path: string): Promise<void> => {
     try {
       rows[path] = rowFor(await fs.readFile(path, 'utf8'));
+      failures.delete(path);
     } catch (err) {
       delete rows[path];
+      // A file that is gone is not a failed read: a refresh after a transient failure and a
+      // delete must not keep reporting the old failure (R3-1373 review, 1-A-1).
+      if (isNotFound(err)) failures.delete(path);
       if (!isNotFound(err)) {
         const message = err instanceof Error ? err.message : String(err);
         failures.set(path, message);
@@ -223,7 +238,9 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   // ahead of the listing.
   const onRead = (path: string) => (): void => {
     active--;
+    inFlight.delete(path);
     if (disposed) return;
+    if (stale.delete(path)) refreshOne(path);
     read.add(path);
     if (wanted.delete(path)) publish();
     else schedule();
@@ -231,9 +248,38 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
   };
   const startRead = (path: string): void => {
     started.add(path);
+    inFlight.add(path);
     active++;
     // `readOne` settles every failure itself, so this chain has no rejection to lose.
     void readOne(path).then(onRead(path));
+  };
+  // A refresh read runs outside the pool's count: it is one file the reader just changed,
+  // and the scan may long since be complete.
+  const refreshOne = (path: string): void => {
+    if (disposed) return;
+    if (inFlight.has(path)) {
+      stale.add(path);
+      return;
+    }
+    started.add(path);
+    listed?.add(path);
+    inFlight.add(path);
+    void readOne(path).then(() => {
+      inFlight.delete(path);
+      if (disposed) return;
+      if (stale.delete(path)) return refreshOne(path);
+      read.add(path);
+      if (wanted.delete(path)) publish();
+      else schedule();
+    });
+  };
+  /** An entry path under `root`, outside every skipped directory. */
+  const isCorpusEntry = (path: string): boolean => {
+    if (!path.startsWith(base) || !ENTRY_RE.test(path)) return false;
+    return !path
+      .slice(base.length)
+      .split('/')
+      .some((seg) => seg === '' || seg === '.' || seg === '..' || SKIP_DIRS.has(seg));
   };
   const pump = (): void => {
     while (!disposed && active < concurrency && queue.length) {
@@ -256,6 +302,11 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       const firstSet = new Set(first);
       queue = [...first, ...paths.filter((p) => !firstSet.has(p) && !started.has(p))];
       status = 'reading';
+      // A refresh that waited for the listing: a queued key is read by the pool anyway;
+      // anything else (new since the walk, or read early by a priority read) is re-read.
+      // Before the pump, so the pool never starts a key this is about to read.
+      for (const path of deferred) if (!queue.includes(path)) refreshOne(path);
+      deferred.clear();
       publish();
       pump();
     })
@@ -304,6 +355,14 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       queue.unshift(...front);
       // Wanted, and already read before anyone asked: publish now rather than at the timer.
       if (readButUnpublished) publish();
+    },
+    refresh(paths) {
+      if (disposed) return;
+      for (const path of paths) {
+        if (!isCorpusEntry(path)) continue;
+        if (listed === null) deferred.add(path);
+        else refreshOne(path);
+      }
     },
     done,
     dispose() {

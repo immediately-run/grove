@@ -63,4 +63,68 @@ describe('createSourceCache', () => {
     c.invalidate();
     expect(c.size()).toBe(0);
   });
+
+  // R3-1373: a live edit bumps the edited path's version only, and tells subscribers.
+  it('invalidate bumps that path’s version and notifies; other paths keep theirs', () => {
+    const c = createSourceCache(async () => 'v');
+    const heard: number[] = [];
+    const stop = c.subscribe(() => heard.push(c.version('a.mdx')));
+    expect(c.version('a.mdx')).toBe(0);
+    c.invalidate('a.mdx');
+    expect(c.version('a.mdx')).toBe(1);
+    expect(c.version('b.mdx')).toBe(0);
+    expect(heard).toEqual([1]);
+    c.invalidate();
+    expect(c.version('b.mdx')).toBe(1);
+    stop();
+    c.invalidate('a.mdx');
+    expect(heard).toHaveLength(2);
+  });
+
+  // R3-1373 review (1-A-0/1-B-0): a render deferred behind an edit reads the previous
+  // version's resolved promise until the fresh read lands.
+  it('readAt holds the previous version’s promise while the fresh read is pending', async () => {
+    let n = 0;
+    const releases: Array<() => void> = [];
+    const c = createSourceCache(
+      (p) => new Promise<string>((r) => (n++ === 0 ? r(`${p} v0`) : releases.push(() => r(`${p} v1`)))),
+    );
+    const first = c.readAt('a.mdx', 0);
+    expect(await first).toBe('a.mdx v0');
+    c.invalidate('a.mdx');
+    expect(c.readAt('a.mdx', 0)).toBe(first); // the old bytes, while v1 is in flight
+    const fresh = c.readAt('a.mdx', 1);
+    expect(fresh).not.toBe(first);
+    releases.forEach((r) => r());
+    expect(await fresh).toBe('a.mdx v1');
+    expect(c.readAt('a.mdx', 0)).toBe(fresh); // landed: older versions read the newest bytes
+  });
+
+  it('readAt keeps the last resolved read across edits that land before any re-read (2-r2-0)', async () => {
+    const releases: Array<(t: string) => void> = [];
+    let first = true;
+    const c = createSourceCache(
+      () =>
+        new Promise<string>((r) => {
+          if (first) {
+            first = false;
+            return r('v0');
+          }
+          releases.push(r);
+        }),
+    );
+    const p0 = c.read('a.mdx');
+    await p0;
+    c.invalidate('a.mdx');
+    void c.read('a.mdx'); // v1 in flight
+    c.invalidate('a.mdx');
+    const p2 = c.read('a.mdx'); // v2 in flight
+    expect(c.readAt('a.mdx', 0)).toBe(p0);
+    expect(c.readAt('a.mdx', 1)).toBe(p0);
+    releases[1]('v2');
+    await p2;
+    releases[0]('v1'); // the older read lands LATE: it must not replace the newer one
+    await new Promise((r) => setTimeout(r, 0));
+    expect(c.readAt('a.mdx', 0)).toBe(p2);
+  });
 });

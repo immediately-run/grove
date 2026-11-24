@@ -1,4 +1,4 @@
-import { Suspense, use } from 'react';
+import { Suspense, use, useDeferredValue, useSyncExternalStore } from 'react';
 import {
   SafeContent,
   RenderExportedComponentContext,
@@ -35,7 +35,16 @@ function stripFrontmatter(src: string): string {
 }
 
 function SafeBody({ entryKey }: { entryKey: string }) {
-  const raw = use(safeSources.read(entryKey));
+  // R3-1373: a live edit invalidates this entry's read and bumps its version. The
+  // version is DEFERRED: the urgent render keeps reading the previous version (the cache
+  // holds its resolved promise), and only the deferred render reads the fresh bytes — so a
+  // pending re-read suspends in the background and the committed body stays on screen,
+  // never swapped for the fallback (review round 1, 1-A-0/1-B-0). Other entries' versions
+  // do not move.
+  const version = useDeferredValue(
+    useSyncExternalStore(safeSources.subscribe, () => safeSources.version(entryKey))
+  );
+  const raw = use(safeSources.readAt(entryKey, version));
   // Consume the entry's metadata so this re-renders if frontmatter changes (parity with
   // the compiled path's reactivity); the body itself is the stripped source.
   useFileMetadata(entryKey);
