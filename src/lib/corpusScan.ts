@@ -224,6 +224,9 @@ export function createCorpusScan(root: string, fs: ScanFs, opts: CorpusScanOptio
       failures.delete(path);
     } catch (err) {
       delete rows[path];
+      // A file that is gone is not a failed read: a refresh after a transient failure and a
+      // delete must not keep reporting the old failure (R3-1373 review, 1-A-1).
+      if (isNotFound(err)) failures.delete(path);
       if (!isNotFound(err)) {
         const message = err instanceof Error ? err.message : String(err);
         failures.set(path, message);

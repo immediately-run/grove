@@ -24,6 +24,16 @@ export interface CorpusWatchEvent {
 
 type WatchIterator = AsyncIterable<CorpusWatchEvent> & { return?: () => Promise<unknown> };
 
+/** End a watch. A backend whose `return()` rejects at teardown must not leave an
+ *  unhandled rejection behind an unmount (R3-1373 review, 1-A-2). */
+function stopIterator(iterator: WatchIterator): void {
+  try {
+    void iterator.return?.()?.catch?.((err: unknown) => console.warn('[grove] stopping a corpus watch failed', err));
+  } catch (err) {
+    console.warn('[grove] stopping a corpus watch failed', err);
+  }
+}
+
 /** The slice of `fs.promises` the watch needs — injected, so it tests without a sandbox. */
 export interface WatchFs {
   watch(path: string, opts: { recursive: true }): AsyncIterable<CorpusWatchEvent>;
@@ -56,7 +66,7 @@ export function watchCorpus(root: string, fs: WatchFs, onPaths: (absPaths: strin
     try {
       iterator = fs.watch(root, { recursive: true }) as WatchIterator;
       if (stopped) {
-        void iterator.return?.();
+        stopIterator(iterator);
         return;
       }
       for await (const event of iterator) {
@@ -78,6 +88,6 @@ export function watchCorpus(root: string, fs: WatchFs, onPaths: (absPaths: strin
     if (stopped) return;
     stopped = true;
     pending = null;
-    void iterator?.return?.();
+    if (iterator) stopIterator(iterator);
   };
 }

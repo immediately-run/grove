@@ -13,6 +13,11 @@ export type Reader = (path: string) => Promise<string>;
 
 export interface SourceCache {
   read: (path: string) => Promise<string>;
+  /** The read of `path` AT a version (R3-1373). The current version reads as `read`; the
+   *  version just before it answers the promise it last resolved, kept until the newer
+   *  read lands, so a render deferred behind a live edit keeps showing the old bytes
+   *  instead of suspending to a fallback. Any other version reads current. */
+  readAt: (path: string, version: number) => Promise<string>;
   /** Drop a memoised read (a live edit, or an explicit refresh). Bumps the path's
    *  {@link SourceCache.version} (every path's, with no argument) and notifies. */
   invalidate: (path?: string) => void;
@@ -28,26 +33,43 @@ export interface SourceCache {
 
 export function createSourceCache(reader: Reader): SourceCache {
   const cache = new Map<string, Promise<string>>();
+  // R3-1373: the last promise each path held before an invalidate, and the version it
+  // belonged to — what a deferred render reads until the fresh read has landed.
+  const previous = new Map<string, { version: number; promise: Promise<string> }>();
   const versions = new Map<string, number>();
   let epoch = 0; // bumped by a whole-cache invalidate, so every path's version moves
   const listeners = new Set<() => void>();
-  return {
+  const api: SourceCache = {
     read(path) {
       const hit = cache.get(path);
       if (hit) return hit;
-      const p = reader(path).catch((err) => {
-        // Never let a failure become the permanent answer for this path.
-        if (cache.get(path) === p) cache.delete(path);
-        throw err;
-      });
+      const p = reader(path).then(
+        (text) => {
+          // The fresh bytes are in: the held previous read is no longer needed.
+          if (cache.get(path) === p) previous.delete(path);
+          return text;
+        },
+        (err) => {
+          // Never let a failure become the permanent answer for this path.
+          if (cache.get(path) === p) cache.delete(path);
+          throw err;
+        },
+      );
       cache.set(path, p);
       return p;
+    },
+    readAt(path, version) {
+      const held = previous.get(path);
+      if (held && held.version === version && version < api.version(path)) return held.promise;
+      return api.read(path);
     },
     invalidate(path) {
       if (path === undefined) {
         cache.clear();
         epoch++;
       } else {
+        const hit = cache.get(path);
+        if (hit) previous.set(path, { version: api.version(path), promise: hit });
         cache.delete(path);
         versions.set(path, (versions.get(path) ?? 0) + 1);
       }
@@ -62,4 +84,5 @@ export function createSourceCache(reader: Reader): SourceCache {
     },
     size: () => cache.size,
   };
+  return api;
 }

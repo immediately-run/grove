@@ -605,6 +605,32 @@ describe('createCorpusScan refresh (R3-1373)', () => {
     expect(scan.snapshot().metadata['/mnt/c/a.md']).toMatchObject({ title: 'v3' });
   });
 
+  it('a key whose read failed, then was deleted, reports no failure after a refresh (1-A-1)', async () => {
+    const files: Record<string, string> = { '/mnt/c/a.md': entry('A') };
+    let flaky = true;
+    const fs: ScanFs = {
+      readdir: fakeFs(files).readdir,
+      async readFile(path) {
+        if (flaky) {
+          flaky = false;
+          throw new Error('Invalid RPC id');
+        }
+        if (files[path] === undefined) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        return files[path];
+      },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const scan = createCorpusScan('/mnt/c', fs, flushed);
+    await scan.done;
+    await tick();
+    expect(scan.readFailure('/mnt/c/a.md')).toBe('Invalid RPC id');
+    delete files['/mnt/c/a.md'];
+    scan.refresh(['/mnt/c/a.md']);
+    await tick();
+    expect(scan.readFailure('/mnt/c/a.md')).toBeNull();
+    warn.mockRestore();
+  });
+
   it('refresh after dispose does nothing', async () => {
     const { fs, reads } = liveFs({ '/mnt/c/a.md': entry('A') });
     const scan = createCorpusScan('/mnt/c', fs, flushed);

@@ -80,4 +80,23 @@ describe('createSourceCache', () => {
     c.invalidate('a.mdx');
     expect(heard).toHaveLength(2);
   });
+
+  // R3-1373 review (1-A-0/1-B-0): a render deferred behind an edit reads the previous
+  // version's resolved promise until the fresh read lands.
+  it('readAt holds the previous version’s promise while the fresh read is pending', async () => {
+    let n = 0;
+    const releases: Array<() => void> = [];
+    const c = createSourceCache(
+      (p) => new Promise<string>((r) => (n++ === 0 ? r(`${p} v0`) : releases.push(() => r(`${p} v1`)))),
+    );
+    const first = c.readAt('a.mdx', 0);
+    expect(await first).toBe('a.mdx v0');
+    c.invalidate('a.mdx');
+    expect(c.readAt('a.mdx', 0)).toBe(first); // the old bytes, while v1 is in flight
+    const fresh = c.readAt('a.mdx', 1);
+    expect(fresh).not.toBe(first);
+    releases.forEach((r) => r());
+    expect(await fresh).toBe('a.mdx v1');
+    expect(c.readAt('a.mdx', 0)).toBe(fresh); // landed: the held promise is dropped
+  });
 });

@@ -82,6 +82,24 @@ describe('watchCorpus', () => {
     expect(onPaths).not.toHaveBeenCalled();
   });
 
+  it('a return() that rejects at teardown is caught, not left unhandled (1-A-2)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fs: WatchFs = {
+      watch() {
+        return {
+          [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
+          return: () => Promise.reject(new Error('port closed')),
+        } as AsyncIterable<CorpusWatchEvent>;
+      },
+    };
+    const stop = watchCorpus('/mnt/c', fs, vi.fn());
+    await settle();
+    stop();
+    await settle();
+    expect(warn).toHaveBeenCalledWith('[grove] stopping a corpus watch failed', expect.any(Error));
+    warn.mockRestore();
+  });
+
   it('a watch that cannot be set up warns once and never rejects', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fs: WatchFs = {
