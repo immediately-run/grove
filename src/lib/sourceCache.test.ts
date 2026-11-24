@@ -97,6 +97,34 @@ describe('createSourceCache', () => {
     expect(fresh).not.toBe(first);
     releases.forEach((r) => r());
     expect(await fresh).toBe('a.mdx v1');
-    expect(c.readAt('a.mdx', 0)).toBe(fresh); // landed: the held promise is dropped
+    expect(c.readAt('a.mdx', 0)).toBe(fresh); // landed: older versions read the newest bytes
+  });
+
+  it('readAt keeps the last resolved read across edits that land before any re-read (2-r2-0)', async () => {
+    const releases: Array<(t: string) => void> = [];
+    let first = true;
+    const c = createSourceCache(
+      () =>
+        new Promise<string>((r) => {
+          if (first) {
+            first = false;
+            return r('v0');
+          }
+          releases.push(r);
+        }),
+    );
+    const p0 = c.read('a.mdx');
+    await p0;
+    c.invalidate('a.mdx');
+    void c.read('a.mdx'); // v1 in flight
+    c.invalidate('a.mdx');
+    const p2 = c.read('a.mdx'); // v2 in flight
+    expect(c.readAt('a.mdx', 0)).toBe(p0);
+    expect(c.readAt('a.mdx', 1)).toBe(p0);
+    releases[1]('v2');
+    await p2;
+    releases[0]('v1'); // the older read lands LATE: it must not replace the newer one
+    await new Promise((r) => setTimeout(r, 0));
+    expect(c.readAt('a.mdx', 0)).toBe(p2);
   });
 });

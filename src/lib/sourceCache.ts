@@ -13,10 +13,11 @@ export type Reader = (path: string) => Promise<string>;
 
 export interface SourceCache {
   read: (path: string) => Promise<string>;
-  /** The read of `path` AT a version (R3-1373). The current version reads as `read`; the
-   *  version just before it answers the promise it last resolved, kept until the newer
-   *  read lands, so a render deferred behind a live edit keeps showing the old bytes
-   *  instead of suspending to a fallback. Any other version reads current. */
+  /** The read of `path` AT a version (R3-1373). The current version reads as `read`; any
+   *  OLDER version answers the path's last RESOLVED read, so a render deferred behind live
+   *  edits keeps showing the bytes it last had instead of suspending to a fallback — for
+   *  any number of edits that land before a re-read does (review round 2, 2-r2-0). A path
+   *  with no resolved read yet reads current. */
   readAt: (path: string, version: number) => Promise<string>;
   /** Drop a memoised read (a live edit, or an explicit refresh). Bumps the path's
    *  {@link SourceCache.version} (every path's, with no argument) and notifies. */
@@ -33,9 +34,10 @@ export interface SourceCache {
 
 export function createSourceCache(reader: Reader): SourceCache {
   const cache = new Map<string, Promise<string>>();
-  // R3-1373: the last promise each path held before an invalidate, and the version it
-  // belonged to — what a deferred render reads until the fresh read has landed.
-  const previous = new Map<string, { version: number; promise: Promise<string> }>();
+  // R3-1373: each path's newest RESOLVED read (by issue order, so a slow older read that
+  // lands late never replaces a newer one) — what a render deferred behind an edit reads.
+  const resolved = new Map<string, { seq: number; promise: Promise<string> }>();
+  let seq = 0;
   const versions = new Map<string, number>();
   let epoch = 0; // bumped by a whole-cache invalidate, so every path's version moves
   const listeners = new Set<() => void>();
@@ -43,10 +45,11 @@ export function createSourceCache(reader: Reader): SourceCache {
     read(path) {
       const hit = cache.get(path);
       if (hit) return hit;
+      const mine = ++seq;
       const p = reader(path).then(
         (text) => {
-          // The fresh bytes are in: the held previous read is no longer needed.
-          if (cache.get(path) === p) previous.delete(path);
+          const last = resolved.get(path);
+          if (!last || last.seq < mine) resolved.set(path, { seq: mine, promise: p });
           return text;
         },
         (err) => {
@@ -59,8 +62,8 @@ export function createSourceCache(reader: Reader): SourceCache {
       return p;
     },
     readAt(path, version) {
-      const held = previous.get(path);
-      if (held && held.version === version && version < api.version(path)) return held.promise;
+      const last = resolved.get(path);
+      if (last && version < api.version(path)) return last.promise;
       return api.read(path);
     },
     invalidate(path) {
@@ -68,8 +71,6 @@ export function createSourceCache(reader: Reader): SourceCache {
         cache.clear();
         epoch++;
       } else {
-        const hit = cache.get(path);
-        if (hit) previous.set(path, { version: api.version(path), promise: hit });
         cache.delete(path);
         versions.set(path, (versions.get(path) ?? 0) + 1);
       }

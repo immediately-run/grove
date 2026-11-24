@@ -75,4 +75,35 @@ describe("SafeEntryBody across a live edit (R3-1373)", () => {
     expect(container.querySelector(".body")?.textContent).toBe("new body");
     act(() => root.unmount());
   });
+
+  // Review round 2 (2-r2-0): a second edit that lands before the first re-read does.
+  it("two edits inside one read's latency keep the body on screen", async () => {
+    const K2 = '/mnt/c/DIB-27.md';
+    h.files[K2] = '---\ntitle: x\n---\nold body\n';
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    await act(async () => root.render(<SafeEntryBody entryKey={K2} />));
+    await flush();
+    expect(container.querySelector('.body')?.textContent).toBe('old body');
+
+    h.files[K2] = '---\ntitle: x\n---\nedit one\n';
+    h.hold = true;
+    await act(async () => safeSources.invalidate(K2));
+    await flush();
+    const releaseFirst = h.release;
+    h.files[K2] = '---\ntitle: x\n---\nedit two\n';
+    h.hold = true;
+    await act(async () => safeSources.invalidate(K2));
+    await flush();
+    expect(container.querySelector('.grove-prose__loading')).toBeNull();
+    expect(container.querySelector('.body')?.textContent).toBe('old body');
+
+    await act(async () => {
+      releaseFirst?.();
+      h.release?.();
+    });
+    await flush();
+    expect(container.querySelector('.body')?.textContent).toBe('edit two');
+    act(() => root.unmount());
+  });
 });
